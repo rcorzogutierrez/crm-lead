@@ -1,4 +1,4 @@
-import { Component, DestroyRef, computed, effect, inject, input, signal, untracked } from '@angular/core';
+import { Component, DestroyRef, Injector, afterNextRender, computed, effect, inject, input, signal, untracked } from '@angular/core';
 import { FormField, email, form, required, submit } from '@angular/forms/signals';
 import { Router, RouterLink } from '@angular/router';
 import {
@@ -85,6 +85,7 @@ export class ContactDetail {
   protected readonly auth = inject(AuthService);
   private readonly toast = inject(ToastService);
   private readonly router = inject(Router);
+  private readonly injector = inject(Injector);
 
   protected readonly t = t;
   protected readonly money = moneyLabel;
@@ -169,11 +170,26 @@ export class ContactDetail {
     });
   }
 
+  /** Abre la confirmación en línea y lleva el foco a su pregunta; al cerrar, vuelve al botón. */
+  protected openConfirm(kind: 'archive' | 'delete'): void {
+    this.confirming.set(kind);
+    this.focusLater('confirm-title');
+  }
+  protected closeConfirm(): void {
+    const kind = this.confirming();
+    this.confirming.set(null);
+    if (kind) this.focusLater(kind === 'archive' ? 'manage-archive' : 'manage-delete');
+  }
+  private focusLater(id: string): void {
+    afterNextRender(() => document.getElementById(id)?.focus(), { injector: this.injector });
+  }
+
   protected async archive(c: Contact): Promise<void> {
     this.busy.set(true);
     try {
       await this.contacts.archive(c, t('contact.archivedReason'));
       this.confirming.set(null);
+      this.focusLater('archived-banner');
       this.toast.show(t('contact.archivedMsg', { name: c.name }));
     } catch (err) {
       this.toast.error(firestoreErrorMessage(err));
@@ -185,6 +201,7 @@ export class ContactDetail {
   protected async unarchive(c: Contact): Promise<void> {
     try {
       await this.contacts.unarchive(c);
+      this.focusLater('manage-archive');
       this.toast.show(t('contact.unarchived', { name: c.name }));
     } catch (err) {
       this.toast.error(firestoreErrorMessage(err));

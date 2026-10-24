@@ -87,6 +87,8 @@ export const en: Record<I18nKey, string> = {
   'contact.deleteForever': 'Delete forever',
   'contact.deleted': '{name} deleted.',
   'contact.cantDeleteCustomer': 'They already bought: archive them instead, so their sales are kept.',
+  'contact.manage': 'Archive or delete',
+  'contact.deleting': 'Deleting…',
   'contact.atStake': 'At stake:',
   'contact.boughtTitle': 'Services bought',
   'contact.data': 'Contact details',
