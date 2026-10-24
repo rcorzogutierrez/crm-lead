@@ -34,9 +34,9 @@ interface DemoRow {
             <span class="date-face text-xl font-bold tracking-tight">CRM Lead</span>
           </div>
 
-          <div class="grid items-center gap-12 2xl:grid-cols-[minmax(0,1fr)_minmax(0,26rem)]">
+          <div class="grid items-center gap-10 min-[1800px]:grid-cols-[minmax(0,1fr)_minmax(0,26rem)] min-[1800px]:gap-12">
             <div>
-              <h1 class="enter date-face max-w-[14ch] text-[3.25rem] leading-[1.02] font-bold tracking-tight text-balance xl:text-[4rem]" style="--d: 80ms">
+              <h1 class="enter date-face max-w-[16ch] text-[3rem] leading-[1.02] font-bold tracking-tight text-balance xl:text-[3.5rem] min-[1800px]:text-[4rem]" style="--d: 80ms">
                 {{ t('login.thesis') }}
               </h1>
               <p class="enter mt-5 max-w-[44ch] text-lg leading-relaxed text-white/70" style="--d: 160ms">{{ t('login.pitch') }}</p>
@@ -91,7 +91,7 @@ interface DemoRow {
                   }
                 </ul>
               </div>
-              <div class="enter float-slow glass absolute -top-5 -right-4 flex items-center gap-2 rounded-full py-1.5 pr-3.5 pl-2 text-xs font-bold [animation-delay:-3s]" style="--d: 1500ms">
+              <div class="enter float-slow glass absolute -bottom-5 -left-5 flex items-center gap-2 rounded-full py-1.5 pr-3.5 pl-2 text-xs font-bold [animation-delay:-3s]" style="--d: 1500ms">
                 <span class="grid size-6 place-items-center rounded-full bg-[oklch(0.86_0.15_92)] text-[oklch(0.3_0.05_92)]">+1</span>
                 {{ t('login.demo.captured') }}
               </div>
@@ -106,9 +106,12 @@ interface DemoRow {
       <section class="login-side relative flex items-center justify-center px-6 py-16">
         <app-lang-switch class="enter absolute top-5 right-5" style="--d: 200ms" />
         <div class="w-full max-w-[24rem]">
-          <div class="enter flex items-center gap-3 lg:hidden" style="--d: 0ms">
-            <app-logo [size]="40" />
-            <span class="date-face text-xl font-bold">CRM Lead</span>
+          <div class="enter login-hero relative isolate overflow-hidden rounded-2xl p-5 text-white shadow-lift lg:hidden" style="--d: 0ms">
+            <div class="flex items-center gap-2.5">
+              <app-logo [size]="32" />
+              <span class="date-face text-lg font-bold">CRM Lead</span>
+            </div>
+            <p class="date-face mt-5 max-w-[18ch] text-[1.75rem] leading-[1.05] font-bold tracking-tight text-balance">{{ t('login.thesis') }}</p>
           </div>
           <h2 class="enter date-face mt-10 text-[2.25rem] leading-tight font-bold tracking-tight lg:mt-0" style="--d: 120ms">{{ t('login.heading') }}</h2>
           <p class="enter mt-2 text-ink-2" style="--d: 180ms">{{ t('login.hint') }}</p>
