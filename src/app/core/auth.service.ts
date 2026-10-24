@@ -9,6 +9,7 @@ import {
   writeBatch,
 } from 'firebase/firestore';
 import { AUTH, FIRESTORE } from './firebase';
+import { I18nKey } from './i18n/i18n';
 import { Member, MemberRole } from './models';
 
 export type AuthStatus = 'loading' | 'signedOut' | 'pending' | 'member';
@@ -29,7 +30,7 @@ export class AuthService {
   private readonly _user = signal<User | null>(null);
   private readonly _member = signal<Member | null>(null);
   private readonly _status = signal<AuthStatus>('loading');
-  private readonly _error = signal<string | null>(null);
+  private readonly _error = signal<I18nKey | null>(null);
   private stopMember: (() => void) | null = null;
 
   readonly user = this._user.asReadonly();
@@ -56,7 +57,7 @@ export class AuthService {
         await this.ensureMembership(user);
       } catch (err) {
         console.error(err);
-        this._error.set('No pudimos verificar tu acceso al equipo.');
+        this._error.set('auth.err.verify');
         this.setStatus('pending');
       }
     });
@@ -87,9 +88,9 @@ export class AuthService {
       const code = (err as { code?: string }).code;
       if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') return;
       if (code === 'auth/unauthorized-domain') {
-        this._error.set('Este dominio no está autorizado en Firebase Auth. Agrégalo en la consola.');
+        this._error.set('auth.err.domain');
       } else {
-        this._error.set('No se pudo iniciar sesión con Google. Inténtalo de nuevo.');
+        this._error.set('auth.err.google');
       }
     }
   }

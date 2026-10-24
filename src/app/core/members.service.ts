@@ -1,4 +1,5 @@
 import { Service, computed, inject } from '@angular/core';
+import { t } from './i18n/i18n';
 import {
   DocumentData,
   collection,
@@ -52,8 +53,8 @@ export class MembersService {
   readonly byId = computed(() => new Map(this.members().map((m) => [m.uid, m])));
 
   name(uid: string): string {
-    if (!uid) return 'Sin asignar';
-    return this.byId().get(uid)?.displayName ?? 'Ex miembro';
+    if (!uid) return t('member.unassigned');
+    return this.byId().get(uid)?.displayName ?? t('member.former');
   }
 
   invite(email: string, role: MemberRole): Promise<void> {

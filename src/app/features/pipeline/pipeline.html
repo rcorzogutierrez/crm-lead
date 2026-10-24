@@ -2,12 +2,12 @@
   <header class="flex flex-wrap items-end justify-between gap-4 px-4 sm:px-6 lg:px-10">
     <div>
       <h1 class="date-face text-[2rem] leading-tight font-bold">Pipeline</h1>
-      <p class="mt-1 text-sm text-ink-2 max-lg:hidden">Arrastra una tarjeta para cambiarla de etapa. Con teclado: Alt + ← / →.</p>
-      <p class="mt-1 text-sm text-ink-2 lg:hidden">Desliza entre etapas. Abre un lead para cambiarlo de etapa.</p>
+      <p class="mt-1 text-sm text-ink-2 max-lg:hidden">{{ t('pipe.hintDesktop') }}</p>
+      <p class="mt-1 text-sm text-ink-2 lg:hidden">{{ t('pipe.hintMobile') }}</p>
     </div>
-    <div class="inline-flex rounded-lg border border-rule-strong bg-sheet p-0.5" role="radiogroup" aria-label="Qué mostrar">
-      <button type="button" role="radio" [attr.aria-checked]="scope() === 'mine'" (click)="scope.set('mine')" class="h-8 rounded-md px-3 text-sm font-semibold transition-colors" [class]="scope() === 'mine' ? 'bg-ink text-white' : 'text-ink-2 hover:text-ink'">Lo mío</button>
-      <button type="button" role="radio" [attr.aria-checked]="scope() === 'team'" (click)="scope.set('team')" class="h-8 rounded-md px-3 text-sm font-semibold transition-colors" [class]="scope() === 'team' ? 'bg-ink text-white' : 'text-ink-2 hover:text-ink'">Todo el equipo</button>
+    <div class="inline-flex rounded-lg border border-rule-strong bg-sheet p-0.5" role="radiogroup" [attr.aria-label]="t('today.scope')">
+      <button type="button" role="radio" [attr.aria-checked]="scope() === 'mine'" (click)="scope.set('mine')" class="h-8 rounded-md px-3 text-sm font-semibold transition-colors" [class]="scope() === 'mine' ? 'bg-ink text-white' : 'text-ink-2 hover:text-ink'">{{ t('today.mine') }}</button>
+      <button type="button" role="radio" [attr.aria-checked]="scope() === 'team'" (click)="scope.set('team')" class="h-8 rounded-md px-3 text-sm font-semibold transition-colors" [class]="scope() === 'team' ? 'bg-ink text-white' : 'text-ink-2 hover:text-ink'">{{ t('today.team') }}</button>
     </div>
   </header>
 
@@ -54,12 +54,12 @@
               <div class="mt-2.5 flex items-center justify-between gap-2">
                 <app-due-chip [date]="lead.nextFollowUpAt" [closed]="col.closed" />
                 @if (lead.value) {
-                  <span class="text-xs font-bold tabular">{{ '$' }}{{ lead.value.toLocaleString('es') }}</span>
+                  <span class="text-xs font-bold tabular">{{ money(lead.value) }}</span>
                 }
               </div>
             </li>
           } @empty {
-            <li class="rounded-lg border border-dashed border-rule-strong px-3 py-6 text-center text-xs text-ink-3">Suelta aquí</li>
+            <li class="rounded-lg border border-dashed border-rule-strong px-3 py-6 text-center text-xs text-ink-3">{{ t('pipe.dropHere') }}</li>
           }
         </ul>
       </section>

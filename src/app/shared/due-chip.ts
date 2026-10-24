@@ -1,4 +1,5 @@
 import { Component, computed, inject, input } from '@angular/core';
+import { t } from '../core/i18n/i18n';
 import { Clock } from '../core/clock.service';
 import { dueLabel, dueState, fullLabel } from '../core/dates';
 
@@ -19,7 +20,7 @@ export class DueChip {
   readonly closed = input(false);
 
   protected readonly label = computed(() =>
-    this.closed() ? '—' : this.date() ? dueLabel(this.date(), this.clock.now()) : 'Sin próxima acción',
+    this.closed() ? '—' : this.date() ? dueLabel(this.date(), this.clock.now()) : t('today.orphans'),
   );
   protected readonly title = computed(() => fullLabel(this.date()));
   protected readonly tone = computed(() => {

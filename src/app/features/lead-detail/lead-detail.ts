@@ -14,6 +14,7 @@ import { Clock } from '../../core/clock.service';
 import { agoLabel, fullLabel } from '../../core/dates';
 import { LiveQuery, firestoreErrorMessage } from '../../core/firestore-utils';
 import { FollowUpsService } from '../../core/followups.service';
+import { I18nKey, intlLocale, t } from '../../core/i18n/i18n';
 import { LeadsService } from '../../core/leads.service';
 import { MembersService } from '../../core/members.service';
 import {
@@ -33,24 +34,24 @@ import { EmptyState } from '../../shared/empty-state';
 import { FollowUpItem } from '../../shared/followup-item';
 import { ScheduleForm } from '../../shared/schedule-form';
 
-const LOG_TYPES: { id: ActivityType; label: string }[] = [
-  { id: 'note', label: 'Nota' },
-  { id: 'call', label: 'Llamada' },
-  { id: 'whatsapp', label: 'WhatsApp' },
-  { id: 'email', label: 'Email' },
-  { id: 'meeting', label: 'Reunión' },
+const LOG_TYPES: { id: ActivityType; label: I18nKey }[] = [
+  { id: 'note', label: 'act.note' },
+  { id: 'call', label: 'channel.call' },
+  { id: 'whatsapp', label: 'channel.whatsapp' },
+  { id: 'email', label: 'channel.email' },
+  { id: 'meeting', label: 'channel.meeting' },
 ];
 
-const ACTIVITY_LABEL: Record<ActivityType, string> = {
-  note: 'Nota',
-  call: 'Llamada',
-  whatsapp: 'WhatsApp',
-  email: 'Email',
-  meeting: 'Reunión',
-  task: 'Tarea',
-  stage: 'Cambio de etapa',
-  created: 'Lead registrado',
-  followup: 'Follow-up hecho',
+const ACTIVITY_LABEL: Record<ActivityType, I18nKey> = {
+  note: 'act.note',
+  call: 'channel.call',
+  whatsapp: 'channel.whatsapp',
+  email: 'channel.email',
+  meeting: 'channel.meeting',
+  task: 'channel.task',
+  stage: 'act.stage',
+  created: 'act.created',
+  followup: 'act.followup',
 };
 
 /** Ficha del lead: próxima acción, historial tipo diario y datos editables. */
@@ -85,6 +86,7 @@ export class LeadDetail {
   protected readonly members = inject(MembersService);
   private readonly toast = inject(ToastService);
 
+  protected readonly t = t;
   protected readonly stages = STAGES;
   protected readonly sources = SOURCES;
   protected readonly logTypes = LOG_TYPES;
@@ -130,9 +132,9 @@ export class LeadDetail {
     notes: '',
   });
   protected readonly f = form(this.model, (p) => {
-    required(p.name, { message: 'El nombre no puede quedar vacío.' });
-    email(p.email, { message: 'Ese email no parece válido.' });
-    min(p.value, 0, { message: 'El valor no puede ser negativo.' });
+    required(p.name, { message: 'form.nameEmpty' });
+    email(p.email, { message: 'form.emailInvalid' });
+    min(p.value, 0, { message: 'form.valueNegative' });
   });
 
   constructor() {
@@ -174,7 +176,7 @@ export class LeadDetail {
     }
     try {
       await this.leadsService.moveToStage(lead, stage);
-      if (stage === 'won') this.toast.show(`¡${lead.name} ganado!`);
+      if (stage === 'won') this.toast.show(t('detail.won', { name: lead.name }));
     } catch (err) {
       this.toast.error(firestoreErrorMessage(err));
     }
@@ -215,7 +217,7 @@ export class LeadDetail {
         const { stage: _stage, ...patch } = this.model();
         await this.leadsService.update(this.id(), patch);
         this.f().reset();
-        this.toast.show('Datos guardados.');
+        this.toast.show(t('detail.saved'));
       } catch (err) {
         this.toast.error(firestoreErrorMessage(err));
       }
@@ -246,7 +248,7 @@ export class LeadDetail {
     if (!lead) return;
     try {
       await this.leadsService.remove(lead.id);
-      this.toast.show(`${lead.name} eliminado.`);
+      this.toast.show(t('detail.deleted', { name: lead.name }));
       void this.router.navigateByUrl('/leads');
     } catch (err) {
       this.toast.error(firestoreErrorMessage(err));
@@ -259,16 +261,21 @@ export class LeadDetail {
   }
 
   protected activityLabel(a: Activity): string {
-    return ACTIVITY_LABEL[a.type] ?? 'Nota';
+    return t(ACTIVITY_LABEL[a.type] ?? 'act.note');
+  }
+  /** Los cambios de etapa se muestran en el idioma actual, no en el que se guardaron. */
+  protected activityBody(a: Activity): string {
+    if (a.type === 'stage' && a.from && a.to && a.to !== 'lost') return `${stageMeta(a.from).label} → ${stageMeta(a.to).label}`;
+    return a.body;
   }
   protected activityTime(a: Activity): string {
     return a.createdAt
-      ? new Intl.DateTimeFormat('es', { day: 'numeric', month: 'short' }).format(a.createdAt).replace('.', '')
-      : 'ahora';
+      ? new Intl.DateTimeFormat(intlLocale(), { day: 'numeric', month: 'short' }).format(a.createdAt).replace('.', '')
+      : t('ago.now');
   }
   protected activityHour(a: Activity): string {
     return a.createdAt
-      ? new Intl.DateTimeFormat('es', { hour: '2-digit', minute: '2-digit' }).format(a.createdAt)
+      ? new Intl.DateTimeFormat(intlLocale(), { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(a.createdAt)
       : '';
   }
   protected ago(d: Date | null): string {

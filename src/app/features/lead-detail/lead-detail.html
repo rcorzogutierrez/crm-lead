@@ -12,12 +12,12 @@
           @if (lead.company) {
             {{ lead.company }} ·
           }
-          {{ sourceName(lead.source) }} · registrado {{ ago(lead.createdAt) }}
+          {{ sourceName(lead.source) }} · {{ t('detail.registered', { ago: ago(lead.createdAt) }) }}
         </p>
       </div>
       <div class="flex flex-wrap gap-2">
         @if (tel()) {
-          <a class="btn-secondary" [href]="tel()"><svg lucidePhone [size]="16"></svg> Llamar</a>
+          <a class="btn-secondary" [href]="tel()"><svg lucidePhone [size]="16"></svg> {{ t('channel.call.verb') }}</a>
         }
         @if (wa()) {
           <a class="btn-secondary" [href]="wa()" target="_blank" rel="noopener"><svg lucideMessageCircle [size]="16"></svg> WhatsApp</a>
@@ -29,7 +29,7 @@
     </header>
 
     <!-- Etapas -->
-    <nav class="mt-6 overflow-x-auto" aria-label="Etapa del lead">
+    <nav class="mt-6 overflow-x-auto" [attr.aria-label]="t('detail.stageNav')">
       <ol class="flex min-w-max gap-1">
         @for (s of stages; track s.id; let i = $index) {
           <li>
@@ -56,15 +56,15 @@
     @if (askLostReason()) {
       <form class="mt-3 flex flex-wrap items-end gap-2 rounded-lg border border-rule bg-sheet p-3" (submit)="confirmLost($event)">
         <div class="min-w-60 flex-1">
-          <label class="field-label" for="lost-reason">¿Por qué se perdió?</label>
-          <input id="lost-reason" class="input" placeholder="Precio, eligió otro proveedor, sin respuesta…" [value]="lostReason()" (input)="lostReason.set($any($event.target).value)" />
+          <label class="field-label" for="lost-reason">{{ t('detail.lostWhy') }}</label>
+          <input id="lost-reason" class="input" [placeholder]="t('detail.lostPlaceholder')" [value]="lostReason()" (input)="lostReason.set($any($event.target).value)" />
         </div>
-        <button type="button" class="btn-ghost" (click)="askLostReason.set(false)">Cancelar</button>
-        <button type="submit" class="btn-primary">Marcar perdido</button>
+        <button type="button" class="btn-ghost" (click)="askLostReason.set(false)">{{ t('common.cancel') }}</button>
+        <button type="submit" class="btn-primary">{{ t('detail.markLost') }}</button>
       </form>
     }
     @if (lead.stage === 'lost' && lead.lostReason) {
-      <p class="mt-3 text-sm text-ink-2"><span class="font-semibold">Motivo:</span> {{ lead.lostReason }}</p>
+      <p class="mt-3 text-sm text-ink-2"><span class="font-semibold">{{ t('detail.reason') }}</span> {{ lead.lostReason }}</p>
     }
 
     <div class="mt-8 grid gap-8 lg:grid-cols-[minmax(0,1fr)_22rem]">
@@ -72,9 +72,9 @@
         <!-- Próxima acción -->
         <section aria-labelledby="next-title">
           <div class="flex items-baseline justify-between">
-            <h2 id="next-title" class="text-sm font-bold">Próxima acción</h2>
+            <h2 id="next-title" class="text-sm font-bold">{{ t('next.title') }}</h2>
             @if (pending().length && !addingNext()) {
-              <button type="button" class="btn-ghost btn-sm text-pen" (click)="addingNext.set(true)">+ Programar otra</button>
+              <button type="button" class="btn-ghost btn-sm text-pen" (click)="addingNext.set(true)">{{ t('detail.addAnother') }}</button>
             }
           </div>
           <div class="sheet mt-2 px-4">
@@ -86,12 +86,12 @@
             @if (!pending().length && !['won', 'lost'].includes(lead.stage)) {
               <div class="py-4">
                 <p class="mb-3 rounded-md bg-ribbon-soft px-3 py-2 text-sm font-semibold text-ribbon">
-                  Este lead no tiene próxima acción. Programa la siguiente para no perderlo.
+                  {{ t('detail.noNext') }}
                 </p>
                 <app-schedule-form [lead]="lead" [cancellable]="false" />
               </div>
             } @else if (!pending().length) {
-              <p class="py-4 text-sm text-ink-2">Lead cerrado. No necesita seguimiento.</p>
+              <p class="py-4 text-sm text-ink-2">{{ t('detail.closed') }}</p>
             }
             @if (addingNext()) {
               <div class="border-t border-rule py-4">
@@ -103,38 +103,38 @@
 
         <!-- Historial: página de diario -->
         <section aria-labelledby="log-title">
-          <h2 id="log-title" class="text-sm font-bold">Historial</h2>
+          <h2 id="log-title" class="text-sm font-bold">{{ t('detail.history') }}</h2>
           <div class="sheet mt-2 overflow-hidden">
             <form class="border-b border-rule-strong bg-paper p-4" (submit)="log($event)">
-              <div class="flex flex-wrap gap-1.5" role="radiogroup" aria-label="Tipo de registro">
-                @for (t of logTypes; track t.id) {
+              <div class="flex flex-wrap gap-1.5" role="radiogroup" [attr.aria-label]="t('detail.logType')">
+                @for (lt of logTypes; track lt.id) {
                   <button
                     type="button"
                     role="radio"
-                    [attr.aria-checked]="logType() === t.id"
-                    (click)="logType.set(t.id)"
+                    [attr.aria-checked]="logType() === lt.id"
+                    (click)="logType.set(lt.id)"
                     class="inline-flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-[0.8125rem] font-semibold transition-colors"
-                    [class]="logType() === t.id ? 'border-pen bg-pen-soft text-pen-strong' : 'border-rule-strong bg-sheet text-ink-2 hover:text-ink'"
+                    [class]="logType() === lt.id ? 'border-pen bg-pen-soft text-pen-strong' : 'border-rule-strong bg-sheet text-ink-2 hover:text-ink'"
                   >
-                    <app-channel-icon [type]="t.id" [size]="14" />
-                    {{ t.label }}
+                    <app-channel-icon [type]="lt.id" [size]="14" />
+                    {{ t(lt.label) }}
                   </button>
                 }
               </div>
-              <label for="log-body" class="sr-only">Qué pasó</label>
+              <label for="log-body" class="sr-only">{{ t('fu.whatHappened') }}</label>
               <textarea
                 id="log-body"
                 class="input mt-3"
                 rows="2"
-                placeholder="Anota lo que hablaron, acuerdos, objeciones…"
+                [placeholder]="t('detail.logPlaceholder')"
                 [value]="logBody()"
                 (input)="logBody.set($any($event.target).value)"
                 (keydown.control.enter)="log($event)"
                 (keydown.meta.enter)="log($event)"
               ></textarea>
               <div class="mt-2 flex items-center justify-between">
-                <p class="text-xs text-ink-3">Ctrl + Enter para registrar</p>
-                <button type="submit" class="btn-primary btn-sm" [disabled]="logging() || !logBody().trim()">Registrar</button>
+                <p class="text-xs text-ink-3">{{ t('detail.ctrlEnter') }}</p>
+                <button type="submit" class="btn-primary btn-sm" [disabled]="logging() || !logBody().trim()">{{ t('detail.log') }}</button>
               </div>
             </form>
 
@@ -159,12 +159,12 @@
                         <span class="font-normal text-ink-3">· {{ members.name(a.createdBy) }}</span>
                       </p>
                       @if (a.body) {
-                        <p class="mt-0.5 whitespace-pre-line text-ink">{{ a.body }}</p>
+                        <p class="mt-0.5 whitespace-pre-line text-ink">{{ activityBody(a) }}</p>
                       }
                     </div>
                   </li>
                 } @empty {
-                  <li><app-empty-state title="Sin historial todavía">Cada llamada, mensaje y nota que registres queda aquí, en orden.</app-empty-state></li>
+                  <li><app-empty-state [title]="t('detail.noHistory')">{{ t('detail.noHistoryBody') }}</app-empty-state></li>
                 }
               </ol>
             }
@@ -174,37 +174,37 @@
 
       <!-- Datos -->
       <aside aria-labelledby="data-title">
-        <h2 id="data-title" class="text-sm font-bold">Datos</h2>
+        <h2 id="data-title" class="text-sm font-bold">{{ t('detail.data') }}</h2>
         <form class="sheet mt-2 space-y-4 p-4" novalidate (submit)="saveDetails($event)">
           <div>
-            <label class="field-label" for="d-name">Nombre</label>
+            <label class="field-label" for="d-name">{{ t('field.name') }}</label>
             <input id="d-name" class="input" [formField]="f.name" />
             @if (f.name().touched() && f.name().invalid()) {
-              <p class="field-error">{{ f.name().errors()[0].message }}</p>
+              <p class="field-error">{{ t($any(f.name().errors()[0].message)) }}</p>
             }
           </div>
           <div>
-            <label class="field-label" for="d-company">Empresa</label>
+            <label class="field-label" for="d-company">{{ t('field.company') }}</label>
             <input id="d-company" class="input" [formField]="f.company" />
           </div>
           <div>
-            <label class="field-label" for="d-phone">Teléfono / WhatsApp</label>
+            <label class="field-label" for="d-phone">{{ t('field.phoneWa') }}</label>
             <input id="d-phone" class="input tabular" type="tel" [formField]="f.phone" />
           </div>
           <div>
-            <label class="field-label" for="d-email">Email</label>
+            <label class="field-label" for="d-email">{{ t('field.email') }}</label>
             <input id="d-email" class="input" type="email" [formField]="f.email" />
             @if (f.email().touched() && f.email().invalid()) {
-              <p class="field-error">{{ f.email().errors()[0].message }}</p>
+              <p class="field-error">{{ t($any(f.email().errors()[0].message)) }}</p>
             }
           </div>
           <div class="grid grid-cols-2 gap-3">
             <div>
-              <label class="field-label" for="d-value">Valor</label>
+              <label class="field-label" for="d-value">{{ t('list.value') }}</label>
               <input id="d-value" class="input tabular" type="number" step="100" [formField]="f.value" />
             </div>
             <div>
-              <label class="field-label" for="d-source">Origen</label>
+              <label class="field-label" for="d-source">{{ t('field.source') }}</label>
               <select id="d-source" class="input" [formField]="f.source">
                 @for (s of sources; track s.id) {
                   <option [value]="s.id">{{ s.label }}</option>
@@ -213,7 +213,7 @@
             </div>
           </div>
           <div>
-            <label class="field-label" for="d-assignee">Responsable</label>
+            <label class="field-label" for="d-assignee">{{ t('field.assignee') }}</label>
             <select id="d-assignee" class="input" [formField]="f.assigneeId">
               @for (m of members.active(); track m.uid) {
                 <option [value]="m.uid">{{ m.displayName }}</option>
@@ -221,20 +221,20 @@
             </select>
           </div>
           <div>
-            <label class="field-label" for="d-notes">Notas</label>
+            <label class="field-label" for="d-notes">{{ t('field.notes') }}</label>
             <textarea id="d-notes" class="input" rows="4" [formField]="f.notes"></textarea>
           </div>
           @if (f().dirty()) {
             <div class="flex justify-end gap-2 border-t border-rule pt-3">
-              <button type="button" class="btn-ghost btn-sm" (click)="discardDetails()">Descartar</button>
-              <button type="submit" class="btn-primary btn-sm" [disabled]="f().submitting()">Guardar cambios</button>
+              <button type="button" class="btn-ghost btn-sm" (click)="discardDetails()">{{ t('fu.discard') }}</button>
+              <button type="submit" class="btn-primary btn-sm" [disabled]="f().submitting()">{{ t('detail.saveChanges') }}</button>
             </div>
           }
         </form>
 
         <dl class="mt-4 space-y-1 px-1 text-xs text-ink-3">
-          <div class="flex justify-between"><dt>Último contacto</dt><dd class="tabular">{{ ago(lead.lastContactAt) }}</dd></div>
-          <div class="flex justify-between"><dt>Actualizado</dt><dd class="tabular">{{ ago(lead.updatedAt) }}</dd></div>
+          <div class="flex justify-between"><dt>{{ t('list.lastContact') }}</dt><dd class="tabular">{{ ago(lead.lastContactAt) }}</dd></div>
+          <div class="flex justify-between"><dt>{{ t('detail.updated') }}</dt><dd class="tabular">{{ ago(lead.updatedAt) }}</dd></div>
         </dl>
 
         @if (canDelete()) {
@@ -242,14 +242,14 @@
             @if (!confirmDelete()) {
               <button type="button" class="btn-ghost btn-sm text-ribbon hover:bg-ribbon-soft hover:text-ribbon" (click)="confirmDelete.set(true)">
                 <svg lucideTrash2 [size]="14"></svg>
-                Eliminar lead
+                {{ t('detail.delete') }}
               </button>
             } @else {
-              <p class="text-sm font-semibold">¿Eliminar {{ lead.name }} con todo su historial?</p>
-              <p class="mt-1 text-xs text-ink-2">No se puede deshacer. Si solo no avanzó, mejor márcalo como Perdido.</p>
+              <p class="text-sm font-semibold">{{ t('detail.deleteConfirm', { name: lead.name }) }}</p>
+              <p class="mt-1 text-xs text-ink-2">{{ t('detail.deleteHint') }}</p>
               <div class="mt-3 flex gap-2">
-                <button type="button" class="btn-ghost btn-sm" (click)="confirmDelete.set(false)">Cancelar</button>
-                <button type="button" class="btn-danger btn-sm" (click)="remove()">Eliminar para siempre</button>
+                <button type="button" class="btn-ghost btn-sm" (click)="confirmDelete.set(false)">{{ t('common.cancel') }}</button>
+                <button type="button" class="btn-danger btn-sm" (click)="remove()">{{ t('detail.deleteForever') }}</button>
               </div>
             }
           </div>
@@ -262,9 +262,9 @@
       <div class="h-64 animate-pulse rounded-page bg-sheet-2"></div>
     </div>
   } @else {
-    <app-empty-state title="Este lead no existe" class="mt-6">
-      Puede que lo hayan eliminado. Vuelve a la lista para buscarlo.
-      <div actions><a routerLink="/leads" class="btn-secondary btn-sm">Ir a Leads</a></div>
+    <app-empty-state [title]="t('detail.notFound')" class="mt-6">
+      {{ t('detail.notFoundBody') }}
+      <div actions><a routerLink="/leads" class="btn-secondary btn-sm">{{ t('detail.goLeads') }}</a></div>
     </app-empty-state>
   }
 </div>

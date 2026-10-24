@@ -11,7 +11,9 @@ import {
 import { AuthService } from '../../core/auth.service';
 import { FollowUpsService } from '../../core/followups.service';
 import { UiService } from '../../core/ui.service';
+import { I18nKey, t } from '../../core/i18n/i18n';
 import { Avatar } from '../../shared/avatar';
+import { LangSwitch } from '../../shared/lang-switch';
 import { Logo } from '../../shared/logo';
 import { CaptureDrawer } from './capture-drawer';
 
@@ -25,6 +27,7 @@ import { CaptureDrawer } from './capture-drawer';
     Avatar,
     CaptureDrawer,
     Logo,
+    LangSwitch,
     LucideCalendarDays,
     LucideColumns3,
     LucideLogOut,
@@ -51,12 +54,14 @@ export class Shell {
   );
   protected readonly hasOverdue = computed(() => this.followUps.overdue().some(this.mine));
 
-  protected readonly nav = [
-    { path: '/hoy', label: 'Hoy', icon: 'today' },
-    { path: '/leads', label: 'Leads', icon: 'leads' },
-    { path: '/pipeline', label: 'Pipeline', icon: 'pipeline' },
-    { path: '/equipo', label: 'Equipo', icon: 'team' },
-  ] as const;
+  protected readonly t = t;
+
+  protected readonly nav: readonly { path: string; label: I18nKey; icon: 'today' | 'leads' | 'pipeline' | 'team' }[] = [
+    { path: '/hoy', label: 'nav.today', icon: 'today' },
+    { path: '/leads', label: 'nav.leads', icon: 'leads' },
+    { path: '/pipeline', label: 'nav.pipeline', icon: 'pipeline' },
+    { path: '/equipo', label: 'nav.team', icon: 'team' },
+  ];
 
   protected onKey(event: KeyboardEvent): void {
     if (event.metaKey || event.ctrlKey || event.altKey || this.ui.captureOpen()) return;

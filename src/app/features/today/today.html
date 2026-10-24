@@ -3,11 +3,11 @@
     <div>
       <p class="text-sm font-semibold text-ink-3 tabular">{{ year() }}</p>
       <h1 class="date-face text-[2rem] leading-tight font-bold first-letter:uppercase sm:text-[2.5rem]">{{ dateTitle() }}</h1>
-      <p class="mt-1 text-ink-2" aria-live="polite">{{ loading() ? 'Abriendo la agenda…' : summary() }}</p>
+      <p class="mt-1 text-ink-2" aria-live="polite">{{ loading() ? t('today.loading') : summary() }}</p>
     </div>
-    <div class="inline-flex rounded-lg border border-rule-strong bg-sheet p-0.5" role="radiogroup" aria-label="Qué mostrar">
-      <button type="button" role="radio" [attr.aria-checked]="scope() === 'mine'" (click)="scope.set('mine')" class="h-8 rounded-md px-3 text-sm font-semibold transition-colors" [class]="scope() === 'mine' ? 'bg-ink text-white' : 'text-ink-2 hover:text-ink'">Lo mío</button>
-      <button type="button" role="radio" [attr.aria-checked]="scope() === 'team'" (click)="scope.set('team')" class="h-8 rounded-md px-3 text-sm font-semibold transition-colors" [class]="scope() === 'team' ? 'bg-ink text-white' : 'text-ink-2 hover:text-ink'">Todo el equipo</button>
+    <div class="inline-flex rounded-lg border border-rule-strong bg-sheet p-0.5" role="radiogroup" [attr.aria-label]="t('today.scope')">
+      <button type="button" role="radio" [attr.aria-checked]="scope() === 'mine'" (click)="scope.set('mine')" class="h-8 rounded-md px-3 text-sm font-semibold transition-colors" [class]="scope() === 'mine' ? 'bg-ink text-white' : 'text-ink-2 hover:text-ink'">{{ t('today.mine') }}</button>
+      <button type="button" role="radio" [attr.aria-checked]="scope() === 'team'" (click)="scope.set('team')" class="h-8 rounded-md px-3 text-sm font-semibold transition-colors" [class]="scope() === 'team' ? 'bg-ink text-white' : 'text-ink-2 hover:text-ink'">{{ t('today.team') }}</button>
     </div>
   </header>
 
@@ -22,7 +22,7 @@
         <section class="sheet overflow-hidden" aria-labelledby="overdue-title">
           <header class="flex items-center gap-2 border-b border-rule bg-ribbon-soft px-4 py-2.5">
             <span class="size-2 rounded-full bg-ribbon" aria-hidden="true"></span>
-            <h2 id="overdue-title" class="text-sm font-bold text-ribbon">Arrastrado de días anteriores</h2>
+            <h2 id="overdue-title" class="text-sm font-bold text-ribbon">{{ t('today.overdue') }}</h2>
             <span class="ml-auto text-sm font-semibold text-ribbon tabular">{{ overdue().length }}</span>
           </header>
           <ul class="divide-y divide-rule px-4">
@@ -36,7 +36,7 @@
       <!-- Página de hoy -->
       <section class="sheet relative overflow-hidden" aria-labelledby="today-title">
         <header class="flex items-center justify-between border-b border-rule-strong px-4 py-2.5">
-          <h2 id="today-title" class="text-sm font-bold">Hoy</h2>
+          <h2 id="today-title" class="text-sm font-bold">{{ t('due.today') }}</h2>
           <button type="button" class="btn-ghost btn-sm text-pen hover:text-pen-strong" (click)="ui.openCapture()">+ Lead</button>
         </header>
 
@@ -47,7 +47,7 @@
             }
           </div>
         } @else {
-          <ol class="agenda-page relative" aria-label="Horas de hoy">
+          <ol class="agenda-page relative" [attr.aria-label]="t('today.hours')">
             @for (row of hours(); track row.hour) {
               <li class="agenda-row relative flex min-h-13 border-b border-rule last:border-b-0">
                 <span
@@ -71,17 +71,17 @@
           </ol>
           @if (!today().length) {
             <p class="border-t border-rule px-4 py-3 text-sm text-ink-2">
-              Página libre. Aprovecha para darle próxima acción a los leads de la derecha.
+              {{ t('today.free') }}
             </p>
           }
         }
       </section>
     </div>
 
-    <aside class="space-y-6" aria-label="Lo que viene">
+    <aside class="space-y-6" [attr.aria-label]="t('today.upcoming')">
       <section aria-labelledby="orphans-title">
         <div class="flex items-baseline justify-between">
-          <h2 id="orphans-title" class="text-sm font-bold">Sin próxima acción</h2>
+          <h2 id="orphans-title" class="text-sm font-bold">{{ t('today.orphans') }}</h2>
           <span class="text-sm font-semibold tabular" [class]="orphans().length ? 'text-ribbon' : 'text-ink-3'">{{ orphans().length }}</span>
         </div>
         <div class="sheet mt-2 overflow-hidden">
@@ -98,7 +98,7 @@
                       </p>
                     </div>
                     @if (schedulingFor() !== lead.id) {
-                      <button type="button" class="btn-secondary btn-sm shrink-0" (click)="schedulingFor.set(lead.id)">Programar</button>
+                      <button type="button" class="btn-secondary btn-sm shrink-0" (click)="schedulingFor.set(lead.id)">{{ t('common.schedule') }}</button>
                     }
                   </div>
                   @if (schedulingFor() === lead.id) {
@@ -110,16 +110,16 @@
               }
             </ul>
             @if (orphans().length > 8) {
-              <a routerLink="/leads" [queryParams]="{ filtro: 'sin-accion' }" class="block border-t border-rule px-4 py-2.5 text-sm font-semibold text-pen hover:bg-sheet-2">Ver los {{ orphans().length }}</a>
+              <a routerLink="/leads" [queryParams]="{ filtro: 'sin-accion' }" class="block border-t border-rule px-4 py-2.5 text-sm font-semibold text-pen hover:bg-sheet-2">{{ t('today.seeAll', { n: orphans().length }) }}</a>
             }
           } @else {
-            <app-empty-state title="Todos tienen próxima acción">Cada lead activo tiene algo agendado. Así se cierra.</app-empty-state>
+            <app-empty-state [title]="t('today.allSet')">{{ t('today.allSetBody') }}</app-empty-state>
           }
         </div>
       </section>
 
       <section aria-labelledby="next-title">
-        <h2 id="next-title" class="text-sm font-bold">Próximos 7 días</h2>
+        <h2 id="next-title" class="text-sm font-bold">{{ t('today.next7') }}</h2>
         <div class="sheet mt-2 overflow-hidden">
           @if (nextDays().length) {
             @for (day of nextDays(); track day.date.getTime()) {
@@ -136,24 +136,24 @@
               </div>
             }
           } @else {
-            <app-empty-state title="Semana despejada">Lo que programes aparecerá aquí, día por día.</app-empty-state>
+            <app-empty-state [title]="t('today.clearWeek')">{{ t('today.clearWeekBody') }}</app-empty-state>
           }
         </div>
       </section>
 
       <section aria-labelledby="pulse-title" class="border-t border-rule-strong pt-4">
-        <h2 id="pulse-title" class="sr-only">Pulso</h2>
+        <h2 id="pulse-title" class="sr-only">{{ t('today.pulse') }}</h2>
         <dl class="grid grid-cols-3 gap-3 text-sm">
           <div>
-            <dt class="text-xs text-ink-3">Activos</dt>
+            <dt class="text-xs text-ink-3">{{ t('today.active') }}</dt>
             <dd class="text-lg font-bold tabular">{{ openCount() }}</dd>
           </div>
           <div>
-            <dt class="text-xs text-ink-3">Nuevos 7 d</dt>
+            <dt class="text-xs text-ink-3">{{ t('today.new7') }}</dt>
             <dd class="text-lg font-bold tabular">{{ newThisWeek() }}</dd>
           </div>
           <div>
-            <dt class="text-xs text-ink-3">En juego</dt>
+            <dt class="text-xs text-ink-3">{{ t('today.atStake') }}</dt>
             <dd class="text-lg font-bold tabular">{{ pipelineValue() }}</dd>
           </div>
         </dl>

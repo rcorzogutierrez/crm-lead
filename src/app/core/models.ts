@@ -1,3 +1,5 @@
+import { t } from './i18n/i18n';
+
 /** Etapas del pipeline, en orden. `won` y `lost` son etapas cerradas. */
 export type Stage = 'new' | 'contacted' | 'qualified' | 'proposal' | 'negotiation' | 'won' | 'lost';
 
@@ -85,7 +87,8 @@ export interface Activity {
 
 export interface StageMeta {
   id: Stage;
-  label: string;
+  /** Nombre traducido (getter: sigue al idioma actual). */
+  readonly label: string;
   /** Clase de color del punto/borde de la etapa. */
   dot: string;
   /** Clases del badge de la etapa. */
@@ -94,13 +97,13 @@ export interface StageMeta {
 }
 
 export const STAGES: readonly StageMeta[] = [
-  { id: 'new', label: 'Nuevo', dot: 'bg-stage-new', badge: 'bg-stage-new/15 text-stage-new-ink', closed: false },
-  { id: 'contacted', label: 'Contactado', dot: 'bg-stage-contacted', badge: 'bg-stage-contacted/15 text-stage-contacted-ink', closed: false },
-  { id: 'qualified', label: 'Calificado', dot: 'bg-stage-qualified', badge: 'bg-stage-qualified/15 text-stage-qualified-ink', closed: false },
-  { id: 'proposal', label: 'Propuesta', dot: 'bg-stage-proposal', badge: 'bg-stage-proposal/18 text-stage-proposal-ink', closed: false },
-  { id: 'negotiation', label: 'Negociación', dot: 'bg-stage-negotiation', badge: 'bg-stage-negotiation/20 text-stage-negotiation-ink', closed: false },
-  { id: 'won', label: 'Ganado', dot: 'bg-stage-won', badge: 'bg-stage-won text-white', closed: true },
-  { id: 'lost', label: 'Perdido', dot: 'bg-stage-lost', badge: 'bg-stage-lost/15 text-ink-2', closed: true },
+  { id: 'new', get label() { return t('stage.new'); }, dot: 'bg-stage-new', badge: 'bg-stage-new/15 text-stage-new-ink', closed: false },
+  { id: 'contacted', get label() { return t('stage.contacted'); }, dot: 'bg-stage-contacted', badge: 'bg-stage-contacted/15 text-stage-contacted-ink', closed: false },
+  { id: 'qualified', get label() { return t('stage.qualified'); }, dot: 'bg-stage-qualified', badge: 'bg-stage-qualified/15 text-stage-qualified-ink', closed: false },
+  { id: 'proposal', get label() { return t('stage.proposal'); }, dot: 'bg-stage-proposal', badge: 'bg-stage-proposal/18 text-stage-proposal-ink', closed: false },
+  { id: 'negotiation', get label() { return t('stage.negotiation'); }, dot: 'bg-stage-negotiation', badge: 'bg-stage-negotiation/20 text-stage-negotiation-ink', closed: false },
+  { id: 'won', get label() { return t('stage.won'); }, dot: 'bg-stage-won', badge: 'bg-stage-won text-white', closed: true },
+  { id: 'lost', get label() { return t('stage.lost'); }, dot: 'bg-stage-lost', badge: 'bg-stage-lost/15 text-ink-2', closed: true },
 ];
 
 export const OPEN_STAGES = STAGES.filter((s) => !s.closed);
@@ -109,31 +112,31 @@ export function stageMeta(stage: Stage): StageMeta {
   return STAGES.find((s) => s.id === stage) ?? STAGES[0];
 }
 
-export const SOURCES: readonly { id: LeadSource; label: string }[] = [
-  { id: 'web', label: 'Formulario web' },
-  { id: 'whatsapp', label: 'WhatsApp' },
-  { id: 'phone', label: 'Llamada' },
-  { id: 'referral', label: 'Referido' },
-  { id: 'social', label: 'Redes sociales' },
-  { id: 'event', label: 'Evento' },
-  { id: 'email', label: 'Email' },
-  { id: 'other', label: 'Otro' },
+export const SOURCES: readonly { id: LeadSource; readonly label: string }[] = [
+  { id: 'web', get label() { return t('source.web'); } },
+  { id: 'whatsapp', get label() { return t('source.whatsapp'); } },
+  { id: 'phone', get label() { return t('source.phone'); } },
+  { id: 'referral', get label() { return t('source.referral'); } },
+  { id: 'social', get label() { return t('source.social'); } },
+  { id: 'event', get label() { return t('source.event'); } },
+  { id: 'email', get label() { return t('source.email'); } },
+  { id: 'other', get label() { return t('source.other'); } },
 ];
 
 export function sourceLabel(source: LeadSource): string {
-  return SOURCES.find((s) => s.id === source)?.label ?? 'Otro';
+  return SOURCES.find((s) => s.id === source)?.label ?? t('source.other');
 }
 
-export const CHANNELS: readonly { id: ContactChannel; label: string; verb: string }[] = [
-  { id: 'call', label: 'Llamada', verb: 'Llamar' },
-  { id: 'whatsapp', label: 'WhatsApp', verb: 'Escribir por WhatsApp' },
-  { id: 'email', label: 'Email', verb: 'Enviar email' },
-  { id: 'meeting', label: 'Reunión', verb: 'Reunirse' },
-  { id: 'task', label: 'Tarea', verb: 'Hacer' },
+export const CHANNELS: readonly { id: ContactChannel; readonly label: string; readonly verb: string }[] = [
+  { id: 'call', get label() { return t('channel.call'); }, get verb() { return t('channel.call.verb'); } },
+  { id: 'whatsapp', get label() { return t('channel.whatsapp'); }, get verb() { return t('channel.whatsapp.verb'); } },
+  { id: 'email', get label() { return t('channel.email'); }, get verb() { return t('channel.email.verb'); } },
+  { id: 'meeting', get label() { return t('channel.meeting'); }, get verb() { return t('channel.meeting.verb'); } },
+  { id: 'task', get label() { return t('channel.task'); }, get verb() { return t('channel.task.verb'); } },
 ];
 
 export function channelLabel(channel: ContactChannel): string {
-  return CHANNELS.find((c) => c.id === channel)?.label ?? 'Tarea';
+  return CHANNELS.find((c) => c.id === channel)?.label ?? t('channel.task');
 }
 
 export function isClosed(stage: Stage): boolean {

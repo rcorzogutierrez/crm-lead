@@ -1,4 +1,5 @@
 import { Component, computed, inject, input, signal } from '@angular/core';
+import { t } from '../core/i18n/i18n';
 import { RouterLink } from '@angular/router';
 import {
   LucideCalendarClock,
@@ -46,6 +47,7 @@ export class FollowUpItem {
   readonly showLead = input(true);
   readonly showAssignee = input(false);
 
+  protected readonly t = t;
   protected readonly mode = signal<Mode>('idle');
   protected readonly busy = signal(false);
   protected readonly outcome = signal('');
@@ -87,7 +89,7 @@ export class FollowUpItem {
           : null,
       });
       this.toast.show(
-        this.scheduleNext() ? `Hecho. Siguiente con ${this.fu().leadName} programado.` : 'Hecho.',
+        this.scheduleNext() ? t('fu.doneNext', { name: this.fu().leadName }) : t('fu.done'),
       );
       this.mode.set('idle');
     } catch (err) {
@@ -103,8 +105,8 @@ export class FollowUpItem {
       const fu = this.fu();
       const original = fu.dueAt;
       await this.followUps.reschedule(fu, presetDate(preset, this.clock.now()));
-      this.toast.show('Reprogramado.', {
-        action: { label: 'Deshacer', run: () => void this.followUps.reschedule(fu, original) },
+      this.toast.show(t('fu.rescheduled'), {
+        action: { label: t('common.undo'), run: () => void this.followUps.reschedule(fu, original) },
       });
       this.mode.set('idle');
     } catch (err) {
@@ -117,7 +119,7 @@ export class FollowUpItem {
   protected async cancel(): Promise<void> {
     try {
       await this.followUps.cancel(this.fu());
-      this.toast.show('Follow-up descartado.');
+      this.toast.show(t('fu.discarded'));
     } catch (err) {
       this.toast.error(firestoreErrorMessage(err));
     }
