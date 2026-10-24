@@ -90,6 +90,7 @@ Reglas de dominio:
 - El **primer** usuario que entra crea `meta/team` y queda como admin. Los demás necesitan `invites/{email}` creado por un admin desde *Equipo*; si no, ven "Acceso pendiente".
 - Solo miembros `active` leen/escriben. Contactos y catálogo: todo el equipo.
 - **Leads, su historial y sus follow-ups: un vendedor (`member`) solo ve y toca los suyos** (`assigneeId`); el admin ve todo. Las consultas de un vendedor deben filtrar `where('assigneeId', '==', uid)` o las reglas las rechazan (`LeadsService`, `FollowUpsService`).
+- Roles (`admin` / `member` = vendedor): solo un admin cambia el rol o el acceso de **otro** miembro, con confirmación en línea en *Equipo*, y el de una invitación pendiente. Nadie cambia su propio rol ni acceso: así el equipo nunca se queda sin admin activo.
 - Solo un admin reasigna (`LeadsService.reassign`, que arrastra los follow-ups pendientes) o cambia el responsable de un contacto. Un vendedor crea leads siempre a su nombre.
 - Borrar un lead: admin, o su creador si sigue siendo el responsable.
 - Cambios en reglas: probarlos contra el emulador antes de `deploy:rules`.

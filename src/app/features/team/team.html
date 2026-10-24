@@ -4,6 +4,10 @@
 
   <section class="mt-8" aria-labelledby="members-title">
     <h2 id="members-title" class="text-sm font-bold">{{ t('team.members') }}</h2>
+    <dl class="mt-1 space-y-0.5 text-xs text-ink-3">
+      <div><dt class="me-1 inline font-semibold text-ink-2">{{ t('role.admin') }}:</dt> <dd class="inline">{{ t('team.roleHelpAdmin') }}</dd></div>
+      <div><dt class="me-1 inline font-semibold text-ink-2">{{ t('role.member') }}:</dt> <dd class="inline">{{ t('team.roleHelpMember') }}</dd></div>
+    </dl>
     <ul class="sheet mt-2 divide-y divide-rule">
       @for (m of members.members(); track m.uid) {
         <li class="flex flex-wrap items-center gap-3 px-4 py-3" [class.opacity-60]="!m.active">
@@ -23,7 +27,7 @@
             </p>
           </div>
           @if (auth.isAdmin() && m.uid !== auth.uid()) {
-            <select class="input h-8 w-auto text-[0.8125rem]" [attr.aria-label]="t('team.roleOf', { name: m.displayName })" [value]="m.role" (change)="setRole(m, $any($event.target).value)">
+            <select class="input h-8 w-auto text-[0.8125rem]" [attr.aria-label]="t('team.roleOf', { name: m.displayName })" [value]="shownRole(m)" (change)="pickRole(m, $any($event.target).value)">
               <option value="member">{{ t('role.member') }}</option>
               <option value="admin">{{ t('role.admin') }}</option>
             </select>
@@ -36,7 +40,19 @@
               <button type="button" class="btn-secondary btn-sm" (click)="toggleActive(m)">{{ t('team.restore') }}</button>
             }
           } @else {
-            <span class="rounded-md bg-sheet-2 px-2 py-1 text-xs font-semibold text-ink-2">{{ m.role === 'admin' ? t('role.admin') : t('role.member') }}</span>
+            @if (auth.isAdmin()) {
+              <span class="hidden text-xs text-ink-3 sm:inline">{{ t('team.ownRole') }}</span>
+            }
+            <span class="rounded-md bg-sheet-2 px-2 py-1 text-xs font-semibold text-ink-2">{{ roleLabel(m.role) }}</span>
+          }
+          @if (pendingRole(); as pending) {
+            @if (pending.uid === m.uid) {
+              <div class="flex w-full flex-wrap items-center gap-2 rounded-md bg-sheet-2 px-3 py-2" role="group" [attr.aria-label]="t('team.roleOf', { name: m.displayName })">
+                <p class="min-w-0 basis-full text-sm sm:flex-1 sm:basis-0">{{ t(pending.role === 'admin' ? 'team.confirmAdmin' : 'team.confirmMember', { name: m.displayName }) }}</p>
+                <button type="button" class="btn-ghost btn-sm ms-auto sm:ms-0" (click)="pendingRole.set(null)">{{ t('common.cancel') }}</button>
+                <button type="button" class="btn-primary btn-sm" (click)="confirmRole(m)">{{ t('team.confirmRole') }}</button>
+              </div>
+            }
           }
         </li>
       }
@@ -71,7 +87,10 @@
           @for (inv of members.invites(); track inv.email) {
             <li class="flex items-center gap-3 px-4 py-2.5 text-sm">
               <span class="min-w-0 flex-1 truncate">{{ inv.email }}</span>
-              <span class="text-xs text-ink-3">{{ inv.role === 'admin' ? t('role.admin') : t('role.member') }}</span>
+              <select class="input h-8 w-auto text-[0.8125rem]" [attr.aria-label]="t('team.inviteRoleOf', { email: inv.email })" [value]="inv.role" (change)="setInviteRole(inv, $any($event.target).value)">
+                <option value="member">{{ t('role.member') }}</option>
+                <option value="admin">{{ t('role.admin') }}</option>
+              </select>
               <button type="button" class="btn-ghost btn-sm" (click)="revoke(inv.email)">{{ t('team.withdraw') }}</button>
             </li>
           }

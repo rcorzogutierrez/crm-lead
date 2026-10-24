@@ -5,7 +5,7 @@ import { firestoreErrorMessage } from '../../core/firestore-utils';
 import { t } from '../../core/i18n/i18n';
 import { LeadsService } from '../../core/leads.service';
 import { MembersService } from '../../core/members.service';
-import { Member, MemberRole } from '../../core/models';
+import { Invite, Member, MemberRole } from '../../core/models';
 import { ToastService } from '../../core/toast.service';
 import { Avatar } from '../../shared/avatar';
 
@@ -35,6 +35,22 @@ export class Team {
   });
 
   protected readonly confirmUid = signal<string | null>(null);
+  /** Cambio de rol elegido en el selector, a la espera de confirmación en línea. */
+  protected readonly pendingRole = signal<{ uid: string; role: MemberRole } | null>(null);
+
+  protected roleLabel(role: MemberRole): string {
+    return role === 'admin' ? t('role.admin') : t('role.member');
+  }
+
+  /** Valor que muestra el selector: el elegido mientras se confirma, si no el guardado. */
+  protected shownRole(m: Member): MemberRole {
+    const pending = this.pendingRole();
+    return pending?.uid === m.uid ? pending.role : m.role;
+  }
+
+  protected pickRole(m: Member, role: MemberRole): void {
+    this.pendingRole.set(role === m.role ? null : { uid: m.uid, role });
+  }
 
   protected async invite(event: Event): Promise<void> {
     event.preventDefault();
@@ -56,9 +72,23 @@ export class Team {
     });
   }
 
-  protected async setRole(m: Member, role: MemberRole): Promise<void> {
+  protected async confirmRole(m: Member): Promise<void> {
+    const pending = this.pendingRole();
+    if (pending?.uid !== m.uid) return;
     try {
-      await this.members.setRole(m.uid, role);
+      await this.members.setRole(m.uid, pending.role);
+      this.toast.show(t('team.roleChanged', { name: m.displayName, role: this.roleLabel(pending.role) }));
+    } catch (err) {
+      this.toast.error(firestoreErrorMessage(err));
+    } finally {
+      this.pendingRole.set(null);
+    }
+  }
+
+  protected async setInviteRole(inv: Invite, role: MemberRole): Promise<void> {
+    try {
+      await this.members.setInviteRole(inv.email, role);
+      this.toast.show(t('team.inviteRoleChanged', { email: inv.email, role: this.roleLabel(role) }));
     } catch (err) {
       this.toast.error(firestoreErrorMessage(err));
     }
