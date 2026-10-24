@@ -1,6 +1,6 @@
 # Compila, prueba y publica en Firebase (Hosting + reglas e índices de Firestore).
-# - push a main: build + tests + deploy (lo mismo que `npm run deploy`).
-# - pull request: solo build + tests, para ver si el cambio rompe algo antes de fusionarlo.
+# - push a main: lint + tests + pruebas de reglas + build, y luego deploy (como `npm run deploy`).
+# - pull request: lo mismo sin deploy, para ver si el cambio rompe algo antes de fusionarlo.
 # - Actions → "Deploy" → Run workflow: vuelve a publicar main a mano.
 # Necesita el secreto FIREBASE_SERVICE_ACCOUNT (JSON de una cuenta de servicio del proyecto).
 name: Deploy
@@ -33,6 +33,7 @@ jobs:
           cache: npm
 
       - run: npm ci
+      - run: npm run lint
       - run: npx ng test --watch=false
       - run: npm run build
 
@@ -43,8 +44,34 @@ jobs:
           path: dist/crm-lead/browser
           retention-days: 7
 
+  # firestore.rules contra el emulador de Firestore (necesita Java).
+  rules:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+
+      # El .jar del emulador se descarga una vez y se reutiliza.
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/firebase/emulators
+          key: firebase-emulators-${{ runner.os }}-v1
+
+      - run: npm ci
+      - run: npm run test:rules
+
   deploy:
-    needs: build
+    needs: [build, rules]
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 15

@@ -10,7 +10,9 @@
     "start:emulator": "ng serve -c emulator",
     "emulators": "npx -y firebase-tools@latest emulators:start --only auth,firestore --project demo-crm-lead",
     "deploy:rules": "npx -y firebase-tools@latest deploy --only firestore",
-    "deploy": "ng build && npx -y firebase-tools@latest deploy"
+    "deploy": "ng build && npx -y firebase-tools@latest deploy",
+    "lint": "ng lint",
+    "test:rules": "npx -y firebase-tools@latest emulators:exec --only firestore --project demo-crm-lead \"vitest run --config tests/rules/vitest.config.mts\""
   },
   "private": true,
   "packageManager": "npm@10.9.4",
@@ -31,12 +33,17 @@
     "@angular/build": "^22.2.4",
     "@angular/cli": "^22.2.4",
     "@angular/compiler-cli": "^22.2.0",
+    "@eslint/js": "^10.0.1",
+    "@firebase/rules-unit-testing": "^6.0.0",
     "@tailwindcss/postcss": "^4.1.12",
+    "angular-eslint": "22.6.0",
+    "eslint": "^10.12.0",
     "jsdom": "^30.0.0",
     "postcss": "^8.5.3",
     "prettier": "^3.8.1",
     "tailwindcss": "^4.1.12",
     "typescript": "~6.0.2",
+    "typescript-eslint": "8.71.0",
     "vitest": "^5.0.0"
   }
 }

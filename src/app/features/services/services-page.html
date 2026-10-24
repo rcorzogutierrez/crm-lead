@@ -32,6 +32,8 @@
     <form class="grid gap-3 p-4 md:grid-cols-[minmax(0,2fr)_minmax(0,3fr)_9rem_8rem]" novalidate (submit)="save($event)" [attr.aria-label]="editing() ? t('svc.edit') : t('svc.new')">
       <div>
         <label class="field-label" for="s-name">{{ t('field.name') }}</label>
+        <!-- El editor se abre en línea al pulsar "Nuevo"/"Editar": el foco va al primer campo a propósito. -->
+        <!-- eslint-disable-next-line @angular-eslint/template/no-autofocus -->
         <input id="s-name" class="input" autocomplete="off" autofocus [formField]="f.name" />
         @if (f.name().touched() && f.name().invalid()) {
           <p class="field-error">{{ t($any(f.name().errors()[0].message)) }}</p>

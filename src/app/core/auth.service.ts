@@ -109,7 +109,7 @@ export class AuthService {
 
   private async ensureMembership(user: User): Promise<void> {
     const memberRef = doc(this.db, 'members', user.uid);
-    let snap = await getDoc(memberRef);
+    const snap = await getDoc(memberRef);
 
     if (!snap.exists()) {
       const email = (user.email ?? '').toLowerCase();
@@ -142,7 +142,6 @@ export class AuthService {
         await batch.commit();
         await deleteDoc(inviteRef).catch(() => undefined);
       }
-      snap = await getDoc(memberRef);
     }
 
     this.watchMember(user.uid);
