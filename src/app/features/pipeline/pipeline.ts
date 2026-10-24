@@ -1,6 +1,8 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { AuthService } from '../../core/auth.service';
+import { ContactsService } from '../../core/contacts.service';
+import { FollowUpsService } from '../../core/followups.service';
 import { moneyLabel } from '../../core/dates';
 import { firestoreErrorMessage } from '../../core/firestore-utils';
 import { t } from '../../core/i18n/i18n';
@@ -24,18 +26,23 @@ export class Pipeline {
   protected readonly leadsService = inject(LeadsService);
   protected readonly members = inject(MembersService);
   private readonly auth = inject(AuthService);
+  private readonly contacts = inject(ContactsService);
+  private readonly followUps = inject(FollowUpsService);
   private readonly toast = inject(ToastService);
 
   protected readonly t = t;
   protected readonly money = moneyLabel;
   protected readonly scope = signal<'mine' | 'team'>('team');
+  /** Todos, solo clientes nuevos (prospectos) o solo recompras de clientes. */
+  protected readonly kind = signal<'all' | 'new' | 'repeat'>('all');
   protected readonly dragging = signal<string | null>(null);
   protected readonly over = signal<Stage | null>(null);
 
   protected readonly columns = computed(() => {
     const leads = this.leadsService
       .leads()
-      .filter((l) => this.scope() === 'team' || l.assigneeId === this.auth.uid());
+      .filter((l) => this.scope() === 'team' || l.assigneeId === this.auth.uid())
+      .filter((l) => this.kind() === 'all' || (this.kind() === 'repeat') === this.isRepeat(l));
     return STAGES.map((s) => {
       const items = leads
         .filter((l) => l.stage === s.id)
@@ -47,6 +54,15 @@ export class Pipeline {
       };
     });
   });
+
+  /** Recompra: el contacto ya había ganado otro lead. */
+  protected isRepeat(lead: Lead): boolean {
+    return this.contacts.summary(lead.contactId).won.some((w) => w.id !== lead.id);
+  }
+
+  protected title(lead: Lead): string {
+    return lead.serviceName || lead.name;
+  }
 
   protected onDragStart(event: DragEvent, lead: Lead): void {
     event.dataTransfer?.setData('text/plain', lead.id);
@@ -90,9 +106,15 @@ export class Pipeline {
     const from = lead.stage;
     try {
       await this.leadsService.moveToStage(lead, stage);
-      this.toast.show(`${lead.name} → ${stageMeta(stage).label}`, {
-        action: { label: t('common.undo'), run: () => void this.leadsService.moveToStage({ ...lead, stage }, from) },
-      });
+      if (stage === 'won') {
+        this.toast.show(t('detail.won', { name: this.title(lead) }), {
+          action: { label: t('postsale.short'), run: () => void this.followUps.schedulePostSale(lead) },
+        });
+      } else {
+        this.toast.show(`${this.title(lead)} → ${stageMeta(stage).label}`, {
+          action: { label: t('common.undo'), run: () => void this.leadsService.moveToStage({ ...lead, stage }, from) },
+        });
+      }
     } catch (err) {
       this.toast.error(firestoreErrorMessage(err));
     }

@@ -1,7 +1,6 @@
 import { Service, computed, inject } from '@angular/core';
 import {
   DocumentData,
-  addDoc,
   collection,
   deleteDoc,
   doc,
@@ -16,7 +15,7 @@ import {
 import { AuthService } from './auth.service';
 import { FIRESTORE } from './firebase';
 import { toDate } from './firestore-utils';
-import { Lead, LeadDraft, Stage, isClosed, stageMeta } from './models';
+import { ContactDraft, Lead, LeadDraft, LeadPricing, LeadSource, PriceTier, Stage, isClosed, stageMeta } from './models';
 import { teamQuery } from './team-query';
 
 function mapLead(id: string, d: DocumentData): Lead {
@@ -37,8 +36,34 @@ function mapLead(id: string, d: DocumentData): Lead {
     createdBy: d['createdBy'] ?? '',
     createdAt: toDate(d['createdAt']),
     updatedAt: toDate(d['updatedAt']),
+    contactId: d['contactId'] ?? null,
+    serviceId: d['serviceId'] ?? null,
+    serviceName: d['serviceName'] ?? '',
+    detail: d['detail'] ?? '',
+    quantity: Number(d['quantity'] ?? 1),
+    unitPrice: Number(d['unitPrice'] ?? 0),
+    tier: (d['tier'] as PriceTier) ?? 'bronze',
+    tierPct: Number(d['tierPct'] ?? 0),
+    priceAck: typeof d['priceAck'] === 'number' ? d['priceAck'] : null,
+    wonAt: toDate(d['wonAt']),
   };
 }
+
+export interface NewLead {
+  /** Contacto existente; si es null se crea uno con `contact`. */
+  contactId: string | null;
+  contact: ContactDraft;
+  source: LeadSource;
+  stage: Stage;
+  assigneeId: string;
+  notes: string;
+  detail: string;
+  /** null = sin servicio del catálogo (valor 0). */
+  pricing: LeadPricing | null;
+}
+
+/** Cambio de precio de un lead abierto; `note` queda en el historial. */
+export type PricingPatch = Omit<LeadPricing, 'serviceName'> & { serviceName: string; note: string };
 
 /** Leads del equipo, en vivo. Un equipo pequeño cabe completo en memoria. */
 @Service()
@@ -59,25 +84,89 @@ export class LeadsService {
   /** Leads activos sin ningún follow-up programado: el error que este CRM no perdona. */
   readonly withoutNextStep = computed(() => this.open().filter((l) => !l.nextFollowUpAt));
 
-  async create(draft: LeadDraft): Promise<string> {
+  /**
+   * Crea el lead (y el contacto si es nuevo) en un solo batch, con su actividad de alta.
+   * Devuelve el id del lead.
+   */
+  async create(input: NewLead): Promise<{ leadId: string; contactId: string }> {
     const uid = this.auth.uid();
-    const ref = await addDoc(collection(this.db, 'leads'), {
-      ...clean(draft),
-      assigneeId: draft.assigneeId || uid,
+    const assigneeId = input.assigneeId || uid;
+    const c = clean(input.contact);
+    const batch = writeBatch(this.db);
+
+    let contactId = input.contactId;
+    if (!contactId) {
+      const ref = doc(collection(this.db, 'contacts'));
+      contactId = ref.id;
+      batch.set(ref, {
+        name: c.name,
+        company: c.company,
+        email: c.email.toLowerCase(),
+        phone: c.phone,
+        assigneeId: c.assigneeId || assigneeId,
+        notes: c.notes,
+        createdBy: uid,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+    }
+
+    const p = input.pricing;
+    const leadRef = doc(collection(this.db, 'leads'));
+    batch.set(leadRef, {
+      name: c.name,
+      company: c.company,
+      email: c.email.toLowerCase(),
+      phone: c.phone,
+      source: input.source,
+      stage: input.stage,
+      assigneeId,
+      notes: input.notes.trim(),
+      detail: input.detail.trim(),
+      contactId,
+      serviceId: p?.serviceId ?? null,
+      serviceName: p?.serviceName ?? '',
+      quantity: p?.quantity ?? 1,
+      unitPrice: p?.unitPrice ?? 0,
+      tier: p?.tier ?? 'bronze',
+      tierPct: p?.tierPct ?? 0,
+      value: p?.value ?? 0,
+      priceAck: null,
       lostReason: '',
       nextFollowUpAt: null,
       lastContactAt: null,
+      wonAt: input.stage === 'won' ? serverTimestamp() : null,
       createdBy: uid,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     });
-    await addDoc(collection(this.db, 'leads', ref.id, 'activities'), {
+    batch.set(doc(collection(this.db, 'leads', leadRef.id, 'activities')), {
       type: 'created',
-      body: '',
+      body: p?.serviceName ?? '',
       createdBy: uid,
       createdAt: serverTimestamp(),
     });
-    return ref.id;
+    await batch.commit();
+    return { leadId: leadRef.id, contactId };
+  }
+
+  /** Cambia servicio, cantidad o categoría de un lead abierto y lo anota en el historial. */
+  async updatePricing(lead: Lead, patch: PricingPatch): Promise<void> {
+    const { note, ...pricing } = patch;
+    const batch = writeBatch(this.db);
+    batch.update(doc(this.db, 'leads', lead.id), { ...pricing, priceAck: null, updatedAt: serverTimestamp() });
+    batch.set(doc(collection(this.db, 'leads', lead.id, 'activities')), {
+      type: 'pricing',
+      body: note,
+      createdBy: this.auth.uid(),
+      createdAt: serverTimestamp(),
+    });
+    await batch.commit();
+  }
+
+  /** Mantiene el precio pactado aunque el oficial haya cambiado (no vuelve a avisar por ese precio). */
+  keepPrice(lead: Lead, officialPrice: number): Promise<void> {
+    return updateDoc(doc(this.db, 'leads', lead.id), { priceAck: officialPrice, updatedAt: serverTimestamp() });
   }
 
   update(id: string, patch: Partial<LeadDraft> & { lostReason?: string }): Promise<void> {
@@ -91,6 +180,7 @@ export class LeadsService {
     batch.update(doc(this.db, 'leads', lead.id), {
       stage: to,
       lostReason: to === 'lost' ? lostReason : '',
+      wonAt: to === 'won' ? serverTimestamp() : null,
       updatedAt: serverTimestamp(),
     });
     batch.set(doc(collection(this.db, 'leads', lead.id, 'activities')), {

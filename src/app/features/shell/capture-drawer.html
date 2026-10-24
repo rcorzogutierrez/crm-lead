@@ -11,52 +11,127 @@
     (submit)="save($event, false)"
   >
     <header class="flex items-center justify-between border-b border-rule px-5 py-3.5">
-      <h2 id="capture-title" class="date-face text-lg font-bold">{{ t('shell.newLead') }}</h2>
+      <h2 id="capture-title" class="date-face text-lg font-bold">{{ fixedContact() ? t('capture.newDeal') : t('shell.newLead') }}</h2>
       <button type="button" class="btn-icon btn-ghost" (click)="close()" [attr.aria-label]="t('common.close')">
         <svg lucideX [size]="18"></svg>
       </button>
     </header>
 
     <div class="flex-1 space-y-5 overflow-y-auto px-5 py-5">
-      <div class="grid gap-4 sm:grid-cols-2">
-        <div class="sm:col-span-2">
-          <label class="field-label" for="c-name">{{ t('field.name') }}</label>
-          <input
-            id="c-name"
-            class="input"
-            autocomplete="off"
-            autofocus
-            placeholder="Ana Morales"
-            [formField]="f.name"
-          />
-          @if (f.name().touched() && f.name().invalid()) {
-            <p class="field-error">{{ t($any(f.name().errors()[0].message)) }}</p>
-          }
+      <!-- Quién -->
+      @if (fixedContact(); as c) {
+        <div class="flex items-center gap-3 rounded-lg border border-rule bg-paper px-4 py-3">
+          <svg lucideUserRound [size]="18" class="text-ink-2"></svg>
+          <p class="min-w-0 flex-1 text-sm">
+            {{ t('capture.forContact') }} <strong>{{ c.name }}</strong>
+            @if (c.company) { <span class="text-ink-2">· {{ c.company }}</span> }
+          </p>
         </div>
-        <div>
-          <label class="field-label" for="c-phone">{{ t('field.phoneWa') }}</label>
-          <input id="c-phone" class="input tabular" type="tel" autocomplete="off" placeholder="+52 55 1234 5678" [formField]="f.phone" />
-        </div>
-        <div>
-          <label class="field-label" for="c-email">{{ t('field.email') }}</label>
-          <input id="c-email" class="input" type="email" autocomplete="off" placeholder="ana@empresa.com" [formField]="f.email" />
-          @if (f.email().touched() && f.email().invalid()) {
-            <p class="field-error">{{ t($any(f.email().errors()[0].message)) }}</p>
-          }
-        </div>
-        <div>
-          <label class="field-label" for="c-company">{{ t('field.company') }}</label>
-          <input id="c-company" class="input" autocomplete="off" [placeholder]="t('common.optional')" [formField]="f.company" />
-        </div>
-        <div>
-          <label class="field-label" for="c-source">{{ t('field.source') }}</label>
-          <select id="c-source" class="input" [formField]="f.source">
-            @for (s of sources; track s.id) {
-              <option [value]="s.id">{{ s.label }}</option>
+      } @else {
+        <div class="grid gap-4 sm:grid-cols-2">
+          <div class="sm:col-span-2">
+            <label class="field-label" for="c-name">{{ t('field.name') }}</label>
+            <input
+              id="c-name"
+              class="input"
+              autocomplete="off"
+              autofocus
+              placeholder="Ana Morales"
+              [formField]="f.name"
+            />
+            @if (f.name().touched() && f.name().invalid()) {
+              <p class="field-error">{{ t($any(f.name().errors()[0].message)) }}</p>
             }
-          </select>
+          </div>
+          <div>
+            <label class="field-label" for="c-phone">{{ t('field.phoneWa') }}</label>
+            <input id="c-phone" class="input tabular" type="tel" autocomplete="off" placeholder="+52 55 1234 5678" [formField]="f.phone" />
+          </div>
+          <div>
+            <label class="field-label" for="c-email">{{ t('field.email') }}</label>
+            <input id="c-email" class="input" type="email" autocomplete="off" placeholder="ana@empresa.com" [formField]="f.email" />
+            @if (f.email().touched() && f.email().invalid()) {
+              <p class="field-error">{{ t($any(f.email().errors()[0].message)) }}</p>
+            }
+          </div>
+          <div class="sm:col-span-2">
+            <label class="field-label" for="c-company">{{ t('field.company') }}</label>
+            <input id="c-company" class="input" autocomplete="off" [placeholder]="t('common.optional')" [formField]="f.company" />
+          </div>
         </div>
-      </div>
+
+        @if (match(); as mc) {
+          <div class="rounded-lg border border-pen/30 bg-pen-soft px-4 py-3" role="status">
+            <p class="flex gap-2 text-sm">
+              <svg lucideUserRound [size]="18" class="mt-0.5 shrink-0 text-pen-strong"></svg>
+              <span>
+                {{ t('capture.matchPrefix') }} <strong>{{ mc.name }}</strong>@if (mc.company) { ({{ mc.company }})}.
+                @if (contacts.isCustomer(mc.id)) {
+                  {{ t('capture.matchCustomer', { n: contacts.summary(mc.id).won.length }) }}
+                } @else {
+                  {{ t('capture.matchProspect') }}
+                }
+              </span>
+            </p>
+            <div class="mt-2.5 flex flex-wrap gap-2 pl-7" role="radiogroup" [attr.aria-label]="t('capture.matchChoice')">
+              <button type="button" role="radio" [attr.aria-checked]="useMatch()" class="btn-sm btn" [class]="useMatch() ? 'bg-pen text-white' : 'border border-rule-strong bg-sheet text-ink'" (click)="useMatch.set(true)">
+                {{ t('capture.matchUse', { name: mc.name }) }}
+              </button>
+              <button type="button" role="radio" [attr.aria-checked]="!useMatch()" class="btn-sm btn" [class]="!useMatch() ? 'bg-pen text-white' : 'border border-rule-strong bg-sheet text-ink'" (click)="useMatch.set(false)">
+                {{ t('capture.matchOther') }}
+              </button>
+            </div>
+          </div>
+        }
+      }
+
+      <!-- Qué quiere comprar -->
+      <fieldset class="space-y-3 border-t border-rule pt-5">
+        <legend class="mb-3 text-sm font-bold">{{ t('capture.whatTitle') }}</legend>
+        @if (catalog.active().length) {
+          <div>
+            <label class="field-label" for="c-service">{{ t('field.service') }}</label>
+            <select id="c-service" class="input" [formField]="f.serviceId">
+              <option value="">{{ t('capture.noService') }}</option>
+              @for (s of catalog.active(); track s.id) {
+                <option [value]="s.id">{{ s.name }} · {{ money(s.price) }}@if (s.unit) { / {{ s.unit }}}</option>
+              }
+            </select>
+          </div>
+          @if (service(); as svc) {
+            <div class="grid gap-3 sm:grid-cols-[8rem_minmax(0,1fr)]">
+              @if (svc.unit) {
+                <div>
+                  <label class="field-label" for="c-qty">{{ t('field.quantity', { unit: svc.unit }) }}</label>
+                  <input id="c-qty" class="input tabular" type="number" step="1" [formField]="f.quantity" />
+                </div>
+              }
+              <div [class]="svc.unit ? '' : 'sm:col-span-2'">
+                <label class="field-label" for="c-detail">{{ t('field.detail') }}</label>
+                <input id="c-detail" class="input" autocomplete="off" [placeholder]="t('field.detailPlaceholder')" [formField]="f.detail" />
+              </div>
+            </div>
+            <div>
+              <p class="field-label">{{ t('tier.label') }}</p>
+              <app-tier-picker [unitPrice]="svc.price" [quantity]="quantity()" [(value)]="tier" />
+              <p class="mt-1.5 text-[0.8125rem] text-ink-2 tabular">
+                @if (svc.unit) {
+                  {{ t('capture.officialQty', { qty: quantity(), price: money(svc.price), total: money(official()) }) }}
+                } @else {
+                  {{ t('capture.official', { total: money(official()) }) }}
+                }
+              </p>
+            </div>
+          }
+        } @else {
+          <p class="rounded-lg bg-sheet-2 px-3 py-2 text-sm text-ink-2">
+            {{ t('capture.noCatalog') }}
+            @if (auth.isAdmin()) {
+              <a routerLink="/servicios" class="font-semibold text-pen" (click)="close()">{{ t('capture.goCatalog') }}</a>
+            }
+          </p>
+        }
+      </fieldset>
 
       <fieldset class="rounded-lg border border-rule bg-paper px-4 pt-3 pb-4">
         <legend class="sr-only">{{ t('next.title') }}</legend>
@@ -100,8 +175,12 @@
             </select>
           </div>
           <div>
-            <label class="field-label" for="c-value">{{ t('field.value') }}</label>
-            <input id="c-value" class="input tabular" type="number" step="100" [formField]="f.value" />
+            <label class="field-label" for="c-source">{{ t('field.source') }}</label>
+            <select id="c-source" class="input" [formField]="f.source">
+              @for (s of sources; track s.id) {
+                <option [value]="s.id">{{ s.label }}</option>
+              }
+            </select>
           </div>
           <div class="sm:col-span-2">
             <label class="field-label" for="c-assignee">{{ t('field.assignee') }}</label>

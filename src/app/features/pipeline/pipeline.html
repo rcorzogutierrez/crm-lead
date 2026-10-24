@@ -5,9 +5,16 @@
       <p class="mt-1 text-sm text-ink-2 max-lg:hidden">{{ t('pipe.hintDesktop') }}</p>
       <p class="mt-1 text-sm text-ink-2 lg:hidden">{{ t('pipe.hintMobile') }}</p>
     </div>
+    <div class="flex flex-wrap gap-2">
+    <div class="inline-flex rounded-lg border border-rule-strong bg-sheet p-0.5" role="radiogroup" [attr.aria-label]="t('pipe.kind')">
+      <button type="button" role="radio" [attr.aria-checked]="kind() === 'all'" (click)="kind.set('all')" class="h-8 rounded-md px-3 text-sm font-semibold transition-colors" [class]="kind() === 'all' ? 'bg-ink text-white' : 'text-ink-2 hover:text-ink'">{{ t('pipe.kindAll') }}</button>
+      <button type="button" role="radio" [attr.aria-checked]="kind() === 'new'" (click)="kind.set('new')" class="h-8 rounded-md px-3 text-sm font-semibold transition-colors" [class]="kind() === 'new' ? 'bg-ink text-white' : 'text-ink-2 hover:text-ink'">{{ t('pipe.kindNew') }}</button>
+      <button type="button" role="radio" [attr.aria-checked]="kind() === 'repeat'" (click)="kind.set('repeat')" class="h-8 rounded-md px-3 text-sm font-semibold transition-colors" [class]="kind() === 'repeat' ? 'bg-ink text-white' : 'text-ink-2 hover:text-ink'">{{ t('pipe.kindRepeat') }}</button>
+    </div>
     <div class="inline-flex rounded-lg border border-rule-strong bg-sheet p-0.5" role="radiogroup" [attr.aria-label]="t('today.scope')">
       <button type="button" role="radio" [attr.aria-checked]="scope() === 'mine'" (click)="scope.set('mine')" class="h-8 rounded-md px-3 text-sm font-semibold transition-colors" [class]="scope() === 'mine' ? 'bg-ink text-white' : 'text-ink-2 hover:text-ink'">{{ t('today.mine') }}</button>
       <button type="button" role="radio" [attr.aria-checked]="scope() === 'team'" (click)="scope.set('team')" class="h-8 rounded-md px-3 text-sm font-semibold transition-colors" [class]="scope() === 'team' ? 'bg-ink text-white' : 'text-ink-2 hover:text-ink'">{{ t('today.team') }}</button>
+    </div>
     </div>
   </header>
 
@@ -39,18 +46,21 @@
               draggable="true"
               class="group cursor-grab rounded-lg border border-rule bg-sheet p-3 shadow-[0_1px_1px_oklch(0.25_0.04_265/0.05)] transition-[box-shadow,transform,opacity] duration-150 hover:shadow-page active:cursor-grabbing"
               [class.opacity-40]="dragging() === lead.id"
-              [attr.aria-label]="lead.name + ', ' + col.label"
+              [attr.aria-label]="title(lead) + ', ' + col.label"
               (dragstart)="onDragStart($event, lead)"
               (dragend)="onDragEnd()"
               (keydown)="onCardKey($event, lead)"
             >
               <div class="flex items-start gap-2">
-                <a [routerLink]="['/leads', lead.id]" class="min-w-0 flex-1 truncate font-semibold hover:text-pen hover:underline" draggable="false">{{ lead.name }}</a>
+                <a [routerLink]="['/leads', lead.id]" class="min-w-0 flex-1 font-semibold leading-snug hover:text-pen hover:underline" draggable="false">{{ title(lead) }}</a>
                 <app-avatar [name]="members.name(lead.assigneeId)" [photo]="members.byId().get(lead.assigneeId)?.photoURL ?? null" size="sm" />
               </div>
-              @if (lead.company) {
-                <p class="truncate text-xs text-ink-3">{{ lead.company }}</p>
-              }
+              <p class="mt-0.5 flex min-w-0 items-center gap-1.5 text-xs text-ink-3">
+                <span class="truncate">{{ lead.serviceName ? lead.name : lead.company }}@if (lead.serviceName && lead.company) { · {{ lead.company }}}</span>
+                @if (isRepeat(lead)) {
+                  <span class="shrink-0 rounded-full bg-ok-soft px-1.5 text-[0.6875rem] leading-[1.125rem] font-bold text-ok">{{ t('contacts.customer') }}</span>
+                }
+              </p>
               <div class="mt-2.5 flex items-center justify-between gap-2">
                 <app-due-chip [date]="lead.nextFollowUpAt" [closed]="col.closed" />
                 @if (lead.value) {

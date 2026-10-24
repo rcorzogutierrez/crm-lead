@@ -36,9 +36,9 @@ export class ActivitiesService {
   private readonly auth = inject(AuthService);
 
   /** Escucha el historial de un lead; se cancela con el DestroyRef dado. */
-  watch(leadId: string, destroyRef: DestroyRef): LiveQuery<Activity> {
+  watch(leadId: string, destroyRef: DestroyRef, max = 200): LiveQuery<Activity> {
     return liveQuery(
-      query(collection(this.db, 'leads', leadId, 'activities'), orderBy('createdAt', 'desc'), limit(200)),
+      query(collection(this.db, 'leads', leadId, 'activities'), orderBy('createdAt', 'desc'), limit(max)),
       mapActivity,
       destroyRef,
     );

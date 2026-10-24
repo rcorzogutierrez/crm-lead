@@ -9,6 +9,7 @@ import {
   LucideSparkles,
   LucideStickyNote,
   LucideSquareCheck,
+  LucideTag,
   LucideUsers,
 } from '@lucide/angular';
 import { ActivityType } from '../core/models';
@@ -23,6 +24,7 @@ const ICONS = {
   stage: LucideArrowRightLeft,
   created: LucideSparkles,
   followup: LucideCalendarCheck,
+  pricing: LucideTag,
 } as const;
 
 @Component({

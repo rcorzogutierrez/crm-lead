@@ -12,7 +12,8 @@ import {
 } from 'firebase/firestore';
 import { AuthService } from './auth.service';
 import { Clock } from './clock.service';
-import { dayDiff } from './dates';
+import { addDays, dayDiff } from './dates';
+import { t } from './i18n/i18n';
 import { FIRESTORE } from './firebase';
 import { toDate } from './firestore-utils';
 import { ContactChannel, FollowUp, Lead } from './models';
@@ -89,6 +90,13 @@ export class FollowUpsService {
       updatedAt: serverTimestamp(),
     });
     await batch.commit();
+  }
+
+  /** Seguimiento de postventa a los 30 días de ganar, para volver a ofrecer algo. */
+  schedulePostSale(lead: Pick<Lead, 'id' | 'name' | 'company' | 'assigneeId'>): Promise<void> {
+    const due = addDays(this.clock.now(), 30);
+    due.setHours(10, 0, 0, 0);
+    return this.schedule(lead, due, 'call', t('postsale.note'));
   }
 
   /** Marca hecho, registra el resultado y, opcionalmente, programa el siguiente. */

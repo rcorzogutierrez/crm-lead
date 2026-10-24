@@ -33,7 +33,9 @@
       >
         @switch (item.icon) {
           @case ('today') { <svg lucideCalendarDays [size]="18" [strokeWidth]="1.75"></svg> }
+          @case ('contacts') { <svg lucideBookUser [size]="18" [strokeWidth]="1.75"></svg> }
           @case ('leads') { <svg lucideUsers [size]="18" [strokeWidth]="1.75"></svg> }
+          @case ('services') { <svg lucidePackage [size]="18" [strokeWidth]="1.75"></svg> }
           @case ('pipeline') { <svg lucideColumns3 [size]="18" [strokeWidth]="1.75"></svg> }
           @case ('team') { <svg lucideUserRoundCog [size]="18" [strokeWidth]="1.75"></svg> }
         }
@@ -89,9 +91,9 @@
   class="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-rule bg-sheet pb-[env(safe-area-inset-bottom)] shadow-[0_-1px_0_var(--color-rule)] lg:hidden"
   [attr.aria-label]="t('shell.mainNav')"
 >
-  @for (item of nav.slice(0, 2); track item.path) {
-    <a [routerLink]="item.path" routerLinkActive="text-pen" #rla="routerLinkActive" [attr.aria-current]="rla.isActive ? 'page' : null" class="relative flex h-16 flex-col items-center justify-center gap-1 text-[0.6875rem] font-semibold text-ink-3">
-      @if (item.icon === 'today') { <svg lucideCalendarDays [size]="20" [strokeWidth]="1.75"></svg> } @else { <svg lucideUsers [size]="20" [strokeWidth]="1.75"></svg> }
+  @for (item of mobileMain.slice(0, 2); track item.path) {
+    <a [routerLink]="item.path" routerLinkActive="text-pen" #rla="routerLinkActive" [attr.aria-current]="rla.isActive ? 'page' : null" class="relative flex h-16 flex-col items-center justify-center gap-1 text-[0.6875rem] font-semibold text-ink-3" (click)="moreOpen.set(false)">
+      @if (item.icon === 'today') { <svg lucideCalendarDays [size]="20" [strokeWidth]="1.75"></svg> } @else { <svg lucideBookUser [size]="20" [strokeWidth]="1.75"></svg> }
       {{ t(item.label) }}
       @if (item.icon === 'today' && dueCount() > 0) {
         <span class="absolute top-2 left-[calc(50%+6px)] grid h-4 min-w-4 place-items-center rounded-full px-1 text-[0.625rem] font-bold text-white tabular" [class]="hasOverdue() ? 'bg-ribbon' : 'bg-pen'">{{ dueCount() }}</span>
@@ -99,16 +101,36 @@
     </a>
   }
   <div class="grid place-items-center">
-    <button type="button" class="grid size-12 place-items-center rounded-full bg-pen text-white shadow-lift active:scale-95" (click)="ui.openCapture()" [attr.aria-label]="t('shell.newLead')">
+    <button type="button" class="grid size-12 place-items-center rounded-full bg-pen text-white shadow-lift active:scale-95" (click)="moreOpen.set(false); ui.openCapture()" [attr.aria-label]="t('shell.newLead')">
       <svg lucidePlus [size]="22"></svg>
     </button>
   </div>
-  @for (item of nav.slice(2); track item.path) {
-    <a [routerLink]="item.path" routerLinkActive="text-pen" #rla="routerLinkActive" [attr.aria-current]="rla.isActive ? 'page' : null" class="flex h-16 flex-col items-center justify-center gap-1 text-[0.6875rem] font-semibold text-ink-3">
-      @if (item.icon === 'pipeline') { <svg lucideColumns3 [size]="20" [strokeWidth]="1.75"></svg> } @else { <svg lucideUserRoundCog [size]="20" [strokeWidth]="1.75"></svg> }
-      {{ t(item.label) }}
-    </a>
-  }
+  <a routerLink="/pipeline" routerLinkActive="text-pen" #rlp="routerLinkActive" [attr.aria-current]="rlp.isActive ? 'page' : null" class="flex h-16 flex-col items-center justify-center gap-1 text-[0.6875rem] font-semibold text-ink-3" (click)="moreOpen.set(false)">
+    <svg lucideColumns3 [size]="20" [strokeWidth]="1.75"></svg>
+    {{ t('nav.pipeline') }}
+  </a>
+  <div class="relative">
+    <button type="button" class="flex h-16 w-full flex-col items-center justify-center gap-1 text-[0.6875rem] font-semibold" [class]="moreOpen() ? 'text-pen' : 'text-ink-3'" [attr.aria-expanded]="moreOpen()" aria-controls="more-menu" (click)="moreOpen.set(!moreOpen())">
+      <svg lucideEllipsis [size]="20" [strokeWidth]="1.75"></svg>
+      {{ t('nav.more') }}
+    </button>
+    @if (moreOpen()) {
+      <ul id="more-menu" class="sheet absolute right-2 bottom-[calc(100%+0.5rem)] w-52 overflow-hidden py-1 shadow-lift">
+        @for (item of mobileMore; track item.path) {
+          <li>
+            <a [routerLink]="item.path" routerLinkActive="text-pen" #rlm="routerLinkActive" [attr.aria-current]="rlm.isActive ? 'page' : null" class="flex h-11 items-center gap-3 px-4 text-sm font-semibold text-ink" (click)="moreOpen.set(false)">
+              @switch (item.icon) {
+                @case ('leads') { <svg lucideUsers [size]="18" [strokeWidth]="1.75"></svg> }
+                @case ('services') { <svg lucidePackage [size]="18" [strokeWidth]="1.75"></svg> }
+                @default { <svg lucideUserRoundCog [size]="18" [strokeWidth]="1.75"></svg> }
+              }
+              {{ t(item.label) }}
+            </a>
+          </li>
+        }
+      </ul>
+    }
+  </div>
 </nav>
 
 <app-capture-drawer />

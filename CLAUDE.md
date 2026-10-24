@@ -42,13 +42,15 @@ src/app/
     auth.service.ts    sesión + alta en el equipo (fundador / invitación / pendiente)
     auth.guards.ts     memberGuard, guestGuard, adminGuard
     team-query.ts      consulta en vivo que solo corre si el usuario es miembro
-    leads / followups / activities / members .service.ts
+    leads / contacts / catalog / followups / activities / members .service.ts
     dates.ts           fechas relativas en español, atajos de reprogramación
   shared/          componentes reutilizables (followup-item, schedule-form, pickers, badges…)
   features/
     auth/          login, acceso pendiente
     shell/         riel/barra de navegación + panel de captura rápida (tecla N)
     today/         "Hoy": página de agenda (vencidos, horas del día, sin próxima acción)
+    contacts/      clientes y prospectos; ficha con negocios abiertos, servicios comprados e historial
+    services/      catálogo de servicios y % de categorías (solo admin edita)
     leads/         lista con búsqueda/filtros en la URL
     lead-detail/   ficha: etapas, próxima acción, historial, datos editables
     pipeline/      tablero por etapas (drag & drop, Alt+←/→)
@@ -62,7 +64,10 @@ src/app/
 | `meta/team` | único | `ownerUid`, `name` — existe desde que entra el primer usuario |
 | `members/{uid}` | miembro | `email`, `displayName`, `photoURL`, `role: admin\|member`, `active` |
 | `invites/{emailEnMinúsculas}` | invitación | `email`, `role`, `invitedBy` — se consume al entrar |
-| `leads/{id}` | lead | `name`, `company`, `email`, `phone`, `source`, `stage`, `value`, `assigneeId`, `notes`, `lostReason`, `nextFollowUpAt`, `lastContactAt`, `createdBy`, timestamps |
+| `contacts/{id}` | persona/empresa | `name`, `company`, `email` (minúsculas), `phone`, `assigneeId`, `notes`, `createdBy` — "cliente" si tiene algún lead ganado (derivado, no se guarda) |
+| `leads/{id}` | lead = oportunidad (un servicio para un contacto) | `contactId`, copia del contacto (`name`, `company`, `email`, `phone`), `serviceId`, `serviceName`, `detail`, `quantity`, `unitPrice`, `tier`, `tierPct`, `value`, `priceAck`, `source`, `stage`, `wonAt`, `assigneeId`, `notes`, `lostReason`, `nextFollowUpAt`, `lastContactAt`, `createdBy`, timestamps |
+| `services/{id}` | catálogo | `name`, `description`, `price` (oficial, por unidad), `unit`, `active` — solo admin escribe; se archivan, no se borran |
+| `meta/pricing` | único | `bronze`, `silver`, `gold` (% sobre el precio oficial; por defecto 3/5/7) — solo admin |
 | `leads/{id}/activities/{id}` | historial | `type` (call, whatsapp, email, meeting, note, stage, created, followup), `body`, `from`/`to`, `createdBy`, `createdAt` |
 | `followups/{id}` | próxima acción | `leadId`, `leadName`, `company`, `assigneeId`, `dueAt`, `channel`, `note`, `status: pending\|done\|cancelled` |
 
@@ -70,7 +75,10 @@ Reglas de dominio:
 - Etapas en orden: `new → contacted → qualified → proposal → negotiation → won | lost`. `won`/`lost` son cerradas y no necesitan follow-up.
 - `leads.nextFollowUpAt` es una **copia desnormalizada** del follow-up pendiente más próximo. Toda escritura de follow-ups (programar, completar, reprogramar, descartar) debe recalcularla en el **mismo batch** (`FollowUpsService`).
 - Completar un follow-up = marcarlo `done` + crear actividad + actualizar `lastContactAt` + (opcional) programar el siguiente, todo en un batch.
-- Cambiar etapa siempre deja una actividad `stage` (`LeadsService.moveToStage`).
+- Cambiar etapa siempre deja una actividad `stage` (`LeadsService.moveToStage`); ganar guarda `wonAt`.
+- Precio: `value = unitPrice × quantity × (100 + tierPct) / 100` (`salePrice`). El vendedor no escribe el precio: elige servicio, cantidad y categoría (bronce por defecto). Las reglas validan que `unitPrice` y `tierPct` sean los vigentes (o los ya pactados) y que un lead ganado no cambie de precio.
+- Cambio de precio oficial: los leads guardan su `unitPrice`; los abiertos muestran aviso (actualizar o mantener → `priceAck`). Los ganados nunca cambian.
+- Editar un contacto copia nombre/empresa/email/teléfono a sus leads y follow-ups pendientes (`ContactsService.update`). Los leads antiguos sin `contactId` se vinculan con el botón del admin en *Clientes* (`migrateLegacy`).
 - Un equipo pequeño cabe en memoria: leads y follow-ups pendientes se escuchan completos en vivo y se filtran en el cliente. Si el volumen crece (> ~5.000 leads), paginar y filtrar en servidor.
 - Índice compuesto requerido: `followups (status ASC, dueAt ASC)` en `firestore.indexes.json`.
 

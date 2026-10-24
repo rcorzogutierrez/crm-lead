@@ -1,8 +1,11 @@
-import { Component, computed, inject } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import {
+  LucideBookUser,
   LucideCalendarDays,
   LucideColumns3,
+  LucideEllipsis,
+  LucidePackage,
   LucideLogOut,
   LucidePlus,
   LucideUsers,
@@ -17,6 +20,12 @@ import { LangSwitch } from '../../shared/lang-switch';
 import { Logo } from '../../shared/logo';
 import { CaptureDrawer } from './capture-drawer';
 
+interface NavItem {
+  path: string;
+  label: I18nKey;
+  icon: 'today' | 'contacts' | 'leads' | 'pipeline' | 'services' | 'team';
+}
+
 /** Marco de la app: riel pizarra (escritorio) o barra inferior (móvil). */
 @Component({
   selector: 'app-shell',
@@ -28,8 +37,11 @@ import { CaptureDrawer } from './capture-drawer';
     CaptureDrawer,
     Logo,
     LangSwitch,
+    LucideBookUser,
     LucideCalendarDays,
     LucideColumns3,
+    LucideEllipsis,
+    LucidePackage,
     LucideLogOut,
     LucidePlus,
     LucideUsers,
@@ -56,12 +68,18 @@ export class Shell {
 
   protected readonly t = t;
 
-  protected readonly nav: readonly { path: string; label: I18nKey; icon: 'today' | 'leads' | 'pipeline' | 'team' }[] = [
+  protected readonly nav: readonly NavItem[] = [
     { path: '/hoy', label: 'nav.today', icon: 'today' },
+    { path: '/clientes', label: 'nav.contacts', icon: 'contacts' },
     { path: '/leads', label: 'nav.leads', icon: 'leads' },
     { path: '/pipeline', label: 'nav.pipeline', icon: 'pipeline' },
+    { path: '/servicios', label: 'nav.services', icon: 'services' },
     { path: '/equipo', label: 'nav.team', icon: 'team' },
   ];
+  /** Barra móvil: los cuatro más usados; el resto va en "Más". */
+  protected readonly mobileMain = this.nav.filter((n) => ['today', 'contacts', 'pipeline'].includes(n.icon));
+  protected readonly mobileMore = this.nav.filter((n) => !['today', 'contacts', 'pipeline'].includes(n.icon));
+  protected readonly moreOpen = signal(false);
 
   protected onKey(event: KeyboardEvent): void {
     if (event.metaKey || event.ctrlKey || event.altKey || this.ui.captureOpen()) return;

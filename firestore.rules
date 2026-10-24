@@ -89,26 +89,131 @@ service cloud.firestore {
       allow update: if false;
     }
 
-    // ---- Datos del CRM ----
+    // ---- Catálogo de servicios y categorías de venta (solo admin escribe) ----
+    function pricingPath() {
+      return /databases/$(database)/documents/meta/pricing;
+    }
+    function servicePath(id) {
+      return /databases/$(database)/documents/services/$(id);
+    }
+    function validRate(v) {
+      return v is number && v >= 0 && v <= 100;
+    }
+    // Porcentaje vigente de una categoría (valores por defecto si aún no hay meta/pricing).
+    function tierRate(tier) {
+      return exists(pricingPath())
+        ? get(pricingPath()).data.get(tier, tier == 'bronze' ? 3 : tier == 'silver' ? 5 : 7)
+        : (tier == 'bronze' ? 3 : tier == 'silver' ? 5 : 7);
+    }
+
+    match /meta/pricing {
+      allow read: if isMember();
+      allow write: if isAdmin()
+        && request.resource.data.keys().hasOnly(['bronze', 'silver', 'gold', 'updatedAt'])
+        && validRate(request.resource.data.bronze)
+        && validRate(request.resource.data.silver)
+        && validRate(request.resource.data.gold);
+    }
+
+    function validService(d) {
+      return isString(d.name, 200) && d.name.size() > 0
+        && isString(d.description, 1000)
+        && d.price is number && d.price >= 0
+        && isString(d.unit, 50)
+        && d.active is bool;
+    }
+
+    match /services/{serviceId} {
+      allow read: if isMember();
+      allow create: if isAdmin() && validService(request.resource.data);
+      allow update: if isAdmin() && validService(request.resource.data);
+      // Nunca se borran: se archivan para conservar el historial de lo vendido.
+      allow delete: if false;
+    }
+
+    // ---- Contactos (prospectos y clientes) ----
+    function validContact(d) {
+      return isString(d.name, 200) && d.name.size() > 0
+        && isString(d.company, 200)
+        && isString(d.email, 200)
+        && isString(d.phone, 50)
+        && isString(d.notes, 5000)
+        && d.assigneeId is string;
+    }
+
+    match /contacts/{contactId} {
+      allow read: if isMember();
+      allow create: if isMember()
+        && validContact(request.resource.data)
+        && request.resource.data.createdBy == request.auth.uid;
+      allow update: if isMember()
+        && validContact(request.resource.data)
+        && request.resource.data.createdBy == resource.data.createdBy;
+      allow delete: if isAdmin();
+    }
+
+    // ---- Leads (oportunidades) ----
     function validLead(d) {
       return isString(d.name, 200) && d.name.size() > 0
         && isString(d.company, 200)
         && isString(d.email, 200)
         && isString(d.phone, 50)
         && isString(d.notes, 5000)
+        && isString(d.get('detail', ''), 1000)
         && d.stage in ['new', 'contacted', 'qualified', 'proposal', 'negotiation', 'won', 'lost']
         && d.source in ['web', 'whatsapp', 'phone', 'referral', 'social', 'event', 'email', 'other']
         && d.value is number && d.value >= 0
-        && d.assigneeId is string;
+        && d.assigneeId is string
+        && (d.get('contactId', null) == null
+            || existsAfter(/databases/$(database)/documents/contacts/$(d.contactId)));
+    }
+
+    // Lead con servicio: el valor sale del precio oficial × cantidad + % de la categoría.
+    function hasService(d) {
+      return d.get('serviceId', null) != null;
+    }
+    function priceMath(d) {
+      return d.quantity is number && d.quantity > 0
+        && d.unitPrice is number && d.unitPrice >= 0
+        && d.tier in ['bronze', 'silver', 'gold']
+        && d.tierPct is number
+        && math.abs(d.value - d.unitPrice * d.quantity * (100 + d.tierPct) / 100) < 0.011;
+    }
+    // Al crear: precio y porcentaje deben ser los vigentes.
+    function pricingOnCreate(d) {
+      return !hasService(d)
+        ? d.value == 0
+        : priceMath(d)
+          && get(servicePath(d.serviceId)).data.price == d.unitPrice
+          && d.tierPct == tierRate(d.tier);
+    }
+    function pricingKeys() {
+      return ['serviceId', 'serviceName', 'quantity', 'unitPrice', 'tier', 'tierPct', 'value'];
+    }
+    // Al editar: un lead ganado no cambia de precio; uno abierto solo puede tomar el precio
+    // oficial vigente (o conservar el pactado) y el porcentaje vigente (o conservar el suyo).
+    // Sin servicio, el valor no se toca a mano: hay que elegir un servicio del catálogo.
+    function pricingOnUpdate(d, old) {
+      return !d.diff(old).affectedKeys().hasAny(pricingKeys())
+        || (old.stage != 'won'
+            && (!hasService(d)
+                ? !hasService(old) && d.value == old.value
+                : priceMath(d)
+                  && (d.unitPrice == old.get('unitPrice', -1) && d.serviceId == old.get('serviceId', null)
+                      || get(servicePath(d.serviceId)).data.price == d.unitPrice)
+                  && (d.tierPct == old.get('tierPct', -1) && d.tier == old.get('tier', null)
+                      || d.tierPct == tierRate(d.tier))));
     }
 
     match /leads/{leadId} {
       allow read: if isMember();
       allow create: if isMember()
         && validLead(request.resource.data)
+        && pricingOnCreate(request.resource.data)
         && request.resource.data.createdBy == request.auth.uid;
       allow update: if isMember()
         && validLead(request.resource.data)
+        && pricingOnUpdate(request.resource.data, resource.data)
         && request.resource.data.createdBy == resource.data.createdBy;
       allow delete: if isAdmin() || (isMember() && resource.data.createdBy == request.auth.uid);
 

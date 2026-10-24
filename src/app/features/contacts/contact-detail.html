@@ -1,0 +1,271 @@
+<div class="mx-auto max-w-[78rem] px-4 pt-5 pb-10 sm:px-6 lg:px-10 lg:pt-8">
+  <a routerLink="/clientes" class="inline-flex items-center gap-1.5 text-sm font-semibold text-ink-2 hover:text-pen">
+    <svg lucideArrowLeft [size]="16"></svg>
+    {{ t('nav.contacts') }}
+  </a>
+
+  @if (contact(); as c) {
+    <header class="mt-4 flex flex-wrap items-start justify-between gap-4">
+      <div class="min-w-0">
+        <h1 class="date-face text-[2rem] leading-tight font-bold break-words">{{ c.name }}</h1>
+        <p class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-ink-2">
+          @if (c.company) {
+            <span>{{ c.company }}</span>
+            <span aria-hidden="true">·</span>
+          }
+          @if (summary().won.length) {
+            <span class="inline-flex h-6 items-center gap-1 rounded-md bg-ok-soft px-2 text-[0.8125rem] font-semibold text-ok">
+              <svg lucideCheck [size]="14" [strokeWidth]="2.5"></svg>
+              {{ t('contacts.customerSince', { date: since() }) }}
+            </span>
+          } @else {
+            <span class="inline-flex h-6 items-center rounded-md bg-sheet-2 px-2 text-[0.8125rem] font-semibold">{{ t('contacts.prospect') }}</span>
+          }
+          <span aria-hidden="true">·</span>
+          <span>{{ t('field.assignee') }}: {{ members.name(c.assigneeId) }}</span>
+        </p>
+      </div>
+      <div class="flex flex-wrap gap-2">
+        @if (tel()) {
+          <a class="btn-secondary" [href]="tel()"><svg lucidePhone [size]="16"></svg> {{ t('channel.call.verb') }}</a>
+        }
+        @if (wa()) {
+          <a class="btn-secondary" [href]="wa()" target="_blank" rel="noopener"><svg lucideMessageCircle [size]="16"></svg> WhatsApp</a>
+        }
+        @if (mail()) {
+          <a class="btn-secondary" [href]="mail()"><svg lucideMail [size]="16"></svg> Email</a>
+        }
+        <button type="button" class="btn-primary" (click)="ui.openCapture(c.id)">
+          <svg lucidePlus [size]="16"></svg>
+          {{ t('capture.newDeal') }}
+        </button>
+      </div>
+    </header>
+
+    <div class="mt-8 grid gap-8 lg:grid-cols-[minmax(0,1fr)_22rem]">
+      <div class="min-w-0 space-y-8">
+        <!-- Oportunidades abiertas -->
+        <section aria-labelledby="open-title">
+          <div class="flex items-baseline justify-between gap-3">
+            <h2 id="open-title" class="text-sm font-bold">
+              {{ t('contact.openTitle') }} <span class="font-medium text-ink-3 tabular">{{ summary().open.length }}</span>
+            </h2>
+            @if (openValue()) {
+              <p class="text-[0.8125rem] text-ink-2">{{ t('contact.atStake') }} <strong class="text-ink tabular">{{ money(openValue()) }}</strong></p>
+            }
+          </div>
+          <div class="mt-2 space-y-3">
+            @for (l of summary().open; track l.id) {
+              <article class="sheet px-4 pt-3 pb-1">
+                <div class="flex flex-wrap items-start justify-between gap-3">
+                  <div class="min-w-0">
+                    <h3 class="font-bold"><a [routerLink]="['/leads', l.id]" class="hover:text-pen hover:underline">{{ dealTitle(l) }}</a></h3>
+                    <p class="text-[0.8125rem] text-ink-2">
+                      @if (l.detail) { {{ l.detail }} · }
+                      {{ t('contact.opened', { ago: ago(l.createdAt) }) }}
+                    </p>
+                  </div>
+                  <div class="flex flex-wrap items-center gap-2">
+                    <app-stage-badge [stage]="l.stage" />
+                    @if (l.serviceId) {
+                      <span class="inline-flex h-6 items-center rounded-md border border-rule-strong px-2 text-xs font-semibold">{{ tierName(l.tier) }} +{{ l.tierPct }} %</span>
+                    }
+                    <strong class="tabular">{{ money(l.value) }}</strong>
+                  </div>
+                </div>
+                <div class="mt-2 border-t border-rule">
+                  @if (nextFor(l); as fu) {
+                    <app-followup-item [fu]="fu" [showLead]="false" [showDate]="true" />
+                  } @else {
+                    <p class="py-3 text-sm font-semibold text-ribbon">
+                      {{ t('today.orphans') }} ·
+                      <a [routerLink]="['/leads', l.id]" class="text-pen underline">{{ t('contact.scheduleOne') }}</a>
+                    </p>
+                  }
+                </div>
+              </article>
+            } @empty {
+              <div class="sheet">
+                <app-empty-state [title]="t('contact.noOpen')">
+                  {{ summary().won.length ? t('contact.noOpenCustomer') : t('contact.noOpenProspect') }}
+                  <div actions><button type="button" class="btn-secondary btn-sm" (click)="ui.openCapture(c.id)">{{ t('capture.newDeal') }}</button></div>
+                </app-empty-state>
+              </div>
+            }
+          </div>
+        </section>
+
+        <!-- Servicios comprados -->
+        <section aria-labelledby="won-title">
+          <div class="flex items-baseline justify-between gap-3">
+            <h2 id="won-title" class="text-sm font-bold">
+              {{ t('contact.boughtTitle') }} <span class="font-medium text-ink-3 tabular">{{ summary().won.length }}</span>
+            </h2>
+            @if (summary().totalWon) {
+              <p class="text-[0.8125rem] text-ink-2">{{ t('contact.totalSold') }} <strong class="text-ink tabular">{{ money(summary().totalWon) }}</strong></p>
+            }
+          </div>
+          <div class="sheet mt-2 overflow-hidden">
+            @if (summary().won.length) {
+              <div class="overflow-x-auto">
+                <table class="w-full min-w-[32rem] text-sm">
+                  <thead class="border-b border-rule-strong bg-sheet-2 text-left text-xs font-semibold text-ink-2">
+                    <tr>
+                      <th scope="col" class="px-4 py-2">{{ t('contact.date') }}</th>
+                      <th scope="col" class="px-3 py-2">{{ t('field.service') }}</th>
+                      <th scope="col" class="px-3 py-2">{{ t('tier.label') }}</th>
+                      <th scope="col" class="px-3 py-2">{{ t('contact.soldBy') }}</th>
+                      <th scope="col" class="px-4 py-2 text-right">{{ t('list.value') }}</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-rule">
+                    @for (l of summary().won; track l.id) {
+                      <tr>
+                        <td class="px-4 py-2.5 text-ink-2 tabular">{{ wonOn(l) }}</td>
+                        <td class="px-3 py-2.5 font-semibold">
+                          <a [routerLink]="['/leads', l.id]" class="hover:text-pen hover:underline">{{ dealTitle(l) }}</a>
+                          @if (l.detail) { <span class="font-normal text-ink-3">· {{ l.detail }}</span> }
+                        </td>
+                        <td class="px-3 py-2.5 text-ink-2">{{ l.serviceId ? tierName(l.tier) : '—' }}</td>
+                        <td class="px-3 py-2.5">{{ members.name(l.assigneeId) }}</td>
+                        <td class="px-4 py-2.5 text-right tabular">{{ money(l.value) }}</td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            } @else {
+              <app-empty-state [title]="t('contact.noBought')">{{ t('contact.noBoughtBody') }}</app-empty-state>
+            }
+          </div>
+          @if (summary().lost.length) {
+            <button type="button" class="btn-ghost btn-sm mt-2 text-pen" [attr.aria-expanded]="showLost()" (click)="showLost.set(!showLost())">
+              {{ t(summary().lost.length === 1 ? 'contact.lost1' : 'contact.lostN', { n: summary().lost.length }) }}
+            </button>
+            @if (showLost()) {
+              <ul class="sheet mt-1 divide-y divide-rule">
+                @for (l of summary().lost; track l.id) {
+                  <li class="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 text-sm">
+                    <a [routerLink]="['/leads', l.id]" class="font-semibold hover:text-pen hover:underline">{{ dealTitle(l) }}</a>
+                    <span class="text-ink-2">{{ l.lostReason || '—' }}</span>
+                  </li>
+                }
+              </ul>
+            }
+          }
+        </section>
+      </div>
+
+      <aside class="space-y-8">
+        <!-- Datos -->
+        <section aria-labelledby="data-title">
+          <div class="flex items-baseline justify-between">
+            <h2 id="data-title" class="text-sm font-bold">{{ t('contact.data') }}</h2>
+            @if (!editing()) {
+              <button type="button" class="btn-ghost btn-sm text-pen" (click)="startEdit()">{{ t('svc.editShort') }}</button>
+            }
+          </div>
+          @if (editing()) {
+            <form class="sheet mt-2 space-y-4 p-4" novalidate (submit)="save($event)">
+              <div>
+                <label class="field-label" for="k-name">{{ t('field.name') }}</label>
+                <input id="k-name" class="input" [formField]="f.name" />
+                @if (f.name().touched() && f.name().invalid()) {
+                  <p class="field-error">{{ t($any(f.name().errors()[0].message)) }}</p>
+                }
+              </div>
+              <div>
+                <label class="field-label" for="k-company">{{ t('field.company') }}</label>
+                <input id="k-company" class="input" [formField]="f.company" />
+              </div>
+              <div>
+                <label class="field-label" for="k-phone">{{ t('field.phoneWa') }}</label>
+                <input id="k-phone" class="input tabular" type="tel" [formField]="f.phone" />
+              </div>
+              <div>
+                <label class="field-label" for="k-email">{{ t('field.email') }}</label>
+                <input id="k-email" class="input" type="email" [formField]="f.email" />
+                @if (f.email().touched() && f.email().invalid()) {
+                  <p class="field-error">{{ t($any(f.email().errors()[0].message)) }}</p>
+                }
+              </div>
+              <div>
+                <label class="field-label" for="k-assignee">{{ t('field.assignee') }}</label>
+                <select id="k-assignee" class="input" [formField]="f.assigneeId">
+                  @for (m of members.active(); track m.uid) {
+                    <option [value]="m.uid">{{ m.displayName }}</option>
+                  }
+                </select>
+              </div>
+              <div>
+                <label class="field-label" for="k-notes">{{ t('field.notes') }}</label>
+                <textarea id="k-notes" class="input" rows="3" [formField]="f.notes"></textarea>
+              </div>
+              <p class="text-xs text-ink-3">{{ t('contact.editHint') }}</p>
+              <div class="flex justify-end gap-2 border-t border-rule pt-3">
+                <button type="button" class="btn-ghost btn-sm" (click)="editing.set(false)">{{ t('common.cancel') }}</button>
+                <button type="submit" class="btn-primary btn-sm" [disabled]="f().submitting()">{{ t('detail.saveChanges') }}</button>
+              </div>
+            </form>
+          } @else {
+            <dl class="sheet mt-2 space-y-2 p-4 text-sm">
+              <div><dt class="text-xs text-ink-3">{{ t('field.phoneWa') }}</dt><dd class="tabular">{{ c.phone || '—' }}</dd></div>
+              <div><dt class="text-xs text-ink-3">{{ t('field.email') }}</dt><dd class="break-all">{{ c.email || '—' }}</dd></div>
+              <div><dt class="text-xs text-ink-3">{{ t('list.lastContact') }}</dt><dd>{{ ago(summary().lastContactAt) }}</dd></div>
+              @if (c.notes) {
+                <div><dt class="text-xs text-ink-3">{{ t('field.notes') }}</dt><dd class="whitespace-pre-line">{{ c.notes }}</dd></div>
+              }
+            </dl>
+          }
+        </section>
+
+        <!-- Historial unificado -->
+        <section aria-labelledby="hist-title">
+          <h2 id="hist-title" class="text-sm font-bold">{{ t('detail.history') }}</h2>
+          <div class="sheet mt-2 overflow-hidden">
+            @if (historyLoading() && !history().length) {
+              <div class="space-y-2 p-4" aria-hidden="true">
+                @for (i of [1, 2, 3]; track i) {
+                  <div class="h-10 animate-pulse rounded bg-sheet-2"></div>
+                }
+              </div>
+            } @else {
+              <ol class="divide-y divide-rule">
+                @for (a of history().slice(0, historyLimit()); track a.lead.id + a.id) {
+                  <li class="px-4 py-3">
+                    <p class="flex flex-wrap items-center gap-1.5 text-xs text-ink-3" [title]="full(a.createdAt)">
+                      <app-channel-icon [type]="a.type" [size]="13" />
+                      <span class="font-semibold text-ink-2">{{ activityLabel(a) }}</span>
+                      · {{ ago(a.createdAt) }} · {{ members.name(a.createdBy) }}
+                    </p>
+                    <p class="mt-0.5 text-[0.8125rem] font-semibold text-pen-strong">
+                      <a [routerLink]="['/leads', a.lead.id]" class="hover:underline">{{ dealTitle(a.lead) }}</a>
+                    </p>
+                    @if (activityBody(a)) {
+                      <p class="mt-0.5 text-sm whitespace-pre-line">{{ activityBody(a) }}</p>
+                    }
+                  </li>
+                } @empty {
+                  <li><app-empty-state [title]="t('detail.noHistory')">{{ t('detail.noHistoryBody') }}</app-empty-state></li>
+                }
+              </ol>
+              @if (history().length > historyLimit()) {
+                <button type="button" class="btn-ghost btn-sm m-2 text-pen" (click)="historyLimit.set(historyLimit() + 30)">{{ t('contact.moreHistory') }}</button>
+              }
+            }
+          </div>
+        </section>
+      </aside>
+    </div>
+  } @else if (loading()) {
+    <div class="mt-6 space-y-3" aria-hidden="true">
+      <div class="h-10 w-72 animate-pulse rounded bg-sheet-2"></div>
+      <div class="h-64 animate-pulse rounded-page bg-sheet-2"></div>
+    </div>
+  } @else {
+    <app-empty-state [title]="t('contact.notFound')" class="mt-6">
+      {{ t('detail.notFoundBody') }}
+      <div actions><a routerLink="/clientes" class="btn-secondary btn-sm">{{ t('contact.goList') }}</a></div>
+    </app-empty-state>
+  }
+</div>
