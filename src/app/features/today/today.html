@@ -26,7 +26,7 @@
       @if (priceAlerts().length === 1) {
         <a class="btn-secondary btn-sm" [routerLink]="['/leads', priceAlerts()[0].id]">{{ t('common.open') }}</a>
       } @else {
-        <a class="btn-secondary btn-sm" routerLink="/leads" [queryParams]="{ filtro: 'precio' }">{{ t('today.priceAlertSee') }}</a>
+        <a class="btn-secondary btn-sm" routerLink="/leads" [queryParams]="{ filter: 'price-change' }">{{ t('today.priceAlertSee') }}</a>
       }
     </div>
   }
@@ -126,7 +126,7 @@
               }
             </ul>
             @if (orphans().length > 8) {
-              <a routerLink="/leads" [queryParams]="{ filtro: 'sin-accion' }" class="block border-t border-rule px-4 py-2.5 text-sm font-semibold text-pen hover:bg-sheet-2">{{ t('today.seeAll', { n: orphans().length }) }}</a>
+              <a routerLink="/leads" [queryParams]="{ filter: 'no-action' }" class="block border-t border-rule px-4 py-2.5 text-sm font-semibold text-pen hover:bg-sheet-2">{{ t('today.seeAll', { n: orphans().length }) }}</a>
             }
           } @else {
             <app-empty-state [title]="t('today.allSet')">{{ t('today.allSetBody') }}</app-empty-state>

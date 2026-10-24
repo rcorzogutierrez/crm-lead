@@ -1,5 +1,5 @@
 <div class="mx-auto max-w-[78rem] px-4 pt-5 pb-10 sm:px-6 lg:px-10 lg:pt-8">
-  <a routerLink="/clientes" class="inline-flex items-center gap-1.5 text-sm font-semibold text-ink-2 hover:text-pen">
+  <a routerLink="/contacts" class="inline-flex items-center gap-1.5 text-sm font-semibold text-ink-2 hover:text-pen">
     <svg lucideArrowLeft [size]="16"></svg>
     {{ t('nav.contacts') }}
   </a>
@@ -276,7 +276,7 @@
   } @else {
     <app-empty-state [title]="t('contact.notFound')" class="mt-6">
       {{ t('detail.notFoundBody') }}
-      <div actions><a routerLink="/clientes" class="btn-secondary btn-sm">{{ t('contact.goList') }}</a></div>
+      <div actions><a routerLink="/contacts" class="btn-secondary btn-sm">{{ t('contact.goList') }}</a></div>
     </app-empty-state>
   }
 </div>

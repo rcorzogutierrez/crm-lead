@@ -11,9 +11,9 @@ export const memberGuard: CanActivateFn = async () => {
     case 'member':
       return true;
     case 'pending':
-      return router.parseUrl('/acceso-pendiente');
+      return router.parseUrl('/pending');
     default:
-      return router.parseUrl('/entrar');
+      return router.parseUrl('/login');
   }
 };
 
@@ -22,12 +22,12 @@ export const guestGuard: CanActivateFn = async () => {
   const auth = inject(AuthService);
   const router = inject(Router);
   await auth.settled();
-  return auth.status() === 'member' ? router.parseUrl('/hoy') : true;
+  return auth.status() === 'member' ? router.parseUrl('/today') : true;
 };
 
 export const adminGuard: CanActivateFn = async () => {
   const auth = inject(AuthService);
   const router = inject(Router);
   await auth.settled();
-  return auth.isAdmin() ? true : router.parseUrl('/hoy');
+  return auth.isAdmin() ? true : router.parseUrl('/today');
 };

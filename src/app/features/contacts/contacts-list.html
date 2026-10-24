@@ -32,7 +32,7 @@
         [placeholder]="t('list.searchPlaceholder')"
         [attr.aria-label]="t('contacts.search')"
         [value]="search()"
-        (input)="setParam('buscar', $any($event.target).value)"
+        (input)="setParam('search', $any($event.target).value)"
       />
     </div>
     <div class="inline-flex flex-wrap rounded-lg border border-rule-strong bg-sheet p-0.5" role="radiogroup" [attr.aria-label]="t('contacts.kind')">
@@ -41,7 +41,7 @@
           type="button"
           role="radio"
           [attr.aria-checked]="kind() === k.id"
-          (click)="setParam('tipo', k.id === 'todos' ? null : k.id)"
+          (click)="setParam('type', k.id === 'all' ? null : k.id)"
           class="h-8 rounded-md px-3 text-sm font-semibold transition-colors"
           [class]="kind() === k.id ? 'bg-ink text-white' : 'text-ink-2 hover:text-ink'"
         >
@@ -88,7 +88,7 @@
           @for (row of rows(); track row.c.id) {
             <tr class="cursor-pointer transition-colors duration-100 hover:bg-pen-soft/50" (click)="open(row.c)">
               <td class="px-4 py-2.5">
-                <a [routerLink]="['/clientes', row.c.id]" class="font-semibold text-ink hover:text-pen" (click)="$event.stopPropagation()">{{ row.c.name }}</a>
+                <a [routerLink]="['/contacts', row.c.id]" class="font-semibold text-ink hover:text-pen" (click)="$event.stopPropagation()">{{ row.c.name }}</a>
                 <p class="truncate text-xs text-ink-3">{{ row.c.company || row.c.phone || row.c.email || '—' }}</p>
               </td>
               <td class="px-3 py-2.5">
@@ -118,7 +118,7 @@
       <ul class="divide-y divide-rule md:hidden">
         @for (row of rows(); track row.c.id) {
           <li class="flex items-center">
-            <a [routerLink]="['/clientes', row.c.id]" class="flex min-w-0 flex-1 items-center gap-3 py-3 pr-2 pl-4 active:bg-sheet-2">
+            <a [routerLink]="['/contacts', row.c.id]" class="flex min-w-0 flex-1 items-center gap-3 py-3 pr-2 pl-4 active:bg-sheet-2">
               <div class="min-w-0 flex-1">
                 <p class="truncate font-semibold">{{ row.c.name }}</p>
                 <p class="mt-0.5 truncate text-xs text-ink-3">

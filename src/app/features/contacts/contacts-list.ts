@@ -15,13 +15,13 @@ import { Avatar } from '../../shared/avatar';
 import { DueChip } from '../../shared/due-chip';
 import { EmptyState } from '../../shared/empty-state';
 
-type Kind = 'todos' | 'clientes' | 'prospectos' | 'sin-abiertas';
+type Kind = 'all' | 'customers' | 'prospects' | 'idle';
 
 const KINDS: { id: Kind; label: I18nKey }[] = [
-  { id: 'todos', label: 'contacts.all' },
-  { id: 'clientes', label: 'contacts.customers' },
-  { id: 'prospectos', label: 'contacts.prospects' },
-  { id: 'sin-abiertas', label: 'contacts.idle' },
+  { id: 'all', label: 'contacts.all' },
+  { id: 'customers', label: 'contacts.customers' },
+  { id: 'prospects', label: 'contacts.prospects' },
+  { id: 'idle', label: 'contacts.idle' },
 ];
 
 const normalize = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
@@ -46,8 +46,8 @@ export class ContactsList {
   protected readonly money = moneyLabel;
 
   private readonly params = toSignal(this.route.queryParamMap, { requireSync: true });
-  protected readonly search = computed(() => this.params().get('buscar') ?? '');
-  protected readonly kind = computed<Kind>(() => (this.params().get('tipo') as Kind) || 'todos');
+  protected readonly search = computed(() => this.params().get('search') ?? '');
+  protected readonly kind = computed<Kind>(() => (this.params().get('type') as Kind) || 'all');
   protected readonly migrating = signal(false);
 
   protected readonly rows = computed(() => {
@@ -59,9 +59,9 @@ export class ContactsList {
       .map((c) => ({ c, s: this.contacts.summary(c.id) }))
       .filter(({ c, s }) => {
         const customer = s.wonCount > 0;
-        if (kind === 'clientes' && !customer) return false;
-        if (kind === 'prospectos' && customer) return false;
-        if (kind === 'sin-abiertas' && (!customer || s.openCount > 0)) return false;
+        if (kind === 'customers' && !customer) return false;
+        if (kind === 'prospects' && customer) return false;
+        if (kind === 'idle' && (!customer || s.openCount > 0)) return false;
         // El teléfono se compara por dígitos: "55 1234" encuentra "+52 (55) 1234-5678".
         const phoneHit = digits.length >= 3 && phoneDigits(c.phone).includes(digits);
         if (q && !phoneHit && !normalize(`${c.name} ${c.company} ${c.email} ${c.phone}`).includes(q)) return false;
@@ -75,7 +75,7 @@ export class ContactsList {
   }
 
   protected open(c: Contact): void {
-    void this.router.navigate(['/clientes', c.id]);
+    void this.router.navigate(['/contacts', c.id]);
   }
 
   protected since(s: ContactSummary): string {

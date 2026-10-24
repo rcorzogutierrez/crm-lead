@@ -1,4 +1,8 @@
+import { Component } from '@angular/core';
+import { TestBed } from '@angular/core/testing';
+import { provideRouter, Router } from '@angular/router';
 import { statsPatch } from './core/contact-stats';
+import { LEGACY_ROUTES, legacyParamsGuard } from './core/legacy-urls';
 import { agoLabel, dayDiff, dueLabel, dueState, presetDate } from './core/dates';
 import { setLang, t } from './core/i18n/i18n';
 
@@ -64,5 +68,40 @@ describe('resumen de compras del contacto', () => {
 
   it('un cambio sin efecto no toca el contacto', () => {
     expect(statsPatch({ stage: 'new', value: 0, assigneeId: 'ana' }, { stage: 'contacted', value: 0, assigneeId: 'ana' }, false)).toEqual({});
+  });
+});
+
+describe('URLs antiguas en español', () => {
+  @Component({ template: '' })
+  class Blank {}
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({
+      providers: [
+        provideRouter([
+          ...LEGACY_ROUTES,
+          { path: 'today', component: Blank },
+          { path: 'contacts', component: Blank, canActivate: [legacyParamsGuard] },
+          { path: 'contacts/:id', component: Blank },
+          { path: 'leads', component: Blank, canActivate: [legacyParamsGuard] },
+        ]),
+      ],
+    });
+  });
+
+  const navigate = async (url: string) => {
+    const router = TestBed.inject(Router);
+    await router.navigateByUrl(url);
+    return router.url;
+  };
+
+  it('redirige las rutas viejas a las nuevas', async () => {
+    expect(await navigate('/hoy')).toBe('/today');
+    expect(await navigate('/clientes/abc')).toBe('/contacts/abc');
+  });
+
+  it('traduce los filtros guardados en la URL', async () => {
+    expect(await navigate('/leads?filtro=sin-accion&responsable=yo&buscar=ana')).toBe('/leads?filter=no-action&assignee=me&search=ana');
+    expect(await navigate('/clientes?tipo=prospectos')).toBe('/contacts?type=prospects');
   });
 });
