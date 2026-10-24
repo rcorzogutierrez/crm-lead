@@ -7,6 +7,7 @@ follow-up programado, no del registro.
 - Idioma del código de dominio (comentarios): **español**. La interfaz es **bilingüe español/inglés** (español por defecto).
 - **i18n en tiempo de ejecución** (`src/app/core/i18n/`), sin librerías y sin recargar: `t('clave', { param })` lee la signal `lang`, así que plantillas y `computed` se actualizan solas. Ningún texto visible va escrito directo en plantillas o servicios: se añade la clave en `es.ts` **y** en `en.ts` (el tipo de `en.ts` obliga a traducirlas todas). Las etiquetas de `STAGES`/`SOURCES`/`CHANNELS` son getters traducidos; fechas y montos usan `intlLocale()`; los `title` de las rutas son claves (`I18nTitleStrategy`). Selector: `shared/lang-switch.ts` (riel, barra móvil, login); la elección se guarda en `localStorage`. No se usa `@angular/localize` porque compila un bundle por idioma y no permite cambiar en caliente.
 - **URLs en inglés** (`/today`, `/leads`, `/contacts`, `/pipeline`, `/services`, `/team`, `/login`, `/pending`), igual que los parámetros de filtro (`?search=`, `?stage=open`, `?filter=no-action`…). Las rutas y parámetros antiguos en español redirigen desde `core/legacy-urls.ts`; una ruta nueva va en inglés.
+- Skill oficial de Angular en `.claude/skills/angular-developer/` (ver `.claude/skills/README.md`); donde difiera, mandan las convenciones de este archivo.
 - Contexto de producto: `PRODUCT.md`. Sistema visual: `DESIGN.md`. Contrato de dirección de diseño: `.impeccable/surfaces/src-app.md`.
 
 ## Stack (fijado, no cambiar sin pedirlo)
