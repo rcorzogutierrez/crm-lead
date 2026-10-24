@@ -5,12 +5,12 @@ export const routes: Routes = [
   {
     path: 'entrar',
     canActivate: [guestGuard],
-    title: 'Entrar · Agenda',
+    title: 'Entrar · CRM Lead',
     loadComponent: () => import('./features/auth/login').then((m) => m.Login),
   },
   {
     path: 'acceso-pendiente',
-    title: 'Acceso pendiente · Agenda',
+    title: 'Acceso pendiente · CRM Lead',
     loadComponent: () => import('./features/auth/pending').then((m) => m.Pending),
   },
   {
@@ -21,27 +21,27 @@ export const routes: Routes = [
       { path: '', pathMatch: 'full', redirectTo: 'hoy' },
       {
         path: 'hoy',
-        title: 'Hoy · Agenda',
+        title: 'Hoy · CRM Lead',
         loadComponent: () => import('./features/today/today').then((m) => m.Today),
       },
       {
         path: 'leads',
-        title: 'Leads · Agenda',
+        title: 'Leads · CRM Lead',
         loadComponent: () => import('./features/leads/leads-list').then((m) => m.LeadsList),
       },
       {
         path: 'leads/:id',
-        title: 'Lead · Agenda',
+        title: 'Lead · CRM Lead',
         loadComponent: () => import('./features/lead-detail/lead-detail').then((m) => m.LeadDetail),
       },
       {
         path: 'pipeline',
-        title: 'Pipeline · Agenda',
+        title: 'Pipeline · CRM Lead',
         loadComponent: () => import('./features/pipeline/pipeline').then((m) => m.Pipeline),
       },
       {
         path: 'equipo',
-        title: 'Equipo · Agenda',
+        title: 'Equipo · CRM Lead',
         loadComponent: () => import('./features/team/team').then((m) => m.Team),
       },
     ],

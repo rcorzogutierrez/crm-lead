@@ -1,17 +1,17 @@
 import { Component, effect, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
-import { LucideBookOpen } from '@lucide/angular';
 import { AuthService } from '../../core/auth.service';
+import { Logo } from '../../shared/logo';
 
 @Component({
   selector: 'app-login',
-  imports: [LucideBookOpen],
+  imports: [Logo],
   template: `
     <div class="grid min-h-dvh lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
       <section class="rail-surface relative hidden flex-col justify-between p-12 text-rail-ink lg:flex">
         <div class="flex items-center gap-2.5">
-          <svg lucideBookOpen [size]="22" [strokeWidth]="1.75"></svg>
-          <span class="date-face text-xl font-bold">Agenda</span>
+          <app-logo [size]="36" />
+          <span class="date-face text-xl font-bold">CRM Lead</span>
         </div>
         <div>
           <p class="date-face max-w-[16ch] text-[2.75rem] leading-[1.05] font-bold">Ningún lead se queda sin próxima acción.</p>
@@ -23,8 +23,8 @@ import { AuthService } from '../../core/auth.service';
       <section class="flex items-center justify-center px-6 py-16">
         <div class="w-full max-w-sm">
           <div class="flex items-center gap-2.5 text-ink lg:hidden">
-            <svg lucideBookOpen [size]="22" [strokeWidth]="1.75"></svg>
-            <span class="date-face text-xl font-bold">Agenda</span>
+            <app-logo [size]="36" />
+            <span class="date-face text-xl font-bold">CRM Lead</span>
           </div>
           <h1 class="date-face mt-8 text-[2rem] font-bold lg:mt-0">Entrar</h1>
           <p class="mt-2 text-ink-2">Usa la cuenta de Google con la que te invitaron al equipo.</p>

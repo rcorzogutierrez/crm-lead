@@ -1,7 +1,6 @@
 import { Component, computed, inject } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import {
-  LucideBookOpen,
   LucideCalendarDays,
   LucideColumns3,
   LucideLogOut,
@@ -13,6 +12,7 @@ import { AuthService } from '../../core/auth.service';
 import { FollowUpsService } from '../../core/followups.service';
 import { UiService } from '../../core/ui.service';
 import { Avatar } from '../../shared/avatar';
+import { Logo } from '../../shared/logo';
 import { CaptureDrawer } from './capture-drawer';
 
 /** Marco de la app: riel pizarra (escritorio) o barra inferior (móvil). */
@@ -24,7 +24,7 @@ import { CaptureDrawer } from './capture-drawer';
     RouterLinkActive,
     Avatar,
     CaptureDrawer,
-    LucideBookOpen,
+    Logo,
     LucideCalendarDays,
     LucideColumns3,
     LucideLogOut,

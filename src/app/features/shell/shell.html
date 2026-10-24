@@ -10,10 +10,8 @@
   aria-label="Navegación principal"
 >
   <div class="flex items-center gap-2.5 px-5 pt-6 pb-5">
-    <span class="grid size-8 place-items-center rounded-md bg-rail-ink/10 text-rail-ink">
-      <svg lucideBookOpen [size]="18" [strokeWidth]="1.75"></svg>
-    </span>
-    <span class="date-face text-[1.0625rem] font-bold tracking-tight">Agenda</span>
+    <app-logo [size]="32" />
+    <span class="date-face text-[1.0625rem] font-bold tracking-tight">CRM Lead</span>
   </div>
 
   <div class="px-3">
@@ -68,8 +66,8 @@
 
 <!-- Barra superior (móvil) -->
 <header class="rail-surface sticky top-0 z-30 flex h-14 items-center gap-2.5 px-4 text-rail-ink lg:hidden">
-  <svg lucideBookOpen [size]="18" [strokeWidth]="1.75"></svg>
-  <span class="date-face text-base font-bold">Agenda</span>
+  <app-logo [size]="28" />
+  <span class="date-face text-base font-bold">CRM Lead</span>
   @if (auth.member(); as me) {
     <button type="button" class="ml-auto rounded-full" (click)="signOut()" aria-label="Cerrar sesión">
       <app-avatar [name]="me.displayName" [photo]="me.photoURL" size="sm" />
