@@ -243,6 +243,53 @@ describe('Contactos (todo el equipo)', () => {
     await assertSucceeds(deleteDoc(doc(db(ANA), 'contacts/c1')));
   });
 
+  it('solo un admin archiva; cualquiera reactiva', async () => {
+    await assertFails(updateDoc(doc(db(LUIS), 'contacts/c1'), { archived: true }));
+    await assertFails(
+      updateDoc(doc(db(LUIS), 'contacts/c1'), { archivedAt: Timestamp.fromDate(new Date()) }),
+    );
+    await assertSucceeds(
+      updateDoc(doc(db(ANA), 'contacts/c1'), { archived: true, archivedAt: Timestamp.fromDate(new Date()) }),
+    );
+    // Editar otros datos de un archivado no lo reactiva ni lo impide.
+    await assertSucceeds(updateDoc(doc(db(LUIS), 'contacts/c1'), { phone: '555' }));
+    await assertSucceeds(updateDoc(doc(db(LUIS), 'contacts/c1'), { archived: false, archivedAt: null }));
+    await assertFails(updateDoc(doc(db(ANA), 'contacts/c1'), { archived: 'sí' }));
+  });
+
+  it('al archivar, el admin pasa sus negocios abiertos a perdido y cancela sus follow-ups', async () => {
+    const fs = db(ANA);
+    const batch = writeBatch(fs);
+    batch.update(doc(fs, 'leads/luis-1'), { stage: 'lost', lostReason: 'Archivado', nextFollowUpAt: null });
+    batch.set(doc(fs, 'leads/luis-1/activities/a9'), { type: 'stage', from: 'new', to: 'lost', body: 'Archivado', createdBy: ANA });
+    batch.update(doc(fs, 'followups/f-luis'), { status: 'cancelled' });
+    batch.update(doc(fs, 'contacts/c1'), { archived: true, archivedAt: Timestamp.fromDate(new Date()), openBy: {} });
+    await assertSucceeds(batch.commit());
+  });
+
+  it('un admin no borra a un cliente con ventas ganadas', async () => {
+    await seed({ 'contacts/c3': { ...contact(LUIS), wonCount: 1, wonTotal: 2060 } });
+    await assertFails(deleteDoc(doc(db(ANA), 'contacts/c3')));
+    await seed({ 'contacts/c4': { ...contact(LUIS), wonCount: 0, wonTotal: 0 } });
+    await assertFails(deleteDoc(doc(db(LUIS), 'contacts/c4')));
+    await assertSucceeds(deleteDoc(doc(db(ANA), 'contacts/c4')));
+  });
+
+  it('un admin borra un contacto con sus negocios, historial y follow-ups', async () => {
+    const fs = db(ANA);
+    const first = writeBatch(fs);
+    first.delete(doc(fs, 'leads/luis-1/activities/a1'));
+    first.delete(doc(fs, 'followups/f-luis'));
+    await assertSucceeds(first.commit());
+    await assertSucceeds(deleteDoc(doc(fs, 'leads/luis-1')));
+    await assertSucceeds(deleteDoc(doc(fs, 'contacts/c1')));
+  });
+
+  it('un vendedor no borra el historial ni los follow-ups de otro', async () => {
+    await assertFails(deleteDoc(doc(db(LUIS), 'leads/pedro-1/activities/a1')));
+    await assertFails(deleteDoc(doc(db(LUIS), 'followups/f-pedro')));
+  });
+
   it('nadie crea un contacto a nombre de otro creador', async () => {
     await assertFails(setDoc(doc(db(LUIS), 'contacts/c3'), contact(LUIS, PEDRO)));
   });
@@ -259,6 +306,15 @@ describe('Leads: cada vendedor ve solo los suyos', () => {
     await assertSucceeds(getDocs(mine));
     await assertFails(getDocs(collection(db(LUIS), 'leads')));
     await assertSucceeds(getDocs(collection(db(ANA), 'leads')));
+  });
+
+  it('un negocio nuevo con un contacto archivado lo reactiva en el mismo batch', async () => {
+    await seed({ 'contacts/c1': { ...contact(LUIS), archived: true, archivedAt: Timestamp.fromDate(new Date()) } });
+    const fs = db(LUIS);
+    const batch = writeBatch(fs);
+    batch.set(doc(fs, 'leads/luis-2'), lead(LUIS));
+    batch.update(doc(fs, 'contacts/c1'), { archived: false, archivedAt: null });
+    await assertSucceeds(batch.commit());
   });
 
   it('un vendedor crea leads solo a su nombre', async () => {

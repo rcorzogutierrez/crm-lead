@@ -69,7 +69,7 @@ src/app/
 | `meta/team` | único | `ownerUid`, `name` — existe desde que entra el primer usuario |
 | `members/{uid}` | miembro | `email`, `displayName`, `photoURL`, `role: admin\|member`, `active` |
 | `invites/{emailEnMinúsculas}` | invitación | `email`, `role`, `invitedBy` — se consume al entrar |
-| `contacts/{id}` | persona/empresa | `name`, `company`, `email` (minúsculas), `phone`, `assigneeId`, `notes`, `createdBy` + resumen `statsV`, `wonCount`, `wonTotal`, `firstWonAt`, `openBy` (uid → nº abiertos) — "cliente" si `wonCount > 0` |
+| `contacts/{id}` | persona/empresa | `name`, `company`, `email` (minúsculas), `phone`, `assigneeId`, `notes`, `createdBy` + resumen `statsV`, `wonCount`, `wonTotal`, `firstWonAt`, `openBy` (uid → nº abiertos), `archived`, `archivedAt` — "cliente" si `wonCount > 0` |
 | `leads/{id}` | lead = oportunidad (un servicio para un contacto) | `contactId`, copia del contacto (`name`, `company`, `email`, `phone`), `serviceId`, `serviceName`, `detail`, `quantity`, `unitPrice`, `tier`, `tierPct`, `value`, `priceAck`, `source`, `stage`, `wonAt`, `assigneeId`, `notes`, `lostReason`, `nextFollowUpAt`, `lastContactAt`, `createdBy`, timestamps |
 | `services/{id}` | catálogo | `name`, `description`, `price` (oficial, por unidad), `unit`, `active` — solo admin escribe; se archivan, no se borran |
 | `meta/pricing` | único | `bronze`, `silver`, `gold` (% sobre el precio oficial; por defecto 3/5/7) — solo admin |
@@ -97,6 +97,8 @@ Reglas de dominio:
 - Roles (`admin` / `member` = vendedor): solo un admin cambia el rol o el acceso de **otro** miembro, con confirmación en línea en *Equipo*, y el de una invitación pendiente. Nadie cambia su propio rol ni acceso: así el equipo nunca se queda sin admin activo.
 - Solo un admin reasigna (`LeadsService.reassign`, que arrastra los follow-ups pendientes) o cambia el responsable de un contacto. Un vendedor crea leads siempre a su nombre.
 - Borrar un lead: admin, o su creador si sigue siendo el responsable.
+- Archivar un contacto: solo admin (`ContactsService.archive`); sus negocios abiertos pasan a Perdido y sus follow-ups pendientes se cancelan en el mismo batch. Se oculta de *Clientes* salvo con el filtro *Archivados*. Reactivar lo puede hacer cualquiera: abrir un negocio nuevo con él lo reactiva.
+- Borrar un contacto: solo admin y solo si no tiene ventas ganadas (las reglas miran `wonCount`); se llevan sus negocios con historial y follow-ups. Un cliente con ventas se archiva.
 - Cambios en reglas: añadir o ajustar su caso en `tests/rules/firestore.rules.test.ts` y pasar `npm run test:rules`.
 - Configuración necesaria en la consola de Firebase: habilitar el proveedor Google en Authentication y añadir el dominio de hosting a *Authorized domains*.
 
