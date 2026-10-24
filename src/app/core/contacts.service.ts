@@ -3,10 +3,12 @@ import {
   DocumentData,
   Timestamp,
   collection,
+  deleteDoc,
   doc,
   orderBy,
   query,
   serverTimestamp,
+  updateDoc,
   writeBatch,
 } from 'firebase/firestore';
 import { AuthService } from './auth.service';
@@ -14,6 +16,7 @@ import { STATS_VERSION } from './contact-stats';
 import { FIRESTORE } from './firebase';
 import { toDate } from './firestore-utils';
 import { FollowUpsService } from './followups.service';
+import { t } from './i18n/i18n';
 import { LeadsService } from './leads.service';
 import { Contact, ContactDraft, ContactStats, Lead, isClosed } from './models';
 import { teamQuery } from './team-query';
@@ -39,6 +42,8 @@ function mapContact(id: string, d: DocumentData): Contact {
             openBy: cleanOpenBy(d['openBy']),
           }
         : null,
+    archived: d['archived'] === true,
+    archivedAt: toDate(d['archivedAt']),
   };
 }
 
@@ -241,7 +246,12 @@ export class ContactsService {
       .sort((a, b) => {
         const sa = normalizeText(a.name).startsWith(q) ? 0 : 1;
         const sb = normalizeText(b.name).startsWith(q) ? 0 : 1;
-        return sa - sb || Number(this.isCustomer(b.id)) - Number(this.isCustomer(a.id)) || a.name.localeCompare(b.name);
+        return (
+          Number(a.archived) - Number(b.archived) ||
+          sa - sb ||
+          Number(this.isCustomer(b.id)) - Number(this.isCustomer(a.id)) ||
+          a.name.localeCompare(b.name)
+        );
       })
       .slice(0, max);
   }
@@ -284,6 +294,61 @@ export class ContactsService {
   }
 
   /**
+   * Solo admin: archiva el contacto (deja de aparecer en la lista, conserva su historial).
+   * Sus negocios abiertos pasan a Perdido con `reason` y sus follow-ups pendientes se
+   * cancelan en el mismo batch, para que ningún lead activo quede sin próxima acción.
+   */
+  async archive(contact: Contact, reason: string): Promise<void> {
+    const uid = this.auth.uid();
+    const open = this.leadsService.leads().filter((l) => l.contactId === contact.id && !isClosed(l.stage));
+    const batch = writeBatch(this.db);
+    for (const l of open) {
+      batch.update(doc(this.db, 'leads', l.id), {
+        stage: 'lost',
+        lostReason: reason,
+        wonAt: null,
+        nextFollowUpAt: null,
+        updatedAt: serverTimestamp(),
+      });
+      batch.set(doc(collection(this.db, 'leads', l.id, 'activities')), {
+        type: 'stage',
+        from: l.stage,
+        to: 'lost',
+        body: reason,
+        createdBy: uid,
+        createdAt: serverTimestamp(),
+      });
+      for (const fu of this.followUps.forLead(l.id)) batch.update(doc(this.db, 'followups', fu.id), { status: 'cancelled' });
+    }
+    // Un admin ve todos los leads: si había abiertos, ya no queda ninguno.
+    batch.update(doc(this.db, 'contacts', contact.id), {
+      archived: true,
+      archivedAt: serverTimestamp(),
+      ...(open.length ? { openBy: {} } : {}),
+      updatedAt: serverTimestamp(),
+    });
+    await batch.commit();
+  }
+
+  /** Vuelve a mostrar el contacto. Sus negocios perdidos siguen perdidos. */
+  unarchive(contact: Contact): Promise<void> {
+    return updateDoc(doc(this.db, 'contacts', contact.id), { archived: false, archivedAt: null, updatedAt: serverTimestamp() });
+  }
+
+  /**
+   * Solo admin: borra el contacto con sus negocios (historial y follow-ups incluidos).
+   * Un cliente con ventas ganadas no se borra: se archiva, para no perder lo vendido.
+   */
+  async remove(contact: Contact): Promise<void> {
+    const leads = this.leadsService.leads().filter((l) => l.contactId === contact.id);
+    if (this.summary(contact.id).wonCount > 0 || leads.some((l) => l.stage === 'won')) {
+      throw new Error(t('contact.cantDeleteCustomer'));
+    }
+    for (const l of leads) await this.leadsService.remove(l, false);
+    await deleteDoc(doc(this.db, 'contacts', contact.id));
+  }
+
+  /**
    * Crea un contacto por cada persona de los leads antiguos (agrupando por email o teléfono)
    * y los vincula. Se puede repetir: solo toca leads sin contacto.
    */
@@ -314,6 +379,8 @@ export class ContactsService {
           createdAt: null,
           updatedAt: null,
           stats: null,
+          archived: false,
+          archivedAt: null,
         };
         known.push(match);
         ops.push({

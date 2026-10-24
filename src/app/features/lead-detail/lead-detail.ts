@@ -441,7 +441,8 @@ export class LeadDetail {
 
   protected canDelete(): boolean {
     const lead = this.lead();
-    return !!lead && (this.auth.isAdmin() || lead.createdBy === this.auth.uid());
+    // Igual que las reglas: el admin, o su creador si sigue siendo el responsable.
+    return !!lead && (this.auth.isAdmin() || (lead.createdBy === this.auth.uid() && lead.assigneeId === this.auth.uid()));
   }
 
   protected activityLabel(a: Activity): string {

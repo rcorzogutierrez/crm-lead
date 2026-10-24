@@ -2,7 +2,7 @@ rules_version = '2';
 
 // Reglas del CRM para un equipo pequeño compartido.
 // - Solo miembros activos (members/{uid}.active == true) leen y escriben datos.
-// - Contactos y catálogo: visibles para todo el equipo.
+// - Contactos y catálogo: visibles para todo el equipo. Solo un admin archiva o borra contactos.
 // - Leads, su historial y sus follow-ups: un vendedor solo ve y toca los suyos (assigneeId);
 //   un admin ve todo y es el único que reasigna.
 // - El primer usuario crea meta/team y queda como admin.
@@ -160,7 +160,16 @@ service cloud.firestore {
         && isString(d.email, 200)
         && isString(d.phone, 50)
         && isString(d.notes, 5000)
-        && d.assigneeId is string;
+        && d.assigneeId is string
+        && d.get('archived', false) is bool;
+    }
+    // Archivar es cosa del admin. Cualquiera puede reactivar (abrir un negocio nuevo
+    // con un contacto archivado lo reactiva en el mismo batch).
+    function archiveOk() {
+      return isAdmin()
+        || !request.resource.data.diff(resource.data).affectedKeys().hasAny(['archived', 'archivedAt'])
+        || (request.resource.data.get('archived', false) == false
+            && request.resource.data.get('archivedAt', null) == null);
     }
 
     match /contacts/{contactId} {
@@ -173,8 +182,10 @@ service cloud.firestore {
       allow update: if isMember()
         && validContact(request.resource.data)
         && request.resource.data.createdBy == resource.data.createdBy
-        && (isAdmin() || request.resource.data.assigneeId == resource.data.assigneeId);
-      allow delete: if isAdmin();
+        && (isAdmin() || request.resource.data.assigneeId == resource.data.assigneeId)
+        && archiveOk();
+      // Solo un admin borra, y nunca a un cliente con ventas ganadas (ese se archiva).
+      allow delete: if isAdmin() && resource.data.get('wonCount', 0) == 0;
     }
 
     // ---- Leads (oportunidades) ----

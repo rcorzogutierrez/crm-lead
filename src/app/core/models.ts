@@ -59,6 +59,9 @@ export interface Contact {
    * los demás. null = aún no calculado (contactos anteriores; lo calcula la app de un admin).
    */
   stats: ContactStats | null;
+  /** Archivado por un admin: ya no se trabaja, se oculta de la lista pero conserva su historial. */
+  archived: boolean;
+  archivedAt: Date | null;
 }
 
 export interface ContactStats {

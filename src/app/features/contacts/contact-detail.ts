@@ -1,13 +1,16 @@
 import { Component, DestroyRef, computed, effect, inject, input, signal, untracked } from '@angular/core';
 import { FormField, email, form, required, submit } from '@angular/forms/signals';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import {
+  LucideArchive,
+  LucideArchiveRestore,
   LucideArrowLeft,
   LucideCheck,
   LucideMail,
   LucideMessageCircle,
   LucidePhone,
   LucidePlus,
+  LucideTrash2,
   LucideUsers,
 } from '@lucide/angular';
 import { ActivitiesService } from '../../core/activities.service';
@@ -19,7 +22,7 @@ import { LiveQuery, firestoreErrorMessage } from '../../core/firestore-utils';
 import { FollowUpsService } from '../../core/followups.service';
 import { I18nKey, intlLocale, t } from '../../core/i18n/i18n';
 import { MembersService } from '../../core/members.service';
-import { Activity, ActivityType, ContactDraft, Lead, stageMeta, tierLabel } from '../../core/models';
+import { Activity, ActivityType, Contact, ContactDraft, Lead, stageMeta, tierLabel } from '../../core/models';
 import { ToastService } from '../../core/toast.service';
 import { UiService } from '../../core/ui.service';
 import { ChannelIcon } from '../../shared/channel-icon';
@@ -61,7 +64,10 @@ interface HistoryEntry extends Activity {
     LucideMessageCircle,
     LucideMail,
     LucidePlus,
+    LucideTrash2,
     LucideUsers,
+    LucideArchive,
+    LucideArchiveRestore,
   ],
   templateUrl: './contact-detail.html',
 })
@@ -78,6 +84,7 @@ export class ContactDetail {
   protected readonly ui = inject(UiService);
   protected readonly auth = inject(AuthService);
   private readonly toast = inject(ToastService);
+  private readonly router = inject(Router);
 
   protected readonly t = t;
   protected readonly money = moneyLabel;
@@ -91,6 +98,15 @@ export class ContactDetail {
     new Intl.ListFormat(intlLocale(), { type: 'conjunction' }).format(this.summary().othersOpen.map((uid) => this.members.name(uid))),
   );
   protected readonly showLost = signal(false);
+  /** Confirmación en línea de archivar o eliminar (solo admin). */
+  protected readonly confirming = signal<'archive' | 'delete' | null>(null);
+  protected readonly busy = signal(false);
+  protected readonly dealCount = computed(() => {
+    const s = this.summary();
+    return s.open.length + s.won.length + s.lost.length;
+  });
+  /** Un cliente con ventas no se elimina: se archiva. */
+  protected readonly canDelete = computed(() => this.auth.isAdmin() && this.summary().wonCount === 0);
   protected readonly editing = signal(false);
 
   protected readonly tel = computed(() => telHref(this.contact()?.phone ?? ''));
@@ -151,6 +167,41 @@ export class ContactDetail {
       }
       return undefined;
     });
+  }
+
+  protected async archive(c: Contact): Promise<void> {
+    this.busy.set(true);
+    try {
+      await this.contacts.archive(c, t('contact.archivedReason'));
+      this.confirming.set(null);
+      this.toast.show(t('contact.archivedMsg', { name: c.name }));
+    } catch (err) {
+      this.toast.error(firestoreErrorMessage(err));
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  protected async unarchive(c: Contact): Promise<void> {
+    try {
+      await this.contacts.unarchive(c);
+      this.toast.show(t('contact.unarchived', { name: c.name }));
+    } catch (err) {
+      this.toast.error(firestoreErrorMessage(err));
+    }
+  }
+
+  protected async remove(c: Contact): Promise<void> {
+    this.busy.set(true);
+    try {
+      await this.contacts.remove(c);
+      this.toast.show(t('contact.deleted', { name: c.name }));
+      void this.router.navigateByUrl('/contacts');
+    } catch (err) {
+      this.toast.error(firestoreErrorMessage(err));
+    } finally {
+      this.busy.set(false);
+    }
   }
 
   protected nextFor(lead: Lead) {

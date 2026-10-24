@@ -106,8 +106,9 @@ export class LeadsService {
 
     let contactId = input.contactId;
     if (contactId) {
+      // Un negocio nuevo reactiva al contacto si estaba archivado.
       const patch = statsPatch(null, deal, await this.firstWonMissing(contactId, deal));
-      if (Object.keys(patch).length) batch.update(doc(this.db, 'contacts', contactId), patch);
+      batch.update(doc(this.db, 'contacts', contactId), { ...patch, archived: false, archivedAt: null });
     } else {
       const ref = doc(collection(this.db, 'contacts'));
       contactId = ref.id;
@@ -223,8 +224,11 @@ export class LeadsService {
     await batch.commit();
   }
 
-  /** Borra el lead con su historial y sus follow-ups. */
-  async remove(lead: Lead): Promise<void> {
+  /**
+   * Borra el lead con su historial y sus follow-ups. `patchContact = false` cuando se
+   * borra también el contacto (no hace falta corregir su resumen).
+   */
+  async remove(lead: Lead, patchContact = true): Promise<void> {
     const id = lead.id;
     // Un vendedor solo puede consultar sus follow-ups: la consulta debe decirlo.
     const fuQuery = this.auth.isAdmin()
@@ -237,7 +241,7 @@ export class LeadsService {
     await batch.commit();
     const last = writeBatch(this.db);
     last.delete(doc(this.db, 'leads', id));
-    this.patchContact(last, lead, null, false);
+    if (patchContact) this.patchContact(last, lead, null, false);
     await last.commit();
   }
 

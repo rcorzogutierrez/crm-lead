@@ -15,13 +15,14 @@ import { Avatar } from '../../shared/avatar';
 import { DueChip } from '../../shared/due-chip';
 import { EmptyState } from '../../shared/empty-state';
 
-type Kind = 'all' | 'customers' | 'prospects' | 'idle';
+type Kind = 'all' | 'customers' | 'prospects' | 'idle' | 'archived';
 
 const KINDS: { id: Kind; label: I18nKey }[] = [
   { id: 'all', label: 'contacts.all' },
   { id: 'customers', label: 'contacts.customers' },
   { id: 'prospects', label: 'contacts.prospects' },
   { id: 'idle', label: 'contacts.idle' },
+  { id: 'archived', label: 'contacts.archived' },
 ];
 
 const normalize = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
@@ -42,7 +43,10 @@ export class ContactsList {
   private readonly toast = inject(ToastService);
 
   protected readonly t = t;
-  protected readonly kinds = KINDS;
+  /** "Archivados" solo aparece si hay alguno (o si ya está elegido en la URL). */
+  protected readonly kinds = computed(() =>
+    KINDS.filter((k) => k.id !== 'archived' || this.kind() === 'archived' || this.contacts.contacts().some((c) => c.archived)),
+  );
   protected readonly money = moneyLabel;
 
   private readonly params = toSignal(this.route.queryParamMap, { requireSync: true });
@@ -58,6 +62,8 @@ export class ContactsList {
       .contacts()
       .map((c) => ({ c, s: this.contacts.summary(c.id) }))
       .filter(({ c, s }) => {
+        // Los archivados se ocultan salvo en su propio filtro.
+        if (c.archived !== (kind === 'archived')) return false;
         const customer = s.wonCount > 0;
         if (kind === 'customers' && !customer) return false;
         if (kind === 'prospects' && customer) return false;
