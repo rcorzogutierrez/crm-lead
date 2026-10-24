@@ -245,3 +245,104 @@ dialog.drawer[open]::backdrop {
 ::view-transition-new(root) {
   animation-duration: 140ms;
 }
+
+/* Pantalla de entrar */
+.login-hero {
+  background:
+    radial-gradient(70% 55% at 18% 12%, oklch(0.42 0.16 275 / 0.7), transparent 70%),
+    radial-gradient(55% 50% at 95% 95%, oklch(0.45 0.16 305 / 0.5), transparent 70%),
+    oklch(0.19 0.04 272);
+}
+.login-hero::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background-image: radial-gradient(oklch(1 0 0 / 0.09) 1px, transparent 1px);
+  background-size: 24px 24px;
+  mask-image: radial-gradient(ellipse 70% 60% at 35% 45%, black, transparent 80%);
+}
+.login-blob {
+  position: absolute;
+  z-index: -1;
+  border-radius: 9999px;
+  filter: blur(70px);
+  animation: blob-drift 16s ease-in-out infinite alternate;
+}
+@keyframes blob-drift {
+  to {
+    transform: translate(7%, -9%) scale(1.15);
+  }
+}
+.login-side {
+  background:
+    radial-gradient(60% 40% at 100% 0%, oklch(0.95 0.03 275 / 0.8), transparent 70%),
+    var(--color-paper);
+}
+.glass {
+  background: oklch(1 0 0 / 0.07);
+  border: 1px solid oklch(1 0 0 / 0.13);
+  backdrop-filter: blur(16px);
+  box-shadow: 0 30px 70px -25px oklch(0.08 0.05 272 / 0.7);
+}
+.google-btn {
+  box-shadow: 0 1px 2px oklch(0.25 0.04 265 / 0.06);
+  transition:
+    transform 180ms var(--ease-out-quart),
+    box-shadow 180ms var(--ease-out-quart),
+    border-color 180ms;
+}
+.google-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  border-color: var(--color-pen);
+  box-shadow: 0 12px 28px -10px oklch(0.5 0.2 275 / 0.35);
+}
+.google-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+.enter {
+  animation: enter-up 720ms var(--ease-out-quart) both;
+  animation-delay: var(--d, 0ms);
+}
+@keyframes enter-up {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+    filter: blur(6px);
+  }
+}
+/* .enter.float-slow: entra y luego flota */
+.float-slow {
+  animation: float 7s ease-in-out infinite;
+}
+.enter.float-slow {
+  animation:
+    enter-up 720ms var(--ease-out-quart) both var(--d, 0ms),
+    float 7s ease-in-out calc(var(--d, 0ms) + 720ms) infinite;
+}
+@keyframes float {
+  50% {
+    transform: translateY(-8px);
+  }
+}
+.check-pop {
+  animation: check-pop 520ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  animation-delay: var(--d, 0ms);
+}
+@keyframes check-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+}
+.now-line {
+  transform-origin: left;
+  animation: draw-line 700ms var(--ease-out-quart) both;
+  animation-delay: var(--d, 0ms);
+}
+@keyframes draw-line {
+  from {
+    transform: scaleX(0);
+    opacity: 0;
+  }
+}
