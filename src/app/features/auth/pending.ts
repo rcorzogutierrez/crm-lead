@@ -33,8 +33,8 @@ export class Pending {
   constructor() {
     effect(() => {
       const s = this.auth.status();
-      if (s === 'member') void this.router.navigateByUrl('/hoy');
-      if (s === 'signedOut') void this.router.navigateByUrl('/entrar');
+      if (s === 'member') void this.router.navigateByUrl('/today');
+      if (s === 'signedOut') void this.router.navigateByUrl('/login');
     });
   }
 

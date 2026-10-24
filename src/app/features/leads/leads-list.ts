@@ -42,12 +42,12 @@ export class LeadsList {
   protected readonly sources = SOURCES;
 
   private readonly params = toSignal(this.route.queryParamMap, { requireSync: true });
-  protected readonly search = computed(() => this.params().get('buscar') ?? '');
-  protected readonly stage = computed(() => this.params().get('etapa') ?? 'abiertos');
-  protected readonly source = computed(() => this.params().get('origen') ?? '');
-  protected readonly assignee = computed(() => this.params().get('responsable') ?? '');
-  protected readonly onlyOrphans = computed(() => this.params().get('filtro') === 'sin-accion');
-  protected readonly onlyPriceChanges = computed(() => this.params().get('filtro') === 'precio');
+  protected readonly search = computed(() => this.params().get('search') ?? '');
+  protected readonly stage = computed(() => this.params().get('stage') ?? 'open');
+  protected readonly source = computed(() => this.params().get('source') ?? '');
+  protected readonly assignee = computed(() => this.params().get('assignee') ?? '');
+  protected readonly onlyOrphans = computed(() => this.params().get('filter') === 'no-action');
+  protected readonly onlyPriceChanges = computed(() => this.params().get('filter') === 'price-change');
 
   protected readonly sortKey = signal<SortKey>('next');
   protected readonly sortAsc = signal(true);
@@ -56,13 +56,13 @@ export class LeadsList {
     const q = normalize(this.search().trim());
     const stage = this.stage();
     const source = this.source();
-    const assignee = this.assignee() === 'yo' ? this.auth.uid() : this.assignee();
+    const assignee = this.assignee() === 'me' ? this.auth.uid() : this.assignee();
     const orphans = this.onlyOrphans();
     const priceChanges = this.onlyPriceChanges();
 
     const list = this.leadsService.leads().filter((l) => {
-      if (stage === 'abiertos' && isClosed(l.stage)) return false;
-      if (stage !== 'abiertos' && stage !== 'todos' && l.stage !== stage) return false;
+      if (stage === 'open' && isClosed(l.stage)) return false;
+      if (stage !== 'open' && stage !== 'all' && l.stage !== stage) return false;
       if (source && l.source !== source) return false;
       if (assignee && l.assigneeId !== assignee) return false;
       if (orphans && (isClosed(l.stage) || l.nextFollowUpAt)) return false;
@@ -100,7 +100,7 @@ export class LeadsList {
   protected readonly totalValue = computed(() => moneyLabel(this.filtered().reduce((s, l) => s + l.value, 0)));
   protected readonly hasFilters = computed(
     () =>
-      !!(this.search() || this.source() || this.assignee() || this.onlyOrphans() || this.onlyPriceChanges() || this.stage() !== 'abiertos'),
+      !!(this.search() || this.source() || this.assignee() || this.onlyOrphans() || this.onlyPriceChanges() || this.stage() !== 'open'),
   );
 
   protected setParam(key: string, value: string | null): void {

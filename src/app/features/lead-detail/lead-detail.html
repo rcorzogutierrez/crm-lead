@@ -11,7 +11,7 @@
         <p class="mt-1 text-ink-2">
           @if (lead.serviceName) {
             @if (contact(); as c) {
-              <a [routerLink]="['/clientes', c.id]" class="font-semibold text-pen hover:underline">{{ c.name }}</a>
+              <a [routerLink]="['/contacts', c.id]" class="font-semibold text-pen hover:underline">{{ c.name }}</a>
             } @else {
               {{ lead.name }}
             }
@@ -271,7 +271,7 @@
             <div class="rounded-lg border border-rule bg-paper px-3 py-2.5 text-sm">
               <p class="flex items-center gap-2 font-semibold">
                 <svg lucideUserRound [size]="16" class="text-ink-2"></svg>
-                <a [routerLink]="['/clientes', c.id]" class="hover:text-pen hover:underline">{{ c.name }}</a>
+                <a [routerLink]="['/contacts', c.id]" class="hover:text-pen hover:underline">{{ c.name }}</a>
               </p>
               <p class="mt-0.5 text-xs text-ink-3">{{ t('detail.personHint') }}</p>
             </div>

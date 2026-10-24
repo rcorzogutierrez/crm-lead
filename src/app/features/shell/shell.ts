@@ -69,12 +69,12 @@ export class Shell {
   protected readonly t = t;
 
   protected readonly nav: readonly NavItem[] = [
-    { path: '/hoy', label: 'nav.today', icon: 'today' },
-    { path: '/clientes', label: 'nav.contacts', icon: 'contacts' },
+    { path: '/today', label: 'nav.today', icon: 'today' },
+    { path: '/contacts', label: 'nav.contacts', icon: 'contacts' },
     { path: '/leads', label: 'nav.leads', icon: 'leads' },
     { path: '/pipeline', label: 'nav.pipeline', icon: 'pipeline' },
-    { path: '/servicios', label: 'nav.services', icon: 'services' },
-    { path: '/equipo', label: 'nav.team', icon: 'team' },
+    { path: '/services', label: 'nav.services', icon: 'services' },
+    { path: '/team', label: 'nav.team', icon: 'team' },
   ];
   /** Barra móvil: los cuatro más usados; el resto va en "Más". */
   protected readonly mobileMain = this.nav.filter((n) => ['today', 'contacts', 'pipeline'].includes(n.icon));
@@ -91,11 +91,11 @@ export class Shell {
     } else if (event.key === '/') {
       event.preventDefault();
       // Buscar clientes: el punto de partida para venderle algo más a alguien que ya existe.
-      void this.router.navigate(['/clientes']).then(() => document.getElementById('contact-search')?.focus());
+      void this.router.navigate(['/contacts']).then(() => document.getElementById('contact-search')?.focus());
     }
   }
 
   protected signOut(): void {
-    void this.auth.signOut().then(() => this.router.navigateByUrl('/entrar'));
+    void this.auth.signOut().then(() => this.router.navigateByUrl('/login'));
   }
 }

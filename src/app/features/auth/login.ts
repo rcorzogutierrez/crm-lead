@@ -92,8 +92,8 @@ export class Login {
   constructor() {
     effect(() => {
       const s = this.auth.status();
-      if (s === 'member') void this.router.navigateByUrl('/hoy');
-      if (s === 'pending') void this.router.navigateByUrl('/acceso-pendiente');
+      if (s === 'member') void this.router.navigateByUrl('/today');
+      if (s === 'pending') void this.router.navigateByUrl('/pending');
     });
 
     if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {

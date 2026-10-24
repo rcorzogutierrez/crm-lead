@@ -66,7 +66,7 @@ interface HistoryEntry extends Activity {
   templateUrl: './contact-detail.html',
 })
 export class ContactDetail {
-  /** Viene de la ruta `/clientes/:id`. */
+  /** Viene de la ruta `/contacts/:id`. */
   readonly id = input.required<string>();
 
   private readonly destroyRef = inject(DestroyRef);

@@ -24,26 +24,26 @@
         [placeholder]="t('list.searchPlaceholder')"
         [attr.aria-label]="t('list.search')"
         [value]="search()"
-        (input)="setParam('buscar', $any($event.target).value)"
+        (input)="setParam('search', $any($event.target).value)"
       />
     </div>
-    <select class="input h-9 w-auto text-sm" [attr.aria-label]="t('field.stage')" [value]="stage()" (change)="setParam('etapa', $any($event.target).value === 'abiertos' ? null : $any($event.target).value)">
-      <option value="abiertos">{{ t('today.active') }}</option>
-      <option value="todos">{{ t('list.allStages') }}</option>
+    <select class="input h-9 w-auto text-sm" [attr.aria-label]="t('field.stage')" [value]="stage()" (change)="setParam('stage', $any($event.target).value === 'open' ? null : $any($event.target).value)">
+      <option value="open">{{ t('today.active') }}</option>
+      <option value="all">{{ t('list.allStages') }}</option>
       @for (s of stages; track s.id) {
         <option [value]="s.id">{{ s.label }}</option>
       }
     </select>
     @if (auth.isAdmin()) {
-      <select class="input h-9 w-auto text-sm" [attr.aria-label]="t('field.assignee')" [value]="assignee()" (change)="setParam('responsable', $any($event.target).value)">
+      <select class="input h-9 w-auto text-sm" [attr.aria-label]="t('field.assignee')" [value]="assignee()" (change)="setParam('assignee', $any($event.target).value)">
         <option value="">{{ t('today.team') }}</option>
-        <option value="yo">{{ t('list.mine') }}</option>
+        <option value="me">{{ t('list.mine') }}</option>
         @for (m of members.active(); track m.uid) {
           <option [value]="m.uid">{{ m.displayName }}</option>
         }
       </select>
     }
-    <select class="input h-9 w-auto text-sm" [attr.aria-label]="t('field.source')" [value]="source()" (change)="setParam('origen', $any($event.target).value)">
+    <select class="input h-9 w-auto text-sm" [attr.aria-label]="t('field.source')" [value]="source()" (change)="setParam('source', $any($event.target).value)">
       <option value="">{{ t('list.anySource') }}</option>
       @for (s of sources; track s.id) {
         <option [value]="s.id">{{ s.label }}</option>
@@ -54,7 +54,7 @@
       class="btn-sm btn border"
       [class]="onlyOrphans() ? 'border-ribbon bg-ribbon text-white' : 'border-rule-strong bg-sheet text-ink-2 hover:border-ink-3'"
       [attr.aria-pressed]="onlyOrphans()"
-      (click)="setParam('filtro', onlyOrphans() ? null : 'sin-accion')"
+      (click)="setParam('filter', onlyOrphans() ? null : 'no-action')"
     >
       {{ t('today.orphans') }}
     </button>
