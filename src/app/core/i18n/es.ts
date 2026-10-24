@@ -85,6 +85,8 @@ export const es = {
   'contact.deleteForever': 'Eliminar para siempre',
   'contact.deleted': '{name} eliminado.',
   'contact.cantDeleteCustomer': 'Ya compró: archívalo en lugar de eliminarlo, así no se pierden sus ventas.',
+  'contact.manage': 'Archivar o eliminar',
+  'contact.deleting': 'Eliminando…',
   'contact.atStake': 'En juego:',
   'contact.boughtTitle': 'Servicios comprados',
   'contact.data': 'Datos de contacto',
