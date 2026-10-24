@@ -1,0 +1,270 @@
+<div class="mx-auto max-w-[78rem] px-4 pt-5 pb-10 sm:px-6 lg:px-10 lg:pt-8">
+  <a routerLink="/leads" class="inline-flex items-center gap-1.5 text-sm font-semibold text-ink-2 hover:text-pen">
+    <svg lucideArrowLeft [size]="16"></svg>
+    Leads
+  </a>
+
+  @if (lead(); as lead) {
+    <header class="mt-4 flex flex-wrap items-start justify-between gap-4">
+      <div class="min-w-0">
+        <h1 class="date-face text-[2rem] leading-tight font-bold break-words">{{ lead.name }}</h1>
+        <p class="mt-1 text-ink-2">
+          @if (lead.company) {
+            {{ lead.company }} ·
+          }
+          {{ sourceName(lead.source) }} · registrado {{ ago(lead.createdAt) }}
+        </p>
+      </div>
+      <div class="flex flex-wrap gap-2">
+        @if (tel()) {
+          <a class="btn-secondary" [href]="tel()"><svg lucidePhone [size]="16"></svg> Llamar</a>
+        }
+        @if (wa()) {
+          <a class="btn-secondary" [href]="wa()" target="_blank" rel="noopener"><svg lucideMessageCircle [size]="16"></svg> WhatsApp</a>
+        }
+        @if (mail()) {
+          <a class="btn-secondary" [href]="mail()"><svg lucideMail [size]="16"></svg> Email</a>
+        }
+      </div>
+    </header>
+
+    <!-- Etapas -->
+    <nav class="mt-6 overflow-x-auto" aria-label="Etapa del lead">
+      <ol class="flex min-w-max gap-1">
+        @for (s of stages; track s.id; let i = $index) {
+          <li>
+            <button
+              type="button"
+              class="stage-step h-9 rounded-md px-3 text-[0.8125rem] font-semibold transition-colors duration-150"
+              [class]="
+                s.id === lead.stage
+                  ? (s.id === 'lost' ? 'bg-stage-lost text-white' : s.id === 'won' ? 'bg-stage-won text-white' : 'bg-ink text-white')
+                  : i < stageIndex() && lead.stage !== 'lost'
+                    ? 'bg-pen-soft text-pen-strong hover:bg-pen/15'
+                    : 'border border-rule-strong bg-sheet text-ink-2 hover:border-ink-3 hover:text-ink'
+              "
+              [attr.aria-current]="s.id === lead.stage ? 'step' : null"
+              (click)="setStage(s.id)"
+            >
+              {{ s.label }}
+            </button>
+          </li>
+        }
+      </ol>
+    </nav>
+
+    @if (askLostReason()) {
+      <form class="mt-3 flex flex-wrap items-end gap-2 rounded-lg border border-rule bg-sheet p-3" (submit)="confirmLost($event)">
+        <div class="min-w-60 flex-1">
+          <label class="field-label" for="lost-reason">¿Por qué se perdió?</label>
+          <input id="lost-reason" class="input" placeholder="Precio, eligió otro proveedor, sin respuesta…" [value]="lostReason()" (input)="lostReason.set($any($event.target).value)" />
+        </div>
+        <button type="button" class="btn-ghost" (click)="askLostReason.set(false)">Cancelar</button>
+        <button type="submit" class="btn-primary">Marcar perdido</button>
+      </form>
+    }
+    @if (lead.stage === 'lost' && lead.lostReason) {
+      <p class="mt-3 text-sm text-ink-2"><span class="font-semibold">Motivo:</span> {{ lead.lostReason }}</p>
+    }
+
+    <div class="mt-8 grid gap-8 lg:grid-cols-[minmax(0,1fr)_22rem]">
+      <div class="min-w-0 space-y-8">
+        <!-- Próxima acción -->
+        <section aria-labelledby="next-title">
+          <div class="flex items-baseline justify-between">
+            <h2 id="next-title" class="text-sm font-bold">Próxima acción</h2>
+            @if (pending().length && !addingNext()) {
+              <button type="button" class="btn-ghost btn-sm text-pen" (click)="addingNext.set(true)">+ Programar otra</button>
+            }
+          </div>
+          <div class="sheet mt-2 px-4">
+            @for (fu of pending(); track fu.id) {
+              <div class="border-b border-rule last:border-b-0">
+                <app-followup-item [fu]="fu" [showLead]="false" [showDate]="true" />
+              </div>
+            }
+            @if (!pending().length && !['won', 'lost'].includes(lead.stage)) {
+              <div class="py-4">
+                <p class="mb-3 rounded-md bg-ribbon-soft px-3 py-2 text-sm font-semibold text-ribbon">
+                  Este lead no tiene próxima acción. Programa la siguiente para no perderlo.
+                </p>
+                <app-schedule-form [lead]="lead" [cancellable]="false" />
+              </div>
+            } @else if (!pending().length) {
+              <p class="py-4 text-sm text-ink-2">Lead cerrado. No necesita seguimiento.</p>
+            }
+            @if (addingNext()) {
+              <div class="border-t border-rule py-4">
+                <app-schedule-form [lead]="lead" (saved)="addingNext.set(false)" (cancelled)="addingNext.set(false)" />
+              </div>
+            }
+          </div>
+        </section>
+
+        <!-- Historial: página de diario -->
+        <section aria-labelledby="log-title">
+          <h2 id="log-title" class="text-sm font-bold">Historial</h2>
+          <div class="sheet mt-2 overflow-hidden">
+            <form class="border-b border-rule-strong bg-paper p-4" (submit)="log($event)">
+              <div class="flex flex-wrap gap-1.5" role="radiogroup" aria-label="Tipo de registro">
+                @for (t of logTypes; track t.id) {
+                  <button
+                    type="button"
+                    role="radio"
+                    [attr.aria-checked]="logType() === t.id"
+                    (click)="logType.set(t.id)"
+                    class="inline-flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-[0.8125rem] font-semibold transition-colors"
+                    [class]="logType() === t.id ? 'border-pen bg-pen-soft text-pen-strong' : 'border-rule-strong bg-sheet text-ink-2 hover:text-ink'"
+                  >
+                    <app-channel-icon [type]="t.id" [size]="14" />
+                    {{ t.label }}
+                  </button>
+                }
+              </div>
+              <label for="log-body" class="sr-only">Qué pasó</label>
+              <textarea
+                id="log-body"
+                class="input mt-3"
+                rows="2"
+                placeholder="Anota lo que hablaron, acuerdos, objeciones…"
+                [value]="logBody()"
+                (input)="logBody.set($any($event.target).value)"
+                (keydown.control.enter)="log($event)"
+                (keydown.meta.enter)="log($event)"
+              ></textarea>
+              <div class="mt-2 flex items-center justify-between">
+                <p class="text-xs text-ink-3">Ctrl + Enter para registrar</p>
+                <button type="submit" class="btn-primary btn-sm" [disabled]="logging() || !logBody().trim()">Registrar</button>
+              </div>
+            </form>
+
+            @if (activitiesLoading()) {
+              <div class="space-y-2 p-4" aria-hidden="true">
+                @for (i of [1, 2, 3]; track i) {
+                  <div class="h-10 animate-pulse rounded bg-sheet-2"></div>
+                }
+              </div>
+            } @else {
+              <ol class="journal">
+                @for (a of activities(); track a.id) {
+                  <li class="flex border-b border-rule last:border-b-0">
+                    <div class="w-20 shrink-0 py-3 pr-3 text-right tabular" [title]="full(a.createdAt)">
+                      <p class="text-xs font-bold text-ink-2">{{ activityTime(a) }}</p>
+                      <p class="text-[0.6875rem] text-ink-3">{{ activityHour(a) }}</p>
+                    </div>
+                    <div class="min-w-0 flex-1 border-l border-margin/70 py-3 pr-4 pl-4">
+                      <p class="flex items-center gap-1.5 text-[0.8125rem] font-semibold text-ink-2">
+                        <app-channel-icon [type]="a.type" [size]="14" />
+                        {{ activityLabel(a) }}
+                        <span class="font-normal text-ink-3">· {{ members.name(a.createdBy) }}</span>
+                      </p>
+                      @if (a.body) {
+                        <p class="mt-0.5 whitespace-pre-line text-ink">{{ a.body }}</p>
+                      }
+                    </div>
+                  </li>
+                } @empty {
+                  <li><app-empty-state title="Sin historial todavía">Cada llamada, mensaje y nota que registres queda aquí, en orden.</app-empty-state></li>
+                }
+              </ol>
+            }
+          </div>
+        </section>
+      </div>
+
+      <!-- Datos -->
+      <aside aria-labelledby="data-title">
+        <h2 id="data-title" class="text-sm font-bold">Datos</h2>
+        <form class="sheet mt-2 space-y-4 p-4" novalidate (submit)="saveDetails($event)">
+          <div>
+            <label class="field-label" for="d-name">Nombre</label>
+            <input id="d-name" class="input" [formField]="f.name" />
+            @if (f.name().touched() && f.name().invalid()) {
+              <p class="field-error">{{ f.name().errors()[0].message }}</p>
+            }
+          </div>
+          <div>
+            <label class="field-label" for="d-company">Empresa</label>
+            <input id="d-company" class="input" [formField]="f.company" />
+          </div>
+          <div>
+            <label class="field-label" for="d-phone">Teléfono / WhatsApp</label>
+            <input id="d-phone" class="input tabular" type="tel" [formField]="f.phone" />
+          </div>
+          <div>
+            <label class="field-label" for="d-email">Email</label>
+            <input id="d-email" class="input" type="email" [formField]="f.email" />
+            @if (f.email().touched() && f.email().invalid()) {
+              <p class="field-error">{{ f.email().errors()[0].message }}</p>
+            }
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="field-label" for="d-value">Valor</label>
+              <input id="d-value" class="input tabular" type="number" step="100" [formField]="f.value" />
+            </div>
+            <div>
+              <label class="field-label" for="d-source">Origen</label>
+              <select id="d-source" class="input" [formField]="f.source">
+                @for (s of sources; track s.id) {
+                  <option [value]="s.id">{{ s.label }}</option>
+                }
+              </select>
+            </div>
+          </div>
+          <div>
+            <label class="field-label" for="d-assignee">Responsable</label>
+            <select id="d-assignee" class="input" [formField]="f.assigneeId">
+              @for (m of members.active(); track m.uid) {
+                <option [value]="m.uid">{{ m.displayName }}</option>
+              }
+            </select>
+          </div>
+          <div>
+            <label class="field-label" for="d-notes">Notas</label>
+            <textarea id="d-notes" class="input" rows="4" [formField]="f.notes"></textarea>
+          </div>
+          @if (f().dirty()) {
+            <div class="flex justify-end gap-2 border-t border-rule pt-3">
+              <button type="button" class="btn-ghost btn-sm" (click)="discardDetails()">Descartar</button>
+              <button type="submit" class="btn-primary btn-sm" [disabled]="f().submitting()">Guardar cambios</button>
+            </div>
+          }
+        </form>
+
+        <dl class="mt-4 space-y-1 px-1 text-xs text-ink-3">
+          <div class="flex justify-between"><dt>Último contacto</dt><dd class="tabular">{{ ago(lead.lastContactAt) }}</dd></div>
+          <div class="flex justify-between"><dt>Actualizado</dt><dd class="tabular">{{ ago(lead.updatedAt) }}</dd></div>
+        </dl>
+
+        @if (canDelete()) {
+          <div class="mt-6 border-t border-rule pt-4">
+            @if (!confirmDelete()) {
+              <button type="button" class="btn-ghost btn-sm text-ribbon hover:bg-ribbon-soft hover:text-ribbon" (click)="confirmDelete.set(true)">
+                <svg lucideTrash2 [size]="14"></svg>
+                Eliminar lead
+              </button>
+            } @else {
+              <p class="text-sm font-semibold">¿Eliminar {{ lead.name }} con todo su historial?</p>
+              <p class="mt-1 text-xs text-ink-2">No se puede deshacer. Si solo no avanzó, mejor márcalo como Perdido.</p>
+              <div class="mt-3 flex gap-2">
+                <button type="button" class="btn-ghost btn-sm" (click)="confirmDelete.set(false)">Cancelar</button>
+                <button type="button" class="btn-danger btn-sm" (click)="remove()">Eliminar para siempre</button>
+              </div>
+            }
+          </div>
+        }
+      </aside>
+    </div>
+  } @else if (loading()) {
+    <div class="mt-6 space-y-3" aria-hidden="true">
+      <div class="h-10 w-72 animate-pulse rounded bg-sheet-2"></div>
+      <div class="h-64 animate-pulse rounded-page bg-sheet-2"></div>
+    </div>
+  } @else {
+    <app-empty-state title="Este lead no existe" class="mt-6">
+      Puede que lo hayan eliminado. Vuelve a la lista para buscarlo.
+      <div actions><a routerLink="/leads" class="btn-secondary btn-sm">Ir a Leads</a></div>
+    </app-empty-state>
+  }
+</div>

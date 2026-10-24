@@ -1,0 +1,20 @@
+{
+  "world": "agenda de cuero",
+  "mode": "operate",
+  "tokensSource": "src/styles.css",
+  "colors": {
+    "leather": "oklch(0.3 0.055 38)",
+    "paper": "oklch(0.982 0.004 250)",
+    "sheet": "oklch(1 0 0)",
+    "rule": "oklch(0.915 0.014 250)",
+    "margin": "oklch(0.7 0.13 22)",
+    "ink": "oklch(0.25 0.04 265)",
+    "pen": "oklch(0.47 0.16 262)",
+    "ribbon": "oklch(0.53 0.19 25)",
+    "highlight": "oklch(0.93 0.12 98)",
+    "ok": "oklch(0.52 0.12 155)"
+  },
+  "typography": { "family": "Archivo Variable", "display": "wdth 82, bold", "base": "15px/24px" },
+  "radius": { "control": "8px", "page": "10px" },
+  "motion": { "duration": "150-250ms", "easing": "cubic-bezier(0.25, 1, 0.5, 1)" }
+}

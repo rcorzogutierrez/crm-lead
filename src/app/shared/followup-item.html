@@ -1,0 +1,114 @@
+<div class="group flex flex-wrap items-start gap-x-3 gap-y-2 py-2.5">
+  <span
+    class="mt-0.5 grid size-8 shrink-0 place-items-center rounded-md"
+    [class]="state() === 'overdue' ? 'bg-ribbon-soft text-ribbon' : 'bg-pen-soft text-pen-strong'"
+    [attr.title]="channelName()"
+  >
+    <app-channel-icon [type]="fu().channel" />
+  </span>
+
+  <div class="min-w-0 flex-1 max-sm:basis-[calc(100%-2.75rem)]">
+    <p class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+      @if (showLead()) {
+        <a [routerLink]="['/leads', fu().leadId]" class="font-semibold text-ink hover:text-pen hover:underline">{{ fu().leadName }}</a>
+        @if (fu().company) {
+          <span class="text-[0.8125rem] text-ink-3">{{ fu().company }}</span>
+        }
+      } @else {
+        <span class="font-semibold">{{ channelName() }}</span>
+      }
+    </p>
+    <p class="text-[0.8125rem] text-ink-2">
+      <span class="tabular font-semibold" [class.text-ribbon]="state() === 'overdue'">{{ when() }}</span>
+      @if (showLead()) {
+        · {{ channelName() }}
+      }
+      @if (fu().note) {
+        · {{ fu().note }}
+      }
+    </p>
+  </div>
+
+  <div class="relative z-[2] flex shrink-0 items-center gap-1 max-sm:w-full max-sm:pl-11">
+    @if (showAssignee()) {
+      <app-avatar class="mr-1" [name]="members.name(fu().assigneeId)" [photo]="members.byId().get(fu().assigneeId)?.photoURL ?? null" size="sm" />
+    }
+    @if (tel() && (fu().channel === 'call' || fu().channel === 'meeting')) {
+      <a class="btn-icon btn-ghost size-8" [href]="tel()" aria-label="Llamar a {{ fu().leadName }}" title="Llamar">
+        <svg lucidePhone [size]="16"></svg>
+      </a>
+    }
+    @if (wa() && fu().channel === 'whatsapp') {
+      <a class="btn-icon btn-ghost size-8" [href]="wa()" target="_blank" rel="noopener" aria-label="Abrir WhatsApp con {{ fu().leadName }}" title="WhatsApp">
+        <svg lucideMessageCircle [size]="16"></svg>
+      </a>
+    }
+    <button
+      type="button"
+      class="btn-ghost btn-sm"
+      [attr.aria-expanded]="mode() === 'snooze'"
+      (click)="open('snooze')"
+      title="Posponer"
+    >
+      <svg lucideCalendarClock [size]="16"></svg>
+      Posponer
+    </button>
+    <button
+      type="button"
+      class="btn-sm btn border border-ok/30 max-sm:ml-auto bg-ok-soft text-ok hover:border-ok hover:bg-ok hover:text-white"
+      [attr.aria-expanded]="mode() === 'complete'"
+      (click)="open('complete')"
+    >
+      <svg lucideCheck [size]="16"></svg>
+      Hecho
+    </button>
+  </div>
+</div>
+
+@if (mode() === 'snooze') {
+  <div class="mb-3 ml-11 flex flex-wrap max-sm:ml-0 items-center gap-1.5 rounded-lg bg-sheet-2 p-2">
+    <span class="px-1 text-[0.8125rem] font-semibold text-ink-2">Mover a</span>
+    <button type="button" class="btn-secondary btn-sm" [disabled]="busy()" (click)="snooze('tomorrow')">Mañana</button>
+    <button type="button" class="btn-secondary btn-sm" [disabled]="busy()" (click)="snooze('in3')">En 3 días</button>
+    <button type="button" class="btn-secondary btn-sm" [disabled]="busy()" (click)="snooze('nextWeek')">Próx. semana</button>
+    <button type="button" class="btn-ghost btn-sm ml-auto text-ribbon hover:text-ribbon" (click)="cancel()">
+      <svg lucideX [size]="14"></svg>
+      Descartar
+    </button>
+  </div>
+}
+
+@if (mode() === 'complete') {
+  <form class="mb-3 ml-11 space-y-3 max-sm:ml-0 rounded-lg border border-rule bg-paper p-3" (submit)="complete($event)">
+    <div>
+      <label class="field-label" [attr.for]="'outcome-' + fu().id">¿Qué pasó?</label>
+      <textarea
+        [id]="'outcome-' + fu().id"
+        class="input"
+        rows="2"
+        placeholder="Contestó, pidió cotización para el viernes…"
+        [value]="outcome()"
+        (input)="outcome.set($any($event.target).value)"
+      ></textarea>
+    </div>
+    <label class="inline-flex items-center gap-2 text-sm font-semibold">
+      <input type="checkbox" class="size-4" [checked]="scheduleNext()" (change)="scheduleNext.set(!scheduleNext())" />
+      Programar el siguiente paso
+    </label>
+    @if (scheduleNext()) {
+      <app-channel-picker [(value)]="nextChannel" />
+      <app-when-picker [(value)]="nextAt" />
+      <input
+        class="input"
+        aria-label="Nota del siguiente paso"
+        placeholder="Siguiente paso (opcional)"
+        [value]="nextNote()"
+        (input)="nextNote.set($any($event.target).value)"
+      />
+    }
+    <div class="flex justify-end gap-2">
+      <button type="button" class="btn-ghost btn-sm" (click)="mode.set('idle')">Cancelar</button>
+      <button type="submit" class="btn-primary btn-sm" [disabled]="busy()">{{ busy() ? 'Guardando…' : 'Guardar' }}</button>
+    </div>
+  </form>
+}

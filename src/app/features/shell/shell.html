@@ -1,0 +1,111 @@
+<a
+  href="#main"
+  class="sr-only z-50 rounded-md bg-pen px-3 py-2 font-semibold text-white focus:not-sr-only focus:fixed focus:top-3 focus:left-3"
+  >Saltar al contenido</a
+>
+
+<!-- Riel de cuero (escritorio) -->
+<aside
+  class="leather fixed inset-y-0 left-0 z-30 hidden w-60 flex-col text-leather-ink lg:flex"
+  aria-label="Navegación principal"
+>
+  <div class="flex items-center gap-2.5 px-5 pt-6 pb-5">
+    <span class="grid size-8 place-items-center rounded-md bg-leather-ink/10 text-leather-ink">
+      <svg lucideBookOpen [size]="18" [strokeWidth]="1.75"></svg>
+    </span>
+    <span class="date-face text-[1.0625rem] font-bold tracking-tight">Agenda</span>
+  </div>
+
+  <div class="px-3">
+    <button type="button" class="btn w-full justify-start bg-leather-ink text-leather-deep hover:bg-white" (click)="ui.openCapture()">
+      <svg lucidePlus [size]="18"></svg>
+      Nuevo lead
+      <kbd class="ml-auto rounded border border-leather-deep/20 px-1.5 text-[0.6875rem] font-semibold text-leather-deep/70">N</kbd>
+    </button>
+  </div>
+
+  <nav class="mt-5 flex-1 space-y-0.5 px-3">
+    @for (item of nav; track item.path) {
+      <a
+        [routerLink]="item.path"
+        routerLinkActive="rail-active"
+        #rla="routerLinkActive"
+        [attr.aria-current]="rla.isActive ? 'page' : null"
+        class="rail-link group relative flex h-10 items-center gap-3 rounded-md px-3 text-[0.9375rem] font-medium text-leather-muted transition-colors duration-150 hover:bg-leather-ink/8 hover:text-leather-ink"
+      >
+        @switch (item.icon) {
+          @case ('today') { <svg lucideCalendarDays [size]="18" [strokeWidth]="1.75"></svg> }
+          @case ('leads') { <svg lucideUsers [size]="18" [strokeWidth]="1.75"></svg> }
+          @case ('pipeline') { <svg lucideColumns3 [size]="18" [strokeWidth]="1.75"></svg> }
+          @case ('team') { <svg lucideUserRoundCog [size]="18" [strokeWidth]="1.75"></svg> }
+        }
+        {{ item.label }}
+        @if (item.icon === 'today' && dueCount() > 0) {
+          <span
+            class="ml-auto grid h-5 min-w-5 place-items-center rounded-full px-1.5 text-[0.6875rem] font-bold tabular"
+            [class]="hasOverdue() ? 'bg-ribbon text-white' : 'bg-highlight text-ink'"
+            [attr.aria-label]="dueCount() + ' pendientes hoy'"
+            >{{ dueCount() }}</span
+          >
+        }
+      </a>
+    }
+  </nav>
+
+  @if (auth.member(); as me) {
+    <div class="flex items-center gap-3 border-t border-leather-ink/10 px-4 py-4">
+      <app-avatar [name]="me.displayName" [photo]="me.photoURL" />
+      <div class="min-w-0 flex-1">
+        <p class="truncate text-sm font-semibold">{{ me.displayName }}</p>
+        <p class="truncate text-xs text-leather-muted">{{ me.role === 'admin' ? 'Admin' : 'Miembro' }}</p>
+      </div>
+      <button type="button" class="btn-icon size-8 text-leather-muted hover:bg-leather-ink/10 hover:text-leather-ink" (click)="signOut()" aria-label="Cerrar sesión" title="Cerrar sesión">
+        <svg lucideLogOut [size]="16"></svg>
+      </button>
+    </div>
+  }
+</aside>
+
+<!-- Barra superior (móvil) -->
+<header class="leather sticky top-0 z-30 flex h-14 items-center gap-2.5 px-4 text-leather-ink lg:hidden">
+  <svg lucideBookOpen [size]="18" [strokeWidth]="1.75"></svg>
+  <span class="date-face text-base font-bold">Agenda</span>
+  @if (auth.member(); as me) {
+    <button type="button" class="ml-auto rounded-full" (click)="signOut()" aria-label="Cerrar sesión">
+      <app-avatar [name]="me.displayName" [photo]="me.photoURL" size="sm" />
+    </button>
+  }
+</header>
+
+<main id="main" class="min-h-dvh pb-24 lg:pb-0" tabindex="-1">
+  <router-outlet />
+</main>
+
+<!-- Navegación inferior (móvil) -->
+<nav
+  class="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-rule bg-sheet pb-[env(safe-area-inset-bottom)] shadow-[0_-1px_0_var(--color-rule)] lg:hidden"
+  aria-label="Navegación principal"
+>
+  @for (item of nav.slice(0, 2); track item.path) {
+    <a [routerLink]="item.path" routerLinkActive="text-pen" #rla="routerLinkActive" [attr.aria-current]="rla.isActive ? 'page' : null" class="relative flex h-16 flex-col items-center justify-center gap-1 text-[0.6875rem] font-semibold text-ink-3">
+      @if (item.icon === 'today') { <svg lucideCalendarDays [size]="20" [strokeWidth]="1.75"></svg> } @else { <svg lucideUsers [size]="20" [strokeWidth]="1.75"></svg> }
+      {{ item.label }}
+      @if (item.icon === 'today' && dueCount() > 0) {
+        <span class="absolute top-2 left-[calc(50%+6px)] grid h-4 min-w-4 place-items-center rounded-full px-1 text-[0.625rem] font-bold text-white tabular" [class]="hasOverdue() ? 'bg-ribbon' : 'bg-pen'">{{ dueCount() }}</span>
+      }
+    </a>
+  }
+  <div class="grid place-items-center">
+    <button type="button" class="grid size-12 place-items-center rounded-full bg-pen text-white shadow-lift active:scale-95" (click)="ui.openCapture()" aria-label="Nuevo lead">
+      <svg lucidePlus [size]="22"></svg>
+    </button>
+  </div>
+  @for (item of nav.slice(2); track item.path) {
+    <a [routerLink]="item.path" routerLinkActive="text-pen" #rla="routerLinkActive" [attr.aria-current]="rla.isActive ? 'page' : null" class="flex h-16 flex-col items-center justify-center gap-1 text-[0.6875rem] font-semibold text-ink-3">
+      @if (item.icon === 'pipeline') { <svg lucideColumns3 [size]="20" [strokeWidth]="1.75"></svg> } @else { <svg lucideUserRoundCog [size]="20" [strokeWidth]="1.75"></svg> }
+      {{ item.label }}
+    </a>
+  }
+</nav>
+
+<app-capture-drawer />

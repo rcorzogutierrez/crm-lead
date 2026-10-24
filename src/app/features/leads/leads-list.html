@@ -1,0 +1,143 @@
+<div class="mx-auto max-w-[90rem] px-4 pt-6 pb-10 sm:px-6 lg:px-10 lg:pt-10">
+  <header class="flex flex-wrap items-end justify-between gap-4">
+    <div>
+      <h1 class="date-face text-[2rem] leading-tight font-bold">Leads</h1>
+      <p class="mt-1 text-ink-2 tabular" aria-live="polite">
+        @if (leadsService.loading()) {
+          Cargando…
+        } @else {
+          {{ filtered().length }} {{ filtered().length === 1 ? 'lead' : 'leads' }} · {{ totalValue() }} en juego
+        }
+      </p>
+    </div>
+    <button type="button" class="btn-primary" (click)="ui.openCapture()">Nuevo lead</button>
+  </header>
+
+  <!-- Filtros -->
+  <div class="mt-6 flex flex-wrap items-center gap-2">
+    <div class="relative w-full sm:w-80">
+      <svg lucideSearch [size]="16" class="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-ink-3"></svg>
+      <input
+        id="lead-search"
+        type="search"
+        class="input pl-9"
+        placeholder="Nombre, empresa o teléfono"
+        aria-label="Buscar leads"
+        [value]="search()"
+        (input)="setParam('buscar', $any($event.target).value)"
+      />
+    </div>
+    <select class="input h-9 w-auto text-sm" aria-label="Etapa" [value]="stage()" (change)="setParam('etapa', $any($event.target).value === 'abiertos' ? null : $any($event.target).value)">
+      <option value="abiertos">Activos</option>
+      <option value="todos">Todas las etapas</option>
+      @for (s of stages; track s.id) {
+        <option [value]="s.id">{{ s.label }}</option>
+      }
+    </select>
+    <select class="input h-9 w-auto text-sm" aria-label="Responsable" [value]="assignee()" (change)="setParam('responsable', $any($event.target).value)">
+      <option value="">Todo el equipo</option>
+      <option value="yo">Asignados a mí</option>
+      @for (m of members.active(); track m.uid) {
+        <option [value]="m.uid">{{ m.displayName }}</option>
+      }
+    </select>
+    <select class="input h-9 w-auto text-sm" aria-label="Origen" [value]="source()" (change)="setParam('origen', $any($event.target).value)">
+      <option value="">Cualquier origen</option>
+      @for (s of sources; track s.id) {
+        <option [value]="s.id">{{ s.label }}</option>
+      }
+    </select>
+    <button
+      type="button"
+      class="btn-sm btn border"
+      [class]="onlyOrphans() ? 'border-ribbon bg-ribbon text-white' : 'border-rule-strong bg-sheet text-ink-2 hover:border-ink-3'"
+      [attr.aria-pressed]="onlyOrphans()"
+      (click)="setParam('filtro', onlyOrphans() ? null : 'sin-accion')"
+    >
+      Sin próxima acción
+    </button>
+    @if (hasFilters()) {
+      <button type="button" class="btn-ghost btn-sm" (click)="clearFilters()">
+        <svg lucideX [size]="14"></svg>
+        Limpiar
+      </button>
+    }
+  </div>
+
+  @if (leadsService.error(); as err) {
+    <p class="mt-6 rounded-lg bg-ribbon-soft px-4 py-3 text-sm font-medium text-ribbon" role="alert">{{ err }}</p>
+  }
+
+  <div class="sheet mt-4 overflow-hidden">
+    @if (leadsService.loading()) {
+      <div class="space-y-px p-4" aria-hidden="true">
+        @for (i of [1, 2, 3, 4, 5, 6]; track i) {
+          <div class="h-12 animate-pulse rounded bg-sheet-2"></div>
+        }
+      </div>
+    } @else if (!filtered().length) {
+      @if (leadsService.leads().length) {
+        <app-empty-state title="Nada coincide con estos filtros">
+          Prueba otra búsqueda o limpia los filtros.
+          <div actions><button type="button" class="btn-secondary btn-sm" (click)="clearFilters()">Limpiar filtros</button></div>
+        </app-empty-state>
+      } @else {
+        <app-empty-state title="Tu agenda está vacía">
+          Registra el primer lead: nombre, teléfono y cuándo lo vas a contactar. Pulsa N en cualquier pantalla para capturar rápido.
+          <div actions><button type="button" class="btn-primary btn-sm" (click)="ui.openCapture()">Registrar primer lead</button></div>
+        </app-empty-state>
+      }
+    } @else {
+      <!-- Tabla (escritorio) -->
+      <table class="w-full text-sm max-md:hidden">
+        <thead class="border-b border-rule-strong bg-sheet-2 text-left text-xs font-semibold text-ink-2">
+          <tr>
+            <th class="px-4 py-2.5" [attr.aria-sort]="ariaSort('name')"><button type="button" class="sort-btn" (click)="sortBy('name')">Lead @if (sortKey() === 'name') { @if (sortAsc()) {<svg lucideArrowUp [size]="12"></svg>} @else {<svg lucideArrowDown [size]="12"></svg>} }</button></th>
+            <th class="px-3 py-2.5">Etapa</th>
+            <th class="px-3 py-2.5" [attr.aria-sort]="ariaSort('next')"><button type="button" class="sort-btn" (click)="sortBy('next')">Próxima acción @if (sortKey() === 'next') { @if (sortAsc()) {<svg lucideArrowUp [size]="12"></svg>} @else {<svg lucideArrowDown [size]="12"></svg>} }</button></th>
+            <th class="px-3 py-2.5" [attr.aria-sort]="ariaSort('contact')"><button type="button" class="sort-btn" (click)="sortBy('contact')">Último contacto @if (sortKey() === 'contact') { @if (sortAsc()) {<svg lucideArrowUp [size]="12"></svg>} @else {<svg lucideArrowDown [size]="12"></svg>} }</button></th>
+            <th class="px-3 py-2.5 text-right" [attr.aria-sort]="ariaSort('value')"><button type="button" class="sort-btn ml-auto" (click)="sortBy('value')">Valor @if (sortKey() === 'value') { @if (sortAsc()) {<svg lucideArrowUp [size]="12"></svg>} @else {<svg lucideArrowDown [size]="12"></svg>} }</button></th>
+            <th class="px-3 py-2.5 max-xl:hidden">Origen</th>
+            <th class="px-4 py-2.5"><span class="sr-only">Responsable</span></th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-rule">
+          @for (lead of filtered(); track lead.id) {
+            <tr class="cursor-pointer transition-colors duration-100 hover:bg-pen-soft/50" (click)="open(lead)">
+              <td class="px-4 py-2.5">
+                <a [routerLink]="['/leads', lead.id]" class="font-semibold text-ink hover:text-pen" (click)="$event.stopPropagation()">{{ lead.name }}</a>
+                <p class="truncate text-xs text-ink-3">{{ lead.company || lead.phone || lead.email || '—' }}</p>
+              </td>
+              <td class="px-3 py-2.5"><app-stage-badge [stage]="lead.stage" /></td>
+              <td class="px-3 py-2.5"><app-due-chip [date]="lead.nextFollowUpAt" [closed]="closed(lead.stage)" /></td>
+              <td class="px-3 py-2.5 text-ink-2 tabular">{{ contact(lead) }}</td>
+              <td class="px-3 py-2.5 text-right font-semibold tabular">{{ lead.value ? money(lead.value) : '—' }}</td>
+              <td class="px-3 py-2.5 text-ink-2 max-xl:hidden">{{ sourceName(lead.source) }}</td>
+              <td class="px-4 py-2.5 text-right">
+                <app-avatar [name]="members.name(lead.assigneeId)" [photo]="members.byId().get(lead.assigneeId)?.photoURL ?? null" size="sm" />
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+
+      <!-- Lista (móvil) -->
+      <ul class="divide-y divide-rule md:hidden">
+        @for (lead of filtered(); track lead.id) {
+          <li>
+            <a [routerLink]="['/leads', lead.id]" class="flex items-center gap-3 px-4 py-3 active:bg-sheet-2">
+              <div class="min-w-0 flex-1">
+                <p class="truncate font-semibold">{{ lead.name }}</p>
+                <p class="mt-1 flex items-center gap-2">
+                  <app-stage-badge [stage]="lead.stage" />
+                  <span class="truncate text-xs text-ink-3">{{ lead.company }}</span>
+                </p>
+              </div>
+              <app-due-chip [date]="lead.nextFollowUpAt" [closed]="closed(lead.stage)" />
+            </a>
+          </li>
+        }
+      </ul>
+    }
+  </div>
+</div>
