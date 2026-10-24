@@ -23,6 +23,11 @@ npm run start:emulator   # en otra
 
 ## Publicar
 
-`npm run deploy` (build + Firebase Hosting + reglas).
+Automático: cada push a `main` (por ejemplo, al fusionar un PR) compila, pasa los tests y publica
+Hosting + reglas + índices con GitHub Actions (`.github/workflows/deploy.yml`). Los PR solo compilan y
+pasan tests. Requiere el secreto de repositorio `FIREBASE_SERVICE_ACCOUNT` (JSON de una cuenta de
+servicio de `crm-lead-follow-up` con los roles *Firebase Admin* y *Service Usage Consumer*).
+
+Manual: `npm run deploy` (build + Firebase Hosting + reglas).
 
 Más detalle técnico en [CLAUDE.md](CLAUDE.md); producto en [PRODUCT.md](PRODUCT.md); diseño en [DESIGN.md](DESIGN.md).

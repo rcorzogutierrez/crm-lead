@@ -31,6 +31,8 @@ npm run deploy:rules      # publica firestore.rules + firestore.indexes.json
 npm run deploy            # build + Firebase Hosting + reglas
 ```
 
+CI/CD: `.github/workflows/deploy.yml` publica en cada push a `main` (build + tests + `firebase deploy --only hosting,firestore`) con el secreto `FIREBASE_SERVICE_ACCOUNT`; en los PR solo compila y prueba.
+
 Con emuladores, `window.__emulatorSignIn(email, nombre)` hace login sin popup (solo existe en la configuración `emulator`).
 
 ## Estructura
