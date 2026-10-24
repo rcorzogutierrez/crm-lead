@@ -1,4 +1,4 @@
-# CLAUDE.md — CRM de leads y follow-up ("Agenda")
+# CLAUDE.md — CRM Lead (CRM de leads y follow-up)
 
 CRM ligero para un **equipo pequeño compartido** que captura leads y les da seguimiento.
 Idea central: **ningún lead activo se queda sin próxima acción**. Todo gira alrededor del
@@ -83,6 +83,7 @@ Reglas de dominio:
 
 ## Convenciones de UI (ver DESIGN.md)
 
+- Marca: **CRM Lead**, icono de embudo (`public/favicon.svg`, mismo dibujo en `shared/logo.ts`; si cambia uno, cambiar el otro y regenerar los PNG de `public/`).
 - Mundo visual "agenda" con paleta **Pizarra**: riel gris pizarra claro, papel blanco frío, renglones, acciones en índigo. Usar los tokens de `@theme` (`bg-rail`, `bg-paper`, `bg-sheet`, `text-ink`, `bg-pen`, `bg-ribbon`, `bg-highlight`, `stage-*`), nunca colores sueltos. El token `pen` es el índigo de acción.
 - Clases base en `@layer components`: `.btn-primary`, `.btn-secondary`, `.btn-ghost`, `.btn-danger`, `.btn-sm`, `.btn-icon`, `.input`, `.field-label`, `.field-error`, `.sheet`, `.date-face`, `.tabular`.
 - Urgencia: vencido = `ribbon` (rojo), hoy = `highlight` (amarillo), sin próxima acción = borde rojo punteado. Siempre con texto, nunca solo color.
