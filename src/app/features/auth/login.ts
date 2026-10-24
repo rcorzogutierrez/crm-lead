@@ -1,6 +1,16 @@
 import { Component, effect, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
-import { LucideBellRing, LucideCheck, LucideMail, LucidePhone, LucideUsers, LucideZap } from '@lucide/angular';
+import {
+  LucideBellRing,
+  LucideCheck,
+  LucideLock,
+  LucideMail,
+  LucidePhone,
+  LucideShieldCheck,
+  LucideSmartphone,
+  LucideUsers,
+  LucideZap,
+} from '@lucide/angular';
 import { AuthService } from '../../core/auth.service';
 import { I18nKey, t } from '../../core/i18n/i18n';
 import { LangSwitch } from '../../shared/lang-switch';
@@ -20,7 +30,7 @@ interface DemoRow {
  */
 @Component({
   selector: 'app-login',
-  imports: [Logo, LangSwitch, LucidePhone, LucideUsers, LucideMail, LucideCheck, LucideZap, LucideBellRing],
+  imports: [Logo, LangSwitch, LucidePhone, LucideUsers, LucideMail, LucideCheck, LucideZap, LucideBellRing, LucideLock, LucideShieldCheck, LucideSmartphone],
   template: `
     <div class="grid min-h-dvh lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
       <!-- Promesa + vista previa -->
@@ -140,10 +150,20 @@ interface DemoRow {
             <p class="enter mt-4 rounded-lg bg-ribbon-soft px-3 py-2 text-sm font-medium text-ribbon" role="alert">{{ t(err) }}</p>
           }
 
-          <div class="enter mt-10 flex gap-3 rounded-xl border border-rule bg-sheet/70 p-4" style="--d: 340ms">
-            <span class="mt-0.5 grid size-8 shrink-0 place-items-center rounded-lg bg-pen-soft text-pen-strong"><svg lucideUsers [size]="16"></svg></span>
-            <p class="text-sm leading-relaxed text-ink-2">{{ t('login.first') }}</p>
-          </div>
+          <ul class="enter mt-10 grid grid-cols-3 gap-4 border-t border-rule pt-6" style="--d: 340ms">
+            <li class="flex flex-col gap-2">
+              <span class="grid size-9 place-items-center rounded-lg bg-pen-soft text-pen-strong"><svg lucideLock [size]="16"></svg></span>
+              <span class="text-[0.8125rem] leading-snug font-medium text-ink-2">{{ t('login.trust.invite') }}</span>
+            </li>
+            <li class="flex flex-col gap-2">
+              <span class="grid size-9 place-items-center rounded-lg bg-pen-soft text-pen-strong"><svg lucideShieldCheck [size]="16"></svg></span>
+              <span class="text-[0.8125rem] leading-snug font-medium text-ink-2">{{ t('login.trust.secure') }}</span>
+            </li>
+            <li class="flex flex-col gap-2">
+              <span class="grid size-9 place-items-center rounded-lg bg-pen-soft text-pen-strong"><svg lucideSmartphone [size]="16"></svg></span>
+              <span class="text-[0.8125rem] leading-snug font-medium text-ink-2">{{ t('login.trust.mobile') }}</span>
+            </li>
+          </ul>
         </div>
       </section>
     </div>
