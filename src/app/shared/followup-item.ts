@@ -106,7 +106,7 @@ export class FollowUpItem {
       const original = fu.dueAt;
       await this.followUps.reschedule(fu, presetDate(preset, this.clock.now()));
       this.toast.show(t('fu.rescheduled'), {
-        action: { label: t('common.undo'), run: () => void this.followUps.reschedule(fu, original) },
+        action: { label: t('common.undo'), run: () => this.toast.follow(this.followUps.reschedule(fu, original), t('common.undone')) },
       });
       this.mode.set('idle');
     } catch (err) {
