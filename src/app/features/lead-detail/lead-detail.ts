@@ -93,7 +93,7 @@ export class LeadDetail {
   private readonly destroyRef = inject(DestroyRef);
   private readonly router = inject(Router);
   private readonly clock = inject(Clock);
-  private readonly auth = inject(AuthService);
+  protected readonly auth = inject(AuthService);
   private readonly leadsService = inject(LeadsService);
   private readonly activitiesService = inject(ActivitiesService);
   protected readonly followUps = inject(FollowUpsService);
@@ -387,12 +387,18 @@ export class LeadDetail {
     await submit(this.f, async () => {
       try {
         // Etapa y valor tienen su propio flujo; los datos de la persona viven en su contacto.
-        const { stage: _stage, value: _value, ...patch } = this.model();
-        if (this.lead()?.contactId) {
-          const { source, assigneeId, notes } = patch;
-          await this.leadsService.update(this.id(), { source, assigneeId, notes });
+        const { stage: _stage, value: _value, assigneeId, ...patch } = this.model();
+        const lead = this.lead();
+        if (lead?.contactId) {
+          const { source, notes } = patch;
+          await this.leadsService.update(this.id(), { source, notes });
         } else {
           await this.leadsService.update(this.id(), patch);
+        }
+        // Reasignar es cosa de admin y arrastra los follow-ups pendientes.
+        if (lead && this.auth.isAdmin() && assigneeId && assigneeId !== lead.assigneeId) {
+          const pending = this.followUps.forLead(lead.id).map((f) => f.id);
+          await this.leadsService.reassign(lead, assigneeId, pending);
         }
         this.f().reset();
         this.toast.show(t('detail.saved'));
@@ -425,7 +431,7 @@ export class LeadDetail {
     const lead = this.lead();
     if (!lead) return;
     try {
-      await this.leadsService.remove(lead.id);
+      await this.leadsService.remove(lead);
       this.toast.show(t('detail.deleted', { name: lead.name }));
       void this.router.navigateByUrl('/leads');
     } catch (err) {

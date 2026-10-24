@@ -34,13 +34,15 @@
         <option [value]="s.id">{{ s.label }}</option>
       }
     </select>
-    <select class="input h-9 w-auto text-sm" [attr.aria-label]="t('field.assignee')" [value]="assignee()" (change)="setParam('responsable', $any($event.target).value)">
-      <option value="">{{ t('today.team') }}</option>
-      <option value="yo">{{ t('list.mine') }}</option>
-      @for (m of members.active(); track m.uid) {
-        <option [value]="m.uid">{{ m.displayName }}</option>
-      }
-    </select>
+    @if (auth.isAdmin()) {
+      <select class="input h-9 w-auto text-sm" [attr.aria-label]="t('field.assignee')" [value]="assignee()" (change)="setParam('responsable', $any($event.target).value)">
+        <option value="">{{ t('today.team') }}</option>
+        <option value="yo">{{ t('list.mine') }}</option>
+        @for (m of members.active(); track m.uid) {
+          <option [value]="m.uid">{{ m.displayName }}</option>
+        }
+      </select>
+    }
     <select class="input h-9 w-auto text-sm" [attr.aria-label]="t('field.source')" [value]="source()" (change)="setParam('origen', $any($event.target).value)">
       <option value="">{{ t('list.anySource') }}</option>
       @for (s of sources; track s.id) {

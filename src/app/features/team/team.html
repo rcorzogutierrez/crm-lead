@@ -16,7 +16,7 @@
               }
             </p>
             <p class="truncate text-xs text-ink-3">
-              {{ m.email }} · {{ t('team.activeLeads', { n: workload().get(m.uid) ?? 0 }) }}
+              {{ m.email }}@if (auth.isAdmin()) { · {{ t('team.activeLeads', { n: workload().get(m.uid) ?? 0 }) }}}
               @if (!m.active) {
                 · {{ t('team.noAccess') }}
               }

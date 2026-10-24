@@ -31,7 +31,7 @@ export class LeadsList {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly clock = inject(Clock);
-  private readonly auth = inject(AuthService);
+  protected readonly auth = inject(AuthService);
   protected readonly leadsService = inject(LeadsService);
   protected readonly members = inject(MembersService);
   protected readonly ui = inject(UiService);

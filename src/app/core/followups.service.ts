@@ -42,7 +42,7 @@ export interface CompleteInput {
 }
 
 /**
- * Follow-ups pendientes del equipo. Cada lead guarda una copia de su próxima
+ * Follow-ups pendientes: todos para un admin, los propios para un vendedor. Cada lead guarda una copia de su próxima
  * fecha (`nextFollowUpAt`) para ordenar y detectar leads sin próxima acción.
  */
 @Service()
@@ -52,7 +52,14 @@ export class FollowUpsService {
   private readonly clock = inject(Clock);
   private readonly live = teamQuery(
     () =>
-      query(collection(this.db, 'followups'), where('status', '==', 'pending'), orderBy('dueAt', 'asc')),
+      this.auth.isAdmin()
+        ? query(collection(this.db, 'followups'), where('status', '==', 'pending'), orderBy('dueAt', 'asc'))
+        : query(
+            collection(this.db, 'followups'),
+            where('assigneeId', '==', this.auth.uid()),
+            where('status', '==', 'pending'),
+            orderBy('dueAt', 'asc'),
+          ),
     mapFollowUp,
   );
 

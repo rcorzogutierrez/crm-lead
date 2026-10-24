@@ -13,7 +13,7 @@
             <span>{{ c.company }}</span>
             <span aria-hidden="true">·</span>
           }
-          @if (summary().won.length) {
+          @if (summary().wonCount) {
             <span class="inline-flex h-6 items-center gap-1 rounded-md bg-ok-soft px-2 text-[0.8125rem] font-semibold text-ok">
               <svg lucideCheck [size]="14" [strokeWidth]="2.5"></svg>
               {{ t('contacts.customerSince', { date: since() }) }}
@@ -54,6 +54,12 @@
               <p class="text-[0.8125rem] text-ink-2">{{ t('contact.atStake') }} <strong class="text-ink tabular">{{ money(openValue()) }}</strong></p>
             }
           </div>
+          @if (summary().othersOpen.length) {
+            <p class="mt-2 flex items-start gap-2 rounded-lg border border-rule bg-paper px-3 py-2 text-[0.8125rem] text-ink-2" role="note">
+              <svg lucideUsers [size]="16" class="mt-0.5 shrink-0"></svg>
+              {{ t('contact.othersOpen', { names: othersNames() }) }}
+            </p>
+          }
           <div class="mt-2 space-y-3">
             @for (l of summary().open; track l.id) {
               <article class="sheet px-4 pt-3 pb-1">
@@ -87,7 +93,7 @@
             } @empty {
               <div class="sheet">
                 <app-empty-state [title]="t('contact.noOpen')">
-                  {{ summary().won.length ? t('contact.noOpenCustomer') : t('contact.noOpenProspect') }}
+                  {{ summary().wonCount ? t('contact.noOpenCustomer') : t('contact.noOpenProspect') }}
                   <div actions><button type="button" class="btn-secondary btn-sm" (click)="ui.openCapture(c.id)">{{ t('capture.newDeal') }}</button></div>
                 </app-empty-state>
               </div>
@@ -99,13 +105,16 @@
         <section aria-labelledby="won-title">
           <div class="flex items-baseline justify-between gap-3">
             <h2 id="won-title" class="text-sm font-bold">
-              {{ t('contact.boughtTitle') }} <span class="font-medium text-ink-3 tabular">{{ summary().won.length }}</span>
+              {{ t('contact.boughtTitle') }} <span class="font-medium text-ink-3 tabular">{{ summary().wonCount }}</span>
             </h2>
             @if (summary().totalWon) {
               <p class="text-[0.8125rem] text-ink-2">{{ t('contact.totalSold') }} <strong class="text-ink tabular">{{ money(summary().totalWon) }}</strong></p>
             }
           </div>
-          <div class="sheet mt-2 overflow-hidden">
+          @if (summary().wonCount > summary().won.length) {
+            <p class="mt-1 text-[0.8125rem] text-ink-2">{{ t(summary().wonCount - summary().won.length === 1 ? 'contact.wonByOthers1' : 'contact.wonByOthersN', { n: summary().wonCount - summary().won.length }) }}</p>
+          }
+          <div class="sheet mt-2 overflow-hidden" [class.hidden]="!summary().won.length && summary().wonCount">
             @if (summary().won.length) {
               <div class="overflow-x-auto">
                 <table class="w-full min-w-[32rem] text-sm">
@@ -134,7 +143,7 @@
                   </tbody>
                 </table>
               </div>
-            } @else {
+            } @else if (!summary().wonCount) {
               <app-empty-state [title]="t('contact.noBought')">{{ t('contact.noBoughtBody') }}</app-empty-state>
             }
           </div>
@@ -189,14 +198,16 @@
                   <p class="field-error">{{ t($any(f.email().errors()[0].message)) }}</p>
                 }
               </div>
-              <div>
-                <label class="field-label" for="k-assignee">{{ t('field.assignee') }}</label>
-                <select id="k-assignee" class="input" [formField]="f.assigneeId">
-                  @for (m of members.active(); track m.uid) {
-                    <option [value]="m.uid">{{ m.displayName }}</option>
-                  }
-                </select>
-              </div>
+              @if (auth.isAdmin()) {
+                <div>
+                  <label class="field-label" for="k-assignee">{{ t('field.assignee') }}</label>
+                  <select id="k-assignee" class="input" [formField]="f.assigneeId">
+                    @for (m of members.active(); track m.uid) {
+                      <option [value]="m.uid">{{ m.displayName }}</option>
+                    }
+                  </select>
+                </div>
+              }
               <div>
                 <label class="field-label" for="k-notes">{{ t('field.notes') }}</label>
                 <textarea id="k-notes" class="input" rows="3" [formField]="f.notes"></textarea>

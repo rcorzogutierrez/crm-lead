@@ -307,14 +307,23 @@
               }
             </select>
           </div>
-          <div>
-            <label class="field-label" for="d-assignee">{{ t('field.assignee') }}</label>
-            <select id="d-assignee" class="input" [formField]="f.assigneeId">
-              @for (m of members.active(); track m.uid) {
-                <option [value]="m.uid">{{ m.displayName }}</option>
-              }
-            </select>
-          </div>
+          @if (auth.isAdmin()) {
+            <div>
+              <label class="field-label" for="d-assignee">{{ t('field.assignee') }}</label>
+              <select id="d-assignee" class="input" [formField]="f.assigneeId">
+                @for (m of members.active(); track m.uid) {
+                  <option [value]="m.uid">{{ m.displayName }}</option>
+                }
+              </select>
+              <p class="mt-1 text-xs text-ink-3">{{ t('detail.reassignHint') }}</p>
+            </div>
+          } @else {
+            <div>
+              <p class="field-label">{{ t('field.assignee') }}</p>
+              <p class="text-sm">{{ members.name(lead.assigneeId) }}</p>
+              <p class="mt-0.5 text-xs text-ink-3">{{ t('detail.assigneeAdminOnly') }}</p>
+            </div>
+          }
           <div>
             <label class="field-label" for="d-notes">{{ t('field.notes') }}</label>
             <textarea id="d-notes" class="input" rows="4" [formField]="f.notes"></textarea>

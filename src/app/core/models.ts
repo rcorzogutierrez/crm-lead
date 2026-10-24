@@ -54,6 +54,19 @@ export interface Contact {
   createdBy: string;
   createdAt: Date | null;
   updatedAt: Date | null;
+  /**
+   * Resumen de compras guardado en el contacto, porque un vendedor no ve los leads de
+   * los demás. null = aún no calculado (contactos anteriores; lo calcula la app de un admin).
+   */
+  stats: ContactStats | null;
+}
+
+export interface ContactStats {
+  wonCount: number;
+  wonTotal: number;
+  firstWonAt: Date | null;
+  /** Negocios abiertos por responsable (uid → cantidad). */
+  openBy: Record<string, number>;
 }
 
 export type ContactDraft = Pick<Contact, 'name' | 'company' | 'email' | 'phone' | 'assigneeId' | 'notes'>;

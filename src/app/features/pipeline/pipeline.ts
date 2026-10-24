@@ -25,7 +25,7 @@ import { DueChip } from '../../shared/due-chip';
 export class Pipeline {
   protected readonly leadsService = inject(LeadsService);
   protected readonly members = inject(MembersService);
-  private readonly auth = inject(AuthService);
+  protected readonly auth = inject(AuthService);
   private readonly contacts = inject(ContactsService);
   private readonly followUps = inject(FollowUpsService);
   private readonly toast = inject(ToastService);
@@ -41,7 +41,7 @@ export class Pipeline {
   protected readonly columns = computed(() => {
     const leads = this.leadsService
       .leads()
-      .filter((l) => this.scope() === 'team' || l.assigneeId === this.auth.uid())
+      .filter((l) => !this.auth.isAdmin() || this.scope() === 'team' || l.assigneeId === this.auth.uid())
       .filter((l) => this.kind() === 'all' || (this.kind() === 'repeat') === this.isRepeat(l));
     return STAGES.map((s) => {
       const items = leads
@@ -57,7 +57,7 @@ export class Pipeline {
 
   /** Recompra: el contacto ya había ganado otro lead. */
   protected isRepeat(lead: Lead): boolean {
-    return this.contacts.summary(lead.contactId).won.some((w) => w.id !== lead.id);
+    return this.contacts.summary(lead.contactId).wonCount > (lead.stage === 'won' ? 1 : 0);
   }
 
   protected title(lead: Lead): string {

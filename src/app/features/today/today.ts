@@ -31,7 +31,7 @@ interface HourRow {
 })
 export class Today {
   private readonly clock = inject(Clock);
-  private readonly auth = inject(AuthService);
+  protected readonly auth = inject(AuthService);
   protected readonly followUps = inject(FollowUpsService);
   protected readonly leads = inject(LeadsService);
   protected readonly ui = inject(UiService);
@@ -43,7 +43,7 @@ export class Today {
   protected readonly schedulingFor = signal<string | null>(null);
 
   private readonly mineOnly = (f: { assigneeId: string }) =>
-    this.scope() === 'team' || f.assigneeId === this.auth.uid();
+    !this.auth.isAdmin() || this.scope() === 'team' || f.assigneeId === this.auth.uid();
 
   protected readonly overdue = computed(() => this.followUps.overdue().filter(this.mineOnly));
   protected readonly today = computed(() => this.followUps.today().filter(this.mineOnly));

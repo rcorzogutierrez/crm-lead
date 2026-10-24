@@ -64,7 +64,7 @@ src/app/
 | `meta/team` | único | `ownerUid`, `name` — existe desde que entra el primer usuario |
 | `members/{uid}` | miembro | `email`, `displayName`, `photoURL`, `role: admin\|member`, `active` |
 | `invites/{emailEnMinúsculas}` | invitación | `email`, `role`, `invitedBy` — se consume al entrar |
-| `contacts/{id}` | persona/empresa | `name`, `company`, `email` (minúsculas), `phone`, `assigneeId`, `notes`, `createdBy` — "cliente" si tiene algún lead ganado (derivado, no se guarda) |
+| `contacts/{id}` | persona/empresa | `name`, `company`, `email` (minúsculas), `phone`, `assigneeId`, `notes`, `createdBy` + resumen `statsV`, `wonCount`, `wonTotal`, `firstWonAt`, `openBy` (uid → nº abiertos) — "cliente" si `wonCount > 0` |
 | `leads/{id}` | lead = oportunidad (un servicio para un contacto) | `contactId`, copia del contacto (`name`, `company`, `email`, `phone`), `serviceId`, `serviceName`, `detail`, `quantity`, `unitPrice`, `tier`, `tierPct`, `value`, `priceAck`, `source`, `stage`, `wonAt`, `assigneeId`, `notes`, `lostReason`, `nextFollowUpAt`, `lastContactAt`, `createdBy`, timestamps |
 | `services/{id}` | catálogo | `name`, `description`, `price` (oficial, por unidad), `unit`, `active` — solo admin escribe; se archivan, no se borran |
 | `meta/pricing` | único | `bronze`, `silver`, `gold` (% sobre el precio oficial; por defecto 3/5/7) — solo admin |
@@ -80,13 +80,17 @@ Reglas de dominio:
 - Cambio de precio oficial: los leads guardan su `unitPrice`; los abiertos muestran aviso (actualizar o mantener → `priceAck`). Los ganados nunca cambian.
 - Editar un contacto copia nombre/empresa/email/teléfono a sus leads y follow-ups pendientes (`ContactsService.update`). Los leads antiguos sin `contactId` se vinculan con el botón del admin en *Clientes* (`migrateLegacy`).
 - Un equipo pequeño cabe en memoria: leads y follow-ups pendientes se escuchan completos en vivo y se filtran en el cliente. Si el volumen crece (> ~5.000 leads), paginar y filtrar en servidor.
-- Índice compuesto requerido: `followups (status ASC, dueAt ASC)` en `firestore.indexes.json`.
+- Resumen del contacto: un vendedor no ve los leads de otros, así que el contacto guarda sus compras y quién tiene negocios abiertos. Toda escritura de leads que cambie etapa, responsable o existencia actualiza el contacto en el **mismo batch** (`statsPatch` en `core/contact-stats.ts`, usado por `LeadsService`). La app de un admin lo recalcula desde todos los leads si no coincide (`ContactsService.syncStats`); solo se confía en él si `statsV` coincide.
+- Índices compuestos requeridos (`firestore.indexes.json`): `followups (status, dueAt)` y `(assigneeId, status, dueAt)`; `leads (assigneeId, createdAt desc)`.
 
 ## Acceso y seguridad
 
 - La config web de Firebase en `core/firebase.config.ts` es pública; la seguridad está en `firestore.rules`.
 - El **primer** usuario que entra crea `meta/team` y queda como admin. Los demás necesitan `invites/{email}` creado por un admin desde *Equipo*; si no, ven "Acceso pendiente".
-- Solo miembros `active` leen/escriben. Borrar un lead: admin o su creador.
+- Solo miembros `active` leen/escriben. Contactos y catálogo: todo el equipo.
+- **Leads, su historial y sus follow-ups: un vendedor (`member`) solo ve y toca los suyos** (`assigneeId`); el admin ve todo. Las consultas de un vendedor deben filtrar `where('assigneeId', '==', uid)` o las reglas las rechazan (`LeadsService`, `FollowUpsService`).
+- Solo un admin reasigna (`LeadsService.reassign`, que arrastra los follow-ups pendientes) o cambia el responsable de un contacto. Un vendedor crea leads siempre a su nombre.
+- Borrar un lead: admin, o su creador si sigue siendo el responsable.
 - Cambios en reglas: probarlos contra el emulador antes de `deploy:rules`.
 - Configuración necesaria en la consola de Firebase: habilitar el proveedor Google en Authentication y añadir el dominio de hosting a *Authorized domains*.
 

@@ -58,10 +58,10 @@ export class ContactsList {
       .contacts()
       .map((c) => ({ c, s: this.contacts.summary(c.id) }))
       .filter(({ c, s }) => {
-        const customer = s.won.length > 0;
+        const customer = s.wonCount > 0;
         if (kind === 'clientes' && !customer) return false;
         if (kind === 'prospectos' && customer) return false;
-        if (kind === 'sin-abiertas' && (!customer || s.open.length > 0)) return false;
+        if (kind === 'sin-abiertas' && (!customer || s.openCount > 0)) return false;
         // El teléfono se compara por dígitos: "55 1234" encuentra "+52 (55) 1234-5678".
         const phoneHit = digits.length >= 3 && phoneDigits(c.phone).includes(digits);
         if (q && !phoneHit && !normalize(`${c.name} ${c.company} ${c.email} ${c.phone}`).includes(q)) return false;

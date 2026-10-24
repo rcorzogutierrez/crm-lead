@@ -20,7 +20,9 @@ export function teamQuery<T>(
       current.set(null);
       return;
     }
-    const q = untracked(() => liveQuery(build(), map));
+    // La consulta puede depender de signals (p. ej. el rol): si cambian, se rehace.
+    const built = build();
+    const q = untracked(() => liveQuery(built, map));
     current.set(q);
     onCleanup(() => q.stop());
   });

@@ -163,7 +163,7 @@ export class CaptureDrawer {
   protected choose(c: Contact): void {
     this.chosenId.set(c.id);
     this.suggestOpen.set(false);
-    this.model.update((m) => ({ ...m, name: c.name, company: c.company, email: c.email, phone: c.phone, assigneeId: c.assigneeId || m.assigneeId }));
+    this.model.update((m) => ({ ...m, name: c.name, company: c.company, email: c.email, phone: c.phone }));
     // Directo a "qué quiere comprar".
     setTimeout(() => document.getElementById('c-service')?.focus());
   }
@@ -254,7 +254,6 @@ export class CaptureDrawer {
     const fixed = untracked(() => this.fixedContact());
     if (fixed) {
       Object.assign(model, { name: fixed.name, company: fixed.company, email: fixed.email, phone: fixed.phone });
-      model.assigneeId = fixed.assigneeId || model.assigneeId;
     }
     this.model.set(model);
     this.f().reset();

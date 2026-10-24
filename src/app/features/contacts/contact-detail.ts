@@ -8,8 +8,10 @@ import {
   LucideMessageCircle,
   LucidePhone,
   LucidePlus,
+  LucideUsers,
 } from '@lucide/angular';
 import { ActivitiesService } from '../../core/activities.service';
+import { AuthService } from '../../core/auth.service';
 import { Clock } from '../../core/clock.service';
 import { ContactsService, wonDate } from '../../core/contacts.service';
 import { agoLabel, fullLabel, moneyLabel } from '../../core/dates';
@@ -59,6 +61,7 @@ interface HistoryEntry extends Activity {
     LucideMessageCircle,
     LucideMail,
     LucidePlus,
+    LucideUsers,
   ],
   templateUrl: './contact-detail.html',
 })
@@ -73,6 +76,7 @@ export class ContactDetail {
   protected readonly followUps = inject(FollowUpsService);
   protected readonly members = inject(MembersService);
   protected readonly ui = inject(UiService);
+  protected readonly auth = inject(AuthService);
   private readonly toast = inject(ToastService);
 
   protected readonly t = t;
@@ -83,6 +87,9 @@ export class ContactDetail {
   protected readonly loading = this.contacts.loading;
   protected readonly summary = computed(() => this.contacts.summary(this.id()));
   protected readonly openValue = computed(() => this.summary().open.reduce((s, l) => s + l.value, 0));
+  protected readonly othersNames = computed(() =>
+    new Intl.ListFormat(intlLocale(), { type: 'conjunction' }).format(this.summary().othersOpen.map((uid) => this.members.name(uid))),
+  );
   protected readonly showLost = signal(false);
   protected readonly editing = signal(false);
 

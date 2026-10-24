@@ -5,10 +5,13 @@
       <h1 class="date-face text-[2rem] leading-tight font-bold first-letter:uppercase sm:text-[2.5rem]">{{ dateTitle() }}</h1>
       <p class="mt-1 text-ink-2" aria-live="polite">{{ loading() ? t('today.loading') : summary() }}</p>
     </div>
-    <div class="inline-flex rounded-lg border border-rule-strong bg-sheet p-0.5" role="radiogroup" [attr.aria-label]="t('today.scope')">
-      <button type="button" role="radio" [attr.aria-checked]="scope() === 'mine'" (click)="scope.set('mine')" class="h-8 rounded-md px-3 text-sm font-semibold transition-colors" [class]="scope() === 'mine' ? 'bg-ink text-white' : 'text-ink-2 hover:text-ink'">{{ t('today.mine') }}</button>
-      <button type="button" role="radio" [attr.aria-checked]="scope() === 'team'" (click)="scope.set('team')" class="h-8 rounded-md px-3 text-sm font-semibold transition-colors" [class]="scope() === 'team' ? 'bg-ink text-white' : 'text-ink-2 hover:text-ink'">{{ t('today.team') }}</button>
-    </div>
+    <!-- Un vendedor solo tiene sus leads: el selector es para el admin. -->
+    @if (auth.isAdmin()) {
+      <div class="inline-flex rounded-lg border border-rule-strong bg-sheet p-0.5" role="radiogroup" [attr.aria-label]="t('today.scope')">
+        <button type="button" role="radio" [attr.aria-checked]="scope() === 'mine'" (click)="scope.set('mine')" class="h-8 rounded-md px-3 text-sm font-semibold transition-colors" [class]="scope() === 'mine' ? 'bg-ink text-white' : 'text-ink-2 hover:text-ink'">{{ t('today.mine') }}</button>
+        <button type="button" role="radio" [attr.aria-checked]="scope() === 'team'" (click)="scope.set('team')" class="h-8 rounded-md px-3 text-sm font-semibold transition-colors" [class]="scope() === 'team' ? 'bg-ink text-white' : 'text-ink-2 hover:text-ink'">{{ t('today.team') }}</button>
+      </div>
+    }
   </header>
 
   @if (followUps.error() || leads.error(); as err) {

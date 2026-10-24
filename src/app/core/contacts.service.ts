@@ -1,6 +1,7 @@
-import { Service, computed, inject } from '@angular/core';
+import { Service, computed, effect, inject } from '@angular/core';
 import {
   DocumentData,
+  Timestamp,
   collection,
   doc,
   orderBy,
@@ -9,11 +10,12 @@ import {
   writeBatch,
 } from 'firebase/firestore';
 import { AuthService } from './auth.service';
+import { STATS_VERSION } from './contact-stats';
 import { FIRESTORE } from './firebase';
 import { toDate } from './firestore-utils';
 import { FollowUpsService } from './followups.service';
 import { LeadsService } from './leads.service';
-import { Contact, ContactDraft, Lead, isClosed } from './models';
+import { Contact, ContactDraft, ContactStats, Lead, isClosed } from './models';
 import { teamQuery } from './team-query';
 
 function mapContact(id: string, d: DocumentData): Contact {
@@ -28,23 +30,53 @@ function mapContact(id: string, d: DocumentData): Contact {
     createdBy: d['createdBy'] ?? '',
     createdAt: toDate(d['createdAt']),
     updatedAt: toDate(d['updatedAt']),
+    stats:
+      d['statsV'] === STATS_VERSION
+        ? {
+            wonCount: Number(d['wonCount'] ?? 0),
+            wonTotal: Number(d['wonTotal'] ?? 0),
+            firstWonAt: toDate(d['firstWonAt']),
+            openBy: cleanOpenBy(d['openBy']),
+          }
+        : null,
   };
 }
 
+function cleanOpenBy(v: unknown): Record<string, number> {
+  const out: Record<string, number> = {};
+  if (v && typeof v === 'object') {
+    for (const [uid, n] of Object.entries(v)) if (typeof n === 'number' && n > 0) out[uid] = n;
+  }
+  return out;
+}
+
+/**
+ * Lo que se sabe de un contacto. `open`/`won`/`lost` son los leads que el usuario puede ver
+ * (todos si es admin, los suyos si es vendedor); los totales vienen del resumen guardado
+ * en el contacto, así un vendedor sabe que es cliente aunque lo haya vendido otro.
+ */
 export interface ContactSummary {
   open: Lead[];
   won: Lead[];
   lost: Lead[];
+  /** Compras ganadas, de cualquier vendedor. */
+  wonCount: number;
   /** Suma de lo ganado. */
   totalWon: number;
   /** Fecha de la primera venta ganada; null = prospecto. */
   customerSince: Date | null;
-  /** Próximo follow-up entre sus leads abiertos. */
+  /** Negocios abiertos, de cualquier vendedor. */
+  openCount: number;
+  /** Otros vendedores con un negocio abierto con este contacto que el usuario no ve. */
+  othersOpen: string[];
+  /** Próximo follow-up entre sus leads abiertos visibles. */
   nextAt: Date | null;
   lastContactAt: Date | null;
 }
 
-const EMPTY_SUMMARY: ContactSummary = {
+type VisibleSummary = Pick<ContactSummary, 'open' | 'won' | 'lost' | 'totalWon' | 'customerSince' | 'nextAt' | 'lastContactAt'>;
+
+const EMPTY_VISIBLE: VisibleSummary = {
   open: [],
   won: [],
   lost: [],
@@ -85,13 +117,14 @@ export class ContactsService {
   readonly error = this.live.error;
   readonly byId = computed(() => new Map(this.contacts().map((c) => [c.id, c])));
 
-  readonly summaries = computed(() => {
-    const map = new Map<string, ContactSummary>();
+  /** Resumen de los leads visibles, agrupados por contacto. */
+  private readonly visible = computed(() => {
+    const map = new Map<string, VisibleSummary>();
     for (const l of this.leadsService.leads()) {
       if (!l.contactId) continue;
       let s = map.get(l.contactId);
       if (!s) {
-        s = { open: [], won: [], lost: [], totalWon: 0, customerSince: null, nextAt: null, lastContactAt: null };
+        s = { ...EMPTY_VISIBLE, open: [], won: [], lost: [] };
         map.set(l.contactId, s);
       }
       if (l.stage === 'won') {
@@ -114,12 +147,85 @@ export class ContactsService {
   /** Leads que aún no tienen contacto (anteriores a esta versión). */
   readonly unlinkedLeads = computed(() => this.leadsService.leads().filter((l) => !l.contactId));
 
+  constructor() {
+    // Un admin ve todos los leads: recalcula el resumen guardado en cada contacto cuando
+    // no coincide (contactos anteriores, o un cambio que se coló sin actualizarlo).
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    effect((onCleanup) => {
+      if (!this.auth.isAdmin() || this.loading() || this.leadsService.error() || this.live.error()) return;
+      const contacts = this.contacts();
+      const leads = this.leadsService.leads();
+      timer = setTimeout(() => void this.syncStats(contacts, leads).catch((err) => console.error(err)), 2000);
+      onCleanup(() => clearTimeout(timer));
+    });
+  }
+
   summary(contactId: string | null): ContactSummary {
-    return (contactId && this.summaries().get(contactId)) || EMPTY_SUMMARY;
+    const v = (contactId && this.visible().get(contactId)) || EMPTY_VISIBLE;
+    const stats = contactId ? (this.byId().get(contactId)?.stats ?? null) : null;
+    const visibleOwners = new Set(v.open.map((l) => l.assigneeId));
+    return {
+      ...v,
+      wonCount: stats ? Math.max(stats.wonCount, v.won.length) : v.won.length,
+      totalWon: stats ? Math.max(stats.wonTotal, v.totalWon) : v.totalWon,
+      customerSince: stats?.firstWonAt ?? v.customerSince,
+      openCount: stats ? Math.max(sum(stats.openBy), v.open.length) : v.open.length,
+      othersOpen: stats ? Object.keys(stats.openBy).filter((uid) => !visibleOwners.has(uid)) : [],
+    };
   }
 
   isCustomer(contactId: string | null): boolean {
-    return this.summary(contactId).won.length > 0;
+    return this.summary(contactId).wonCount > 0;
+  }
+
+  /** Resumen que corresponde a cada contacto según todos los leads (solo tiene sentido para un admin). */
+  private async syncStats(contacts: Contact[], leads: Lead[]): Promise<void> {
+    const expected = new Map<string, ContactStats>();
+    for (const l of leads) {
+      if (!l.contactId) continue;
+      let s = expected.get(l.contactId);
+      if (!s) {
+        s = { wonCount: 0, wonTotal: 0, firstWonAt: null, openBy: {} };
+        expected.set(l.contactId, s);
+      }
+      if (l.stage === 'won') {
+        s.wonCount++;
+        s.wonTotal += l.value;
+        const d = wonDate(l);
+        if (d && (!s.firstWonAt || d < s.firstWonAt)) s.firstWonAt = d;
+      } else if (!isClosed(l.stage)) {
+        s.openBy[l.assigneeId] = (s.openBy[l.assigneeId] ?? 0) + 1;
+      }
+    }
+    const writes: { id: string; data: Record<string, unknown> }[] = [];
+    for (const c of contacts) {
+      const want = expected.get(c.id) ?? { wonCount: 0, wonTotal: 0, firstWonAt: null, openBy: {} };
+      const have = c.stats;
+      // La primera compra guardada se respeta si sigue habiendo compras (es la fecha real de la venta).
+      const firstWonAt = want.wonCount ? (have?.firstWonAt ?? want.firstWonAt) : null;
+      const same =
+        have &&
+        have.wonCount === want.wonCount &&
+        Math.abs(have.wonTotal - want.wonTotal) < 0.01 &&
+        sameOpenBy(have.openBy, want.openBy) &&
+        (have.firstWonAt?.getTime() ?? null) === (firstWonAt?.getTime() ?? null);
+      if (same) continue;
+      writes.push({
+        id: c.id,
+        data: {
+          statsV: STATS_VERSION,
+          wonCount: want.wonCount,
+          wonTotal: Math.round(want.wonTotal * 100) / 100,
+          firstWonAt: firstWonAt ? Timestamp.fromDate(firstWonAt) : null,
+          openBy: want.openBy,
+        },
+      });
+    }
+    for (let i = 0; i < writes.length; i += 400) {
+      const batch = writeBatch(this.db);
+      for (const w of writes.slice(i, i + 400)) batch.update(doc(this.db, 'contacts', w.id), w.data);
+      await batch.commit();
+    }
   }
 
   /** Contactos que coinciden con lo escrito (nombre, empresa, email o dígitos del teléfono), clientes primero. */
@@ -207,6 +313,7 @@ export class ContactsService {
           createdBy: uid,
           createdAt: null,
           updatedAt: null,
+          stats: null,
         };
         known.push(match);
         ops.push({
@@ -251,4 +358,13 @@ export class ContactsService {
     await flush();
     return links.length;
   }
+}
+
+function sum(m: Record<string, number>): number {
+  return Object.values(m).reduce((a, b) => a + b, 0);
+}
+
+function sameOpenBy(a: Record<string, number>, b: Record<string, number>): boolean {
+  const ka = Object.keys(a);
+  return ka.length === Object.keys(b).length && ka.every((k) => a[k] === b[k]);
 }

@@ -4,6 +4,7 @@ import {
   collection,
   deleteDoc,
   doc,
+  getDoc,
   getDocs,
   orderBy,
   query,
@@ -13,6 +14,7 @@ import {
   writeBatch,
 } from 'firebase/firestore';
 import { AuthService } from './auth.service';
+import { DealState, initialStats, statsPatch } from './contact-stats';
 import { FIRESTORE } from './firebase';
 import { toDate } from './firestore-utils';
 import { ContactDraft, Lead, LeadDraft, LeadPricing, LeadSource, PriceTier, Stage, isClosed, stageMeta } from './models';
@@ -65,13 +67,19 @@ export interface NewLead {
 /** Cambio de precio de un lead abierto; `note` queda en el historial. */
 export type PricingPatch = Omit<LeadPricing, 'serviceName'> & { serviceName: string; note: string };
 
-/** Leads del equipo, en vivo. Un equipo pequeño cabe completo en memoria. */
+/**
+ * Leads en vivo: un admin escucha todos; un vendedor solo los suyos (las reglas
+ * no le dejan leer los demás). Un equipo pequeño cabe completo en memoria.
+ */
 @Service()
 export class LeadsService {
   private readonly db = inject(FIRESTORE);
   private readonly auth = inject(AuthService);
   private readonly live = teamQuery(
-    () => query(collection(this.db, 'leads'), orderBy('createdAt', 'desc')),
+    () =>
+      this.auth.isAdmin()
+        ? query(collection(this.db, 'leads'), orderBy('createdAt', 'desc'))
+        : query(collection(this.db, 'leads'), where('assigneeId', '==', this.auth.uid()), orderBy('createdAt', 'desc')),
     mapLead,
   );
 
@@ -90,15 +98,22 @@ export class LeadsService {
    */
   async create(input: NewLead): Promise<{ leadId: string; contactId: string }> {
     const uid = this.auth.uid();
-    const assigneeId = input.assigneeId || uid;
+    // Un vendedor solo crea leads a su nombre; un admin puede asignarlo a otro.
+    const assigneeId = (this.auth.isAdmin() && input.assigneeId) || uid;
     const c = clean(input.contact);
+    const p = input.pricing;
+    const deal: DealState = { stage: input.stage, value: p?.value ?? 0, assigneeId };
     const batch = writeBatch(this.db);
 
     let contactId = input.contactId;
-    if (!contactId) {
+    if (contactId) {
+      const patch = statsPatch(null, deal, await this.firstWonMissing(contactId, deal));
+      if (Object.keys(patch).length) batch.update(doc(this.db, 'contacts', contactId), patch);
+    } else {
       const ref = doc(collection(this.db, 'contacts'));
       contactId = ref.id;
       batch.set(ref, {
+        ...initialStats(deal),
         name: c.name,
         company: c.company,
         email: c.email.toLowerCase(),
@@ -111,7 +126,6 @@ export class LeadsService {
       });
     }
 
-    const p = input.pricing;
     const leadRef = doc(collection(this.db, 'leads'));
     batch.set(leadRef, {
       name: c.name,
@@ -169,14 +183,30 @@ export class LeadsService {
     return updateDoc(doc(this.db, 'leads', lead.id), { priceAck: officialPrice, updatedAt: serverTimestamp() });
   }
 
-  update(id: string, patch: Partial<LeadDraft> & { lostReason?: string }): Promise<void> {
+  /** Datos del lead que no cambian de responsable (para eso, `reassign`). */
+  update(id: string, patch: Partial<Omit<LeadDraft, 'assigneeId'>> & { lostReason?: string }): Promise<void> {
     return updateDoc(doc(this.db, 'leads', id), { ...clean(patch), updatedAt: serverTimestamp() });
+  }
+
+  /**
+   * Solo admin: pasa el lead a otro vendedor junto con sus follow-ups pendientes,
+   * para que el anterior deje de verlos y el nuevo los tenga en su agenda.
+   */
+  async reassign(lead: Lead, assigneeId: string, pendingFollowUpIds: string[]): Promise<void> {
+    if (!assigneeId || lead.assigneeId === assigneeId) return;
+    const batch = writeBatch(this.db);
+    batch.update(doc(this.db, 'leads', lead.id), { assigneeId, updatedAt: serverTimestamp() });
+    for (const id of pendingFollowUpIds) batch.update(doc(this.db, 'followups', id), { assigneeId });
+    this.patchContact(batch, lead, { ...lead, assigneeId }, false);
+    await batch.commit();
   }
 
   /** Cambia de etapa y deja constancia en el historial. */
   async moveToStage(lead: Lead, to: Stage, lostReason = ''): Promise<void> {
     if (lead.stage === to) return;
+    const after: DealState = { ...lead, stage: to };
     const batch = writeBatch(this.db);
+    this.patchContact(batch, lead, after, await this.firstWonMissing(lead.contactId, after));
     batch.update(doc(this.db, 'leads', lead.id), {
       stage: to,
       lostReason: to === 'lost' ? lostReason : '',
@@ -195,16 +225,35 @@ export class LeadsService {
   }
 
   /** Borra el lead con su historial y sus follow-ups. */
-  async remove(id: string): Promise<void> {
-    const [acts, fus] = await Promise.all([
-      getDocs(collection(this.db, 'leads', id, 'activities')),
-      getDocs(query(collection(this.db, 'followups'), where('leadId', '==', id))),
-    ]);
+  async remove(lead: Lead): Promise<void> {
+    const id = lead.id;
+    // Un vendedor solo puede consultar sus follow-ups: la consulta debe decirlo.
+    const fuQuery = this.auth.isAdmin()
+      ? query(collection(this.db, 'followups'), where('leadId', '==', id))
+      : query(collection(this.db, 'followups'), where('leadId', '==', id), where('assigneeId', '==', this.auth.uid()));
+    const [acts, fus] = await Promise.all([getDocs(collection(this.db, 'leads', id, 'activities')), getDocs(fuQuery)]);
     const batch = writeBatch(this.db);
     acts.forEach((d) => batch.delete(d.ref));
     fus.forEach((d) => batch.delete(d.ref));
     await batch.commit();
-    await deleteDoc(doc(this.db, 'leads', id));
+    const last = writeBatch(this.db);
+    last.delete(doc(this.db, 'leads', id));
+    this.patchContact(last, lead, null, false);
+    await last.commit();
+  }
+
+  /** Actualiza el resumen de compras del contacto del lead en el mismo batch. */
+  private patchContact(batch: ReturnType<typeof writeBatch>, before: Lead, after: DealState | null, firstWon: boolean): void {
+    if (!before.contactId) return;
+    const patch = statsPatch(before, after, firstWon);
+    if (Object.keys(patch).length) batch.update(doc(this.db, 'contacts', before.contactId), patch);
+  }
+
+  /** ¿Hay que fijar `firstWonAt`? Solo al ganar y si el contacto aún no la tiene. */
+  private async firstWonMissing(contactId: string | null, after: DealState): Promise<boolean> {
+    if (!contactId || after.stage !== 'won') return false;
+    const snap = await getDoc(doc(this.db, 'contacts', contactId));
+    return !snap.data()?.['firstWonAt'];
   }
 }
 
