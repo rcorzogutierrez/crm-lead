@@ -246,104 +246,134 @@ dialog.drawer[open]::backdrop {
   animation-duration: 140ms;
 }
 
-/* Pantalla de entrar */
-.login-hero {
-  background:
-    radial-gradient(70% 55% at 18% 12%, oklch(0.42 0.16 275 / 0.7), transparent 70%),
-    radial-gradient(55% 50% at 95% 95%, oklch(0.45 0.16 305 / 0.5), transparent 70%),
-    oklch(0.19 0.04 272);
+/* Pantalla de entrar ("Pizarra") */
+.login-board {
+  background: var(--color-rail-deep);
 }
-.login-hero::before {
-  content: '';
+/* Brillo índigo: sigue al cursor (--gx/--gy desde login.ts) y respira despacio */
+.login-glow {
+  position: absolute;
+  z-index: -1;
+  left: var(--gx, 50%);
+  top: var(--gy, 32%);
+  width: min(56rem, 140vw);
+  height: 32rem;
+  translate: -50% -50%;
+  border-radius: 9999px;
+  background: radial-gradient(closest-side, oklch(0.5 0.2 275 / 0.5), transparent);
+  filter: blur(24px);
+  transition:
+    left 1.2s var(--ease-out-quart),
+    top 1.2s var(--ease-out-quart);
+  animation: login-breathe 7s ease-in-out infinite alternate;
+}
+@keyframes login-breathe {
+  to {
+    opacity: 0.65;
+    scale: 1.1;
+  }
+}
+/* Renglones de agenda, desvanecidos hacia los bordes */
+.login-lines {
   position: absolute;
   inset: 0;
   z-index: -1;
-  background-image: radial-gradient(oklch(1 0 0 / 0.09) 1px, transparent 1px);
-  background-size: 24px 24px;
-  mask-image: radial-gradient(ellipse 70% 60% at 35% 45%, black, transparent 80%);
+  background-image: linear-gradient(oklch(1 0 0 / 0.045) 1px, transparent 1px);
+  background-size: 100% 36px;
+  mask-image: radial-gradient(ellipse at 50% 42%, black 30%, transparent 75%);
 }
-.login-blob {
-  position: absolute;
-  z-index: -1;
-  border-radius: 9999px;
-  filter: blur(70px);
-  animation: blob-drift 16s ease-in-out infinite alternate;
-}
-@keyframes blob-drift {
-  to {
-    transform: translate(7%, -9%) scale(1.15);
-  }
-}
-.login-side {
-  background:
-    radial-gradient(60% 40% at 100% 0%, oklch(0.95 0.03 275 / 0.8), transparent 70%),
-    var(--color-paper);
-}
-.glass {
-  background: oklch(1 0 0 / 0.07);
-  border: 1px solid oklch(1 0 0 / 0.13);
-  backdrop-filter: blur(16px);
-  box-shadow: 0 30px 70px -25px oklch(0.08 0.05 272 / 0.7);
-}
-.google-btn {
-  box-shadow: 0 1px 2px oklch(0.25 0.04 265 / 0.06);
-  transition:
-    transform 180ms var(--ease-out-quart),
-    box-shadow 180ms var(--ease-out-quart),
-    border-color 180ms;
-}
-.google-btn:hover:not(:disabled) {
-  transform: translateY(-2px);
-  border-color: var(--color-pen);
-  box-shadow: 0 12px 28px -10px oklch(0.5 0.2 275 / 0.35);
-}
-.google-btn:active:not(:disabled) {
-  transform: translateY(0);
-}
-.enter {
-  animation: enter-up 720ms var(--ease-out-quart) both;
+.login-in {
+  animation: login-in 720ms var(--ease-out-quart) both;
   animation-delay: var(--d, 0ms);
 }
-@keyframes enter-up {
+@keyframes login-in {
   from {
     opacity: 0;
-    transform: translateY(16px);
+    transform: translateY(14px);
     filter: blur(6px);
   }
 }
-/* .enter.float-slow: entra y luego flota */
-.float-slow {
-  animation: float 7s ease-in-out infinite;
+.login-badge {
+  color: var(--color-highlight);
+  background: oklch(0.92 0.11 92 / 0.1);
+  border: 1px solid oklch(0.92 0.11 92 / 0.25);
 }
-.enter.float-slow {
-  animation:
-    enter-up 720ms var(--ease-out-quart) both var(--d, 0ms),
-    float 7s ease-in-out calc(var(--d, 0ms) + 720ms) infinite;
+.login-badge-dot {
+  background: var(--color-highlight);
+  box-shadow: 0 0 0 4px oklch(0.92 0.11 92 / 0.2);
 }
-@keyframes float {
-  50% {
-    transform: translateY(-8px);
+/* Palabra final del titular: entra desde abajo y sale hacia arriba */
+.login-words {
+  display: inline-grid;
+  justify-items: start;
+  text-align: left;
+  vertical-align: bottom;
+  height: 1.08em;
+  overflow: hidden;
+  color: oklch(0.78 0.12 278);
+}
+.login-words > span {
+  grid-area: 1 / 1;
+  opacity: 0;
+  transform: translateY(70%);
+  transition:
+    opacity 450ms,
+    transform 550ms var(--ease-out-quart);
+}
+.login-words > span.is-on {
+  opacity: 1;
+  transform: none;
+}
+.login-words > span.is-off {
+  transform: translateY(-70%);
+}
+/* Google: anillo índigo, se eleva al pasar y un destello lo cruza cada pocos segundos */
+.login-google {
+  position: relative;
+  overflow: hidden;
+  box-shadow:
+    0 0 0 6px oklch(0.5 0.2 275 / 0.28),
+    0 20px 40px -12px oklch(0.1 0.03 265 / 0.55);
+  transition:
+    transform 200ms var(--ease-out-quart),
+    box-shadow 200ms var(--ease-out-quart);
+}
+.login-google::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, transparent 35%, oklch(0.5 0.2 275 / 0.22) 50%, transparent 65%);
+  transform: translateX(-120%);
+  animation: login-shine 4.5s 1.4s ease-in-out infinite;
+}
+@keyframes login-shine {
+  0% {
+    transform: translateX(-120%);
+  }
+  35%,
+  100% {
+    transform: translateX(120%);
   }
 }
-.check-pop {
-  animation: check-pop 520ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
-  animation-delay: var(--d, 0ms);
+.login-google:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow:
+    0 0 0 8px oklch(0.5 0.2 275 / 0.38),
+    0 24px 48px -12px oklch(0.1 0.03 265 / 0.6);
 }
-@keyframes check-pop {
-  from {
-    opacity: 0;
-    transform: scale(0.6);
+.login-google:active:not(:disabled) {
+  transform: translateY(0);
+}
+.login-check {
+  color: oklch(0.78 0.12 278);
+}
+@media (prefers-reduced-motion: reduce) {
+  .login-glow,
+  .login-google::after {
+    animation: none;
   }
-}
-.now-line {
-  transform-origin: left;
-  animation: draw-line 700ms var(--ease-out-quart) both;
-  animation-delay: var(--d, 0ms);
-}
-@keyframes draw-line {
-  from {
-    transform: scaleX(0);
-    opacity: 0;
+  .login-glow {
+    transition: none;
   }
 }
 
