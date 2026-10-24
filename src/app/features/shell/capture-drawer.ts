@@ -2,7 +2,7 @@ import { Component, ElementRef, computed, effect, inject, signal, untracked, vie
 import { FormField, email, form, min, required, submit } from '@angular/forms/signals';
 import { Router } from '@angular/router';
 import { RouterLink } from '@angular/router';
-import { LucideUserRound, LucideX } from '@lucide/angular';
+import { LucidePlus, LucideUserRound, LucideX } from '@lucide/angular';
 import { CatalogService } from '../../core/catalog.service';
 import { ContactsService } from '../../core/contacts.service';
 import { moneyLabel } from '../../core/dates';
@@ -57,7 +57,7 @@ function emptyModel(uid: string): CaptureModel {
  */
 @Component({
   selector: 'app-capture-drawer',
-  imports: [FormField, RouterLink, ChannelPicker, WhenPicker, TierPicker, LucideX, LucideUserRound],
+  imports: [FormField, RouterLink, ChannelPicker, WhenPicker, TierPicker, LucideX, LucidePlus, LucideUserRound],
   templateUrl: './capture-drawer.html',
 })
 export class CaptureDrawer {
@@ -84,11 +84,20 @@ export class CaptureDrawer {
     min(p.quantity, 1, { message: 'form.quantityMin' });
   });
 
-  /** Contacto fijado al abrir desde su ficha ("Nuevo negocio"). */
+  /** Contacto elegido en el buscador o al abrir desde su ficha ("Nuevo negocio"). */
+  protected readonly chosenId = signal<string | null>(null);
   protected readonly fixedContact = computed(() => {
-    const id = this.ui.captureContactId();
+    const id = this.chosenId();
     return id ? (this.contacts.byId().get(id) ?? null) : null;
   });
+
+  // Buscador "¿Para quién?": sugiere contactos mientras se escribe el nombre.
+  protected readonly suggestOpen = signal(false);
+  protected readonly activeIndex = signal(0);
+  protected readonly suggestions = computed(() => this.contacts.search(this.model().name));
+  /** Opciones del listbox: los contactos y, al final, "nuevo contacto". */
+  protected readonly optionCount = computed(() => this.suggestions().length + 1);
+  protected readonly showSuggestions = computed(() => this.suggestOpen() && this.suggestions().length > 0);
   /** Contacto existente con el mismo email o teléfono que lo escrito. */
   protected readonly match = computed<Contact | null>(() => {
     if (this.fixedContact()) return null;
@@ -123,6 +132,51 @@ export class CaptureDrawer {
         el.close();
       }
     });
+  }
+
+  protected onNameInput(): void {
+    this.suggestOpen.set(true);
+    this.activeIndex.set(0);
+  }
+
+  protected onNameKey(event: KeyboardEvent): void {
+    if (!this.showSuggestions()) return;
+    const n = this.optionCount();
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      this.activeIndex.update((i) => (i + 1) % n);
+    } else if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      this.activeIndex.update((i) => (i - 1 + n) % n);
+    } else if (event.key === 'Enter') {
+      event.preventDefault();
+      const c = this.suggestions()[this.activeIndex()];
+      if (c) this.choose(c);
+      else this.suggestOpen.set(false);
+    } else if (event.key === 'Escape') {
+      event.preventDefault();
+      event.stopPropagation();
+      this.suggestOpen.set(false);
+    }
+  }
+
+  protected choose(c: Contact): void {
+    this.chosenId.set(c.id);
+    this.suggestOpen.set(false);
+    this.model.update((m) => ({ ...m, name: c.name, company: c.company, email: c.email, phone: c.phone, assigneeId: c.assigneeId || m.assigneeId }));
+    // Directo a "qué quiere comprar".
+    setTimeout(() => document.getElementById('c-service')?.focus());
+  }
+
+  /** Vuelve a la búsqueda (solo si no se abrió desde la ficha del contacto). */
+  protected unchoose(): void {
+    this.chosenId.set(null);
+    this.model.update((m) => ({ ...m, name: '', company: '', email: '', phone: '' }));
+    setTimeout(() => document.getElementById('c-name')?.focus());
+  }
+
+  protected boughtLabel(n: number): string {
+    return n === 1 ? t('capture.bought1') : t('capture.boughtN', { n });
   }
 
   protected close(): void {
@@ -195,6 +249,8 @@ export class CaptureDrawer {
 
   private reset(): void {
     const model = emptyModel(this.auth.uid());
+    this.chosenId.set(untracked(() => this.ui.captureContactId()));
+    this.suggestOpen.set(false);
     const fixed = untracked(() => this.fixedContact());
     if (fixed) {
       Object.assign(model, { name: fixed.name, company: fixed.company, email: fixed.email, phone: fixed.phone });

@@ -24,21 +24,84 @@
           <svg lucideUserRound [size]="18" class="text-ink-2"></svg>
           <p class="min-w-0 flex-1 text-sm">
             {{ t('capture.forContact') }} <strong>{{ c.name }}</strong>
-            @if (c.company) { <span class="text-ink-2">· {{ c.company }}</span> }
+            @if (c.company) { <span class="text-ink-2">&nbsp;· {{ c.company }}</span> }
+            @if (contacts.isCustomer(c.id)) {
+              <span class="ml-1 inline-flex h-5 items-center rounded bg-ok-soft px-1.5 text-xs font-semibold text-ok">{{ t('contacts.customer') }}</span>
+            }
           </p>
+          @if (!ui.captureContactId()) {
+            <button type="button" class="btn-ghost btn-sm" (click)="unchoose()">{{ t('capture.change') }}</button>
+          }
         </div>
       } @else {
         <div class="grid gap-4 sm:grid-cols-2">
-          <div class="sm:col-span-2">
-            <label class="field-label" for="c-name">{{ t('field.name') }}</label>
+          <div class="relative sm:col-span-2">
+            <label class="field-label" for="c-name">{{ t('capture.who') }}</label>
             <input
               id="c-name"
               class="input"
               autocomplete="off"
               autofocus
-              placeholder="Ana Morales"
+              role="combobox"
+              aria-autocomplete="list"
+              aria-controls="c-suggest"
+              [attr.aria-expanded]="showSuggestions()"
+              [attr.aria-activedescendant]="showSuggestions() ? 'c-opt-' + activeIndex() : null"
+              [attr.aria-describedby]="'c-name-hint'"
+              [placeholder]="t('capture.whoPlaceholder')"
               [formField]="f.name"
+              (input)="onNameInput()"
+              (keydown)="onNameKey($event)"
+              (blur)="suggestOpen.set(false)"
             />
+            <p id="c-name-hint" class="mt-1 text-xs text-ink-3">{{ t('capture.whoHint') }}</p>
+            @if (showSuggestions()) {
+              <ul
+                id="c-suggest"
+                role="listbox"
+                [attr.aria-label]="t('capture.suggestions')"
+                class="absolute inset-x-0 top-[4.25rem] z-10 max-h-80 overflow-y-auto rounded-lg border border-rule-strong bg-sheet py-1 shadow-lg"
+              >
+                @for (s of suggestions(); track s.id; let i = $index) {
+                  <li
+                    [id]="'c-opt-' + i"
+                    role="option"
+                    [attr.aria-selected]="activeIndex() === i"
+                    class="flex min-h-11 cursor-pointer items-center gap-3 px-3 py-2"
+                    [class.bg-pen-soft]="activeIndex() === i"
+                    (mousedown)="$event.preventDefault()"
+                    (mouseenter)="activeIndex.set(i)"
+                    (click)="choose(s)"
+                  >
+                    <svg lucideUserRound [size]="16" class="shrink-0 text-ink-3"></svg>
+                    <span class="min-w-0 flex-1">
+                      <span class="block truncate text-sm font-semibold">{{ s.name }}</span>
+                      <span class="block truncate text-xs text-ink-2">{{ s.company || s.email || s.phone }}</span>
+                    </span>
+                    @if (contacts.isCustomer(s.id)) {
+                      <span class="inline-flex h-5 shrink-0 items-center rounded bg-ok-soft px-1.5 text-xs font-semibold text-ok">
+                        {{ t('contacts.customer') }} · {{ boughtLabel(contacts.summary(s.id).won.length) }}
+                      </span>
+                    } @else {
+                      <span class="shrink-0 text-xs text-ink-3">{{ t('contacts.prospect') }}</span>
+                    }
+                  </li>
+                }
+                <li
+                  [id]="'c-opt-' + suggestions().length"
+                  role="option"
+                  [attr.aria-selected]="activeIndex() === suggestions().length"
+                  class="flex min-h-11 cursor-pointer items-center gap-3 border-t border-rule px-3 py-2 text-sm font-semibold text-pen"
+                  [class.bg-pen-soft]="activeIndex() === suggestions().length"
+                  (mousedown)="$event.preventDefault()"
+                  (mouseenter)="activeIndex.set(suggestions().length)"
+                  (click)="suggestOpen.set(false)"
+                >
+                  <svg lucidePlus [size]="16" class="shrink-0"></svg>
+                  {{ t('capture.newContact', { name: model().name.trim() }) }}
+                </li>
+              </ul>
+            }
             @if (f.name().touched() && f.name().invalid()) {
               <p class="field-error">{{ t($any(f.name().errors()[0].message)) }}</p>
             }

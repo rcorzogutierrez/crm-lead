@@ -55,6 +55,7 @@ const EMPTY_SUMMARY: ContactSummary = {
 };
 
 export const normEmail = (s: string) => s.trim().toLowerCase();
+export const normalizeText = (s: string) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 export const phoneDigits = (s: string) => s.replace(/\D/g, '');
 
 /** Dos teléfonos coinciden si sus dígitos son iguales o uno termina en el otro (prefijo de país). */
@@ -119,6 +120,24 @@ export class ContactsService {
 
   isCustomer(contactId: string | null): boolean {
     return this.summary(contactId).won.length > 0;
+  }
+
+  /** Contactos que coinciden con lo escrito (nombre, empresa, email o dígitos del teléfono), clientes primero. */
+  search(text: string, max = 6): Contact[] {
+    const q = normalizeText(text.trim());
+    if (q.length < 2) return [];
+    const digits = phoneDigits(text);
+    return this.contacts()
+      .filter((c) => {
+        if (normalizeText(`${c.name} ${c.company} ${c.email}`).includes(q)) return true;
+        return digits.length >= 3 && phoneDigits(c.phone).includes(digits);
+      })
+      .sort((a, b) => {
+        const sa = normalizeText(a.name).startsWith(q) ? 0 : 1;
+        const sb = normalizeText(b.name).startsWith(q) ? 0 : 1;
+        return sa - sb || Number(this.isCustomer(b.id)) - Number(this.isCustomer(a.id)) || a.name.localeCompare(b.name);
+      })
+      .slice(0, max);
   }
 
   /** Busca un contacto existente con el mismo email o teléfono. */

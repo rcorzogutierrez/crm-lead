@@ -90,9 +90,8 @@ export class Shell {
       this.ui.openCapture();
     } else if (event.key === '/') {
       event.preventDefault();
-      void this.router.navigate(['/leads'], { queryParams: { buscar: '' }, queryParamsHandling: 'merge' }).then(() =>
-        document.getElementById('lead-search')?.focus(),
-      );
+      // Buscar clientes: el punto de partida para venderle algo más a alguien que ya existe.
+      void this.router.navigate(['/clientes']).then(() => document.getElementById('contact-search')?.focus());
     }
   }
 

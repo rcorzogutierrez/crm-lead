@@ -80,7 +80,8 @@
             <th scope="col" class="px-3 py-2.5 text-right">{{ t('contacts.openDeals') }}</th>
             <th scope="col" class="px-3 py-2.5 text-right">{{ t('contacts.bought') }}</th>
             <th scope="col" class="px-3 py-2.5">{{ t('next.title') }}</th>
-            <th scope="col" class="px-4 py-2.5"><span class="sr-only">{{ t('field.assignee') }}</span></th>
+            <th scope="col" class="px-3 py-2.5"><span class="sr-only">{{ t('field.assignee') }}</span></th>
+            <th scope="col" class="px-4 py-2.5"><span class="sr-only">{{ t('svc.actions') }}</span></th>
           </tr>
         </thead>
         <tbody class="divide-y divide-rule">
@@ -100,8 +101,14 @@
               <td class="px-3 py-2.5 text-right tabular">{{ row.s.open.length }}</td>
               <td class="px-3 py-2.5 text-right font-semibold tabular">{{ row.s.totalWon ? money(row.s.totalWon) : '—' }}</td>
               <td class="px-3 py-2.5"><app-due-chip [date]="row.s.nextAt" [closed]="!row.s.open.length" /></td>
-              <td class="px-4 py-2.5 text-right">
+              <td class="px-3 py-2.5 text-right">
                 <app-avatar [name]="members.name(row.c.assigneeId)" [photo]="members.byId().get(row.c.assigneeId)?.photoURL ?? null" size="sm" />
+              </td>
+              <td class="px-4 py-1.5 text-right whitespace-nowrap">
+                <button type="button" class="btn-ghost btn-sm text-pen" [attr.aria-label]="t('contacts.newDealFor', { name: row.c.name })" (click)="$event.stopPropagation(); ui.openCapture(row.c.id)">
+                  <svg lucidePlus [size]="14"></svg>
+                  {{ t('capture.newDeal') }}
+                </button>
               </td>
             </tr>
           }
@@ -110,8 +117,8 @@
 
       <ul class="divide-y divide-rule md:hidden">
         @for (row of rows(); track row.c.id) {
-          <li>
-            <a [routerLink]="['/clientes', row.c.id]" class="flex items-center gap-3 px-4 py-3 active:bg-sheet-2">
+          <li class="flex items-center">
+            <a [routerLink]="['/clientes', row.c.id]" class="flex min-w-0 flex-1 items-center gap-3 py-3 pr-2 pl-4 active:bg-sheet-2">
               <div class="min-w-0 flex-1">
                 <p class="truncate font-semibold">{{ row.c.name }}</p>
                 <p class="mt-0.5 truncate text-xs text-ink-3">
@@ -122,6 +129,9 @@
               </div>
               <app-due-chip [date]="row.s.nextAt" [closed]="!row.s.open.length" />
             </a>
+            <button type="button" class="mr-2 grid size-11 shrink-0 place-items-center rounded-lg text-pen active:bg-pen-soft" [attr.aria-label]="t('contacts.newDealFor', { name: row.c.name })" (click)="ui.openCapture(row.c.id)">
+              <svg lucidePlus [size]="18"></svg>
+            </button>
           </li>
         }
       </ul>

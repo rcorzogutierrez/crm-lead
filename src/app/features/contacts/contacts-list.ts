@@ -1,9 +1,9 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { LucideSearch } from '@lucide/angular';
+import { LucidePlus, LucideSearch } from '@lucide/angular';
 import { AuthService } from '../../core/auth.service';
-import { ContactSummary, ContactsService } from '../../core/contacts.service';
+import { ContactSummary, ContactsService, phoneDigits } from '../../core/contacts.service';
 import { moneyLabel } from '../../core/dates';
 import { firestoreErrorMessage } from '../../core/firestore-utils';
 import { I18nKey, intlLocale, t } from '../../core/i18n/i18n';
@@ -29,7 +29,7 @@ const normalize = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-�
 /** Clientes y prospectos, con lo que han comprado y lo que tienen abierto. */
 @Component({
   selector: 'app-contacts-list',
-  imports: [RouterLink, Avatar, DueChip, EmptyState, LucideSearch],
+  imports: [RouterLink, Avatar, DueChip, EmptyState, LucidePlus, LucideSearch],
   templateUrl: './contacts-list.html',
 })
 export class ContactsList {
@@ -52,6 +52,7 @@ export class ContactsList {
 
   protected readonly rows = computed(() => {
     const q = normalize(this.search().trim());
+    const digits = phoneDigits(this.search());
     const kind = this.kind();
     return this.contacts
       .contacts()
@@ -61,7 +62,9 @@ export class ContactsList {
         if (kind === 'clientes' && !customer) return false;
         if (kind === 'prospectos' && customer) return false;
         if (kind === 'sin-abiertas' && (!customer || s.open.length > 0)) return false;
-        if (q && !normalize(`${c.name} ${c.company} ${c.email} ${c.phone}`).includes(q)) return false;
+        // El teléfono se compara por dígitos: "55 1234" encuentra "+52 (55) 1234-5678".
+        const phoneHit = digits.length >= 3 && phoneDigits(c.phone).includes(digits);
+        if (q && !phoneHit && !normalize(`${c.name} ${c.company} ${c.email} ${c.phone}`).includes(q)) return false;
         return true;
       })
       .sort((a, b) => a.c.name.localeCompare(b.c.name, intlLocale()));
