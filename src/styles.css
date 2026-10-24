@@ -344,6 +344,8 @@ dialog.drawer[open]::backdrop {
   from {
     transform: scaleX(0);
     opacity: 0;
+  }
+}
 
 /* Selector de idioma: el indicador se desliza y la página cambia con un fundido suave */
 .lang-thumb {
