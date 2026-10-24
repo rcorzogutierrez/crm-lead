@@ -38,6 +38,17 @@ export class Team {
   /** Cambio de rol elegido en el selector, a la espera de confirmación en línea. */
   protected readonly pendingRole = signal<{ uid: string; role: MemberRole } | null>(null);
 
+  /** Pide confirmar en línea y lleva el foco al botón que confirma. */
+  protected askRevoke(m: Member): void {
+    this.confirmUid.set(m.uid);
+    setTimeout(() => document.getElementById('revoke-ok-' + m.uid)?.focus());
+  }
+
+  protected cancelRevoke(m: Member): void {
+    this.confirmUid.set(null);
+    setTimeout(() => document.getElementById('revoke-' + m.uid)?.focus());
+  }
+
   protected roleLabel(role: MemberRole): string {
     return role === 'admin' ? t('role.admin') : t('role.member');
   }

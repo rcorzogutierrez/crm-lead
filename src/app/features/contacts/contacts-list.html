@@ -35,14 +35,15 @@
         (input)="setParam('search', $any($event.target).value)"
       />
     </div>
-    <div class="inline-flex flex-wrap rounded-lg border border-rule-strong bg-sheet p-0.5" role="radiogroup" [attr.aria-label]="t('contacts.kind')">
+    <!-- En móvil los filtros van en una sola fila que se desliza, en lugar de partirse en dos. -->
+    <div class="flex max-w-full overflow-x-auto rounded-lg border border-rule-strong bg-sheet p-0.5 [scrollbar-width:none]" role="radiogroup" [attr.aria-label]="t('contacts.kind')">
       @for (k of kinds(); track k.id) {
         <button
           type="button"
           role="radio"
           [attr.aria-checked]="kind() === k.id"
           (click)="setParam('type', k.id === 'all' ? null : k.id)"
-          class="h-8 rounded-md px-3 text-sm font-semibold transition-colors"
+          class="h-8 shrink-0 rounded-md px-3 text-sm font-semibold whitespace-nowrap transition-colors"
           [class]="kind() === k.id ? 'bg-ink text-white' : 'text-ink-2 hover:text-ink'"
         >
           {{ t(k.label) }}

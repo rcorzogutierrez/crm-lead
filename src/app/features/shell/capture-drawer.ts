@@ -119,6 +119,15 @@ export class CaptureDrawer {
   protected readonly nextChannel = signal<ContactChannel>('call');
   protected readonly nextNote = signal('');
   protected readonly saveError = signal<string | null>(null);
+  /** Pregunta en línea antes de cerrar si ya se escribió algo (Esc, fondo, Cancelar). */
+  protected readonly confirmDiscard = signal(false);
+
+  /** Hay algo escrito que se perdería al cerrar. Los datos que vienen de la ficha del contacto no cuentan. */
+  private readonly hasDraft = computed(() => {
+    const m = this.model();
+    const typedContact = !this.ui.captureContactId() && [m.name, m.company, m.phone, m.email].some((v) => v.trim());
+    return typedContact || !!m.serviceId || !!m.detail.trim() || !!m.notes.trim() || !!this.nextNote().trim();
+  });
 
   constructor() {
     effect(() => {
@@ -184,8 +193,31 @@ export class CaptureDrawer {
     this.ui.captureContactId.set(null);
   }
 
+  /** Cerrar sin guardar: si hay algo escrito, primero se pregunta en el pie del panel. */
+  protected requestClose(): void {
+    if (!this.hasDraft() || this.confirmDiscard()) {
+      this.close();
+      return;
+    }
+    this.confirmDiscard.set(true);
+    setTimeout(() => document.getElementById('c-keep')?.focus());
+  }
+
+  /** Esc nativo del <dialog>: se detiene para preguntar; un segundo Esc ya cierra. */
+  protected onCancel(event: Event): void {
+    if (this.hasDraft() && !this.confirmDiscard()) {
+      event.preventDefault();
+      this.requestClose();
+    }
+  }
+
+  protected keepEditing(): void {
+    this.confirmDiscard.set(false);
+    setTimeout(() => document.getElementById('c-name')?.focus() ?? document.getElementById('c-service')?.focus());
+  }
+
   protected onBackdrop(event: MouseEvent): void {
-    if (event.target === this.dialog().nativeElement) this.close();
+    if (event.target === this.dialog().nativeElement) this.requestClose();
   }
 
   protected async save(event: Event, openAfter: boolean): Promise<void> {
@@ -264,5 +296,6 @@ export class CaptureDrawer {
     this.nextChannel.set('call');
     this.nextNote.set('');
     this.saveError.set(null);
+    this.confirmDiscard.set(false);
   }
 }

@@ -8,6 +8,7 @@ import { moneyLabel } from '../../core/dates';
 import { firestoreErrorMessage } from '../../core/firestore-utils';
 import { t } from '../../core/i18n/i18n';
 import { LeadsService } from '../../core/leads.service';
+import { mediaQuery } from '../../core/media';
 import { ServiceItem, ServiceItemDraft, TIERS, TierRates, isClosed } from '../../core/models';
 import { ToastService } from '../../core/toast.service';
 import { EmptyState } from '../../shared/empty-state';
@@ -36,6 +37,9 @@ export class ServicesPage {
   protected readonly t = t;
   protected readonly money = moneyLabel;
   protected readonly tiers = TIERS;
+
+  /** Móvil: lista apilada en lugar de la tabla de siete columnas (mismo corte `md` que Clientes). */
+  protected readonly narrow = mediaQuery('(max-width: 767.98px)');
 
   protected readonly search = signal('');
   /** null = cerrado; '' = servicio nuevo; id = editando ese servicio. */

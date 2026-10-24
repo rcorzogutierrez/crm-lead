@@ -10,41 +10,44 @@
     </dl>
     <ul class="sheet mt-2 divide-y divide-rule">
       @for (m of members.members(); track m.uid) {
-        <li class="flex flex-wrap items-center gap-3 px-4 py-3" [class.opacity-60]="!m.active">
+        <li class="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3">
           <app-avatar [name]="m.displayName" [photo]="m.photoURL" />
           <div class="min-w-0 flex-1">
-            <p class="truncate font-semibold">
-              {{ m.displayName }}
+            <p class="flex flex-wrap items-center gap-x-1.5 font-semibold" [class.text-ink-2]="!m.active">
+              <span class="truncate">{{ m.displayName }}</span>
               @if (m.uid === auth.uid()) {
                 <span class="font-normal text-ink-3">{{ t('team.you') }}</span>
               }
-            </p>
-            <p class="truncate text-xs text-ink-3">
-              {{ m.email }}@if (auth.isAdmin()) { · {{ t('team.activeLeads', { n: workload().get(m.uid) ?? 0 }) }}}
               @if (!m.active) {
-                · {{ t('team.noAccess') }}
+                <span class="inline-flex h-5 items-center rounded border border-rule-strong px-1.5 text-xs font-semibold text-ink-2">{{ t('team.noAccessTag') }}</span>
               }
             </p>
+            <p class="truncate text-xs text-ink-2">
+              {{ m.email }}@if (auth.isAdmin()) { · {{ t('team.activeLeads', { n: workload().get(m.uid) ?? 0 }) }}}
+            </p>
           </div>
-          @if (auth.isAdmin() && m.uid !== auth.uid()) {
-            <select class="input h-8 w-auto text-[0.8125rem]" [attr.aria-label]="t('team.roleOf', { name: m.displayName })" [value]="shownRole(m)" (change)="pickRole(m, $any($event.target).value)">
-              <option value="member">{{ t('role.member') }}</option>
-              <option value="admin">{{ t('role.admin') }}</option>
-            </select>
-            @if (confirmUid() === m.uid) {
-              <button type="button" class="btn-ghost btn-sm" (click)="confirmUid.set(null)">{{ t('common.cancel') }}</button>
-              <button type="button" class="btn-danger btn-sm" (click)="toggleActive(m)">{{ t('team.revoke') }}</button>
-            } @else if (m.active) {
-              <button type="button" class="btn-ghost btn-sm" (click)="confirmUid.set(m.uid)">{{ t('team.revoke') }}</button>
+          <!-- En móvil los controles bajan a su propio renglón para que el nombre se lea entero. -->
+          <div class="flex w-full flex-wrap items-center gap-2 pl-11 sm:w-auto sm:pl-0">
+            @if (auth.isAdmin() && m.uid !== auth.uid()) {
+              <select class="input h-8 w-auto text-[0.8125rem]" [attr.aria-label]="t('team.roleOf', { name: m.displayName })" [value]="shownRole(m)" (change)="pickRole(m, $any($event.target).value)">
+                <option value="member">{{ t('role.member') }}</option>
+                <option value="admin">{{ t('role.admin') }}</option>
+              </select>
+              @if (confirmUid() === m.uid) {
+                <button type="button" class="btn-ghost btn-sm" (click)="cancelRevoke(m)">{{ t('common.cancel') }}</button>
+                <button type="button" class="btn-danger btn-sm" [id]="'revoke-ok-' + m.uid" (click)="toggleActive(m)">{{ t('team.revoke') }}</button>
+              } @else if (m.active) {
+                <button type="button" class="btn-ghost btn-sm" [id]="'revoke-' + m.uid" (click)="askRevoke(m)">{{ t('team.revoke') }}</button>
+              } @else {
+                <button type="button" class="btn-secondary btn-sm" (click)="toggleActive(m)">{{ t('team.restore') }}</button>
+              }
             } @else {
-              <button type="button" class="btn-secondary btn-sm" (click)="toggleActive(m)">{{ t('team.restore') }}</button>
+              @if (auth.isAdmin()) {
+                <span class="hidden text-xs text-ink-3 sm:inline">{{ t('team.ownRole') }}</span>
+              }
+              <span class="rounded-md bg-sheet-2 px-2 py-1 text-xs font-semibold text-ink-2">{{ roleLabel(m.role) }}</span>
             }
-          } @else {
-            @if (auth.isAdmin()) {
-              <span class="hidden text-xs text-ink-3 sm:inline">{{ t('team.ownRole') }}</span>
-            }
-            <span class="rounded-md bg-sheet-2 px-2 py-1 text-xs font-semibold text-ink-2">{{ roleLabel(m.role) }}</span>
-          }
+          </div>
           @if (pendingRole(); as pending) {
             @if (pending.uid === m.uid) {
               <div class="flex w-full flex-wrap items-center gap-2 rounded-md bg-sheet-2 px-3 py-2" role="group" [attr.aria-label]="t('team.roleOf', { name: m.displayName })">

@@ -100,6 +100,18 @@ export class ContactDetail {
   protected readonly showLost = signal(false);
   /** Confirmación en línea de archivar o eliminar (solo admin). */
   protected readonly confirming = signal<'archive' | 'delete' | null>(null);
+
+  /** Abre la confirmación en línea y le pasa el foco, para que el teclado no vuelva al inicio. */
+  protected ask(kind: 'archive' | 'delete'): void {
+    this.confirming.set(kind);
+    setTimeout(() => document.getElementById('confirm-title')?.focus());
+  }
+
+  protected cancelConfirm(): void {
+    const kind = this.confirming();
+    this.confirming.set(null);
+    setTimeout(() => document.getElementById('ask-' + kind)?.focus());
+  }
   protected readonly busy = signal(false);
   protected readonly dealCount = computed(() => {
     const s = this.summary();
