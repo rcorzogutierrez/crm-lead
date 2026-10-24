@@ -26,6 +26,16 @@ export const routes: Routes = [
         loadComponent: () => import('./features/today/today').then((m) => m.Today),
       },
       {
+        path: 'clientes',
+        title: 'nav.contacts',
+        loadComponent: () => import('./features/contacts/contacts-list').then((m) => m.ContactsList),
+      },
+      {
+        path: 'clientes/:id',
+        title: 'contacts.customer',
+        loadComponent: () => import('./features/contacts/contact-detail').then((m) => m.ContactDetail),
+      },
+      {
         path: 'leads',
         title: 'nav.leads',
         loadComponent: () => import('./features/leads/leads-list').then((m) => m.LeadsList),
@@ -39,6 +49,11 @@ export const routes: Routes = [
         path: 'pipeline',
         title: 'nav.pipeline',
         loadComponent: () => import('./features/pipeline/pipeline').then((m) => m.Pipeline),
+      },
+      {
+        path: 'servicios',
+        title: 'nav.services',
+        loadComponent: () => import('./features/services/services-page').then((m) => m.ServicesPage),
       },
       {
         path: 'equipo',

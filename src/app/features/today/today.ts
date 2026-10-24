@@ -1,6 +1,7 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { AuthService } from '../../core/auth.service';
+import { CatalogService } from '../../core/catalog.service';
 import { Clock } from '../../core/clock.service';
 import { addDays, agoLabel, dayDiff, moneyLabel, startOfDay } from '../../core/dates';
 import { FollowUpsService } from '../../core/followups.service';
@@ -30,10 +31,11 @@ interface HourRow {
 })
 export class Today {
   private readonly clock = inject(Clock);
-  private readonly auth = inject(AuthService);
+  protected readonly auth = inject(AuthService);
   protected readonly followUps = inject(FollowUpsService);
   protected readonly leads = inject(LeadsService);
   protected readonly ui = inject(UiService);
+  private readonly catalog = inject(CatalogService);
 
   /** Ver solo lo mío o todo el equipo. */
   protected readonly t = t;
@@ -41,10 +43,14 @@ export class Today {
   protected readonly schedulingFor = signal<string | null>(null);
 
   private readonly mineOnly = (f: { assigneeId: string }) =>
-    this.scope() === 'team' || f.assigneeId === this.auth.uid();
+    !this.auth.isAdmin() || this.scope() === 'team' || f.assigneeId === this.auth.uid();
 
   protected readonly overdue = computed(() => this.followUps.overdue().filter(this.mineOnly));
   protected readonly today = computed(() => this.followUps.today().filter(this.mineOnly));
+  /** Propuestas abiertas cuyo precio oficial cambió. */
+  protected readonly priceAlerts = computed(() =>
+    this.leads.open().filter((l) => this.mineOnly(l) && this.catalog.hasPriceChange(l)),
+  );
   protected readonly orphans = computed(() => this.leads.withoutNextStep().filter(this.mineOnly));
 
   protected readonly dateTitle = computed(() =>

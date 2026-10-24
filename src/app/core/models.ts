@@ -15,7 +15,10 @@ export type LeadSource =
 
 export type ContactChannel = 'call' | 'whatsapp' | 'email' | 'meeting' | 'task';
 
-export type ActivityType = ContactChannel | 'note' | 'stage' | 'created' | 'followup';
+export type ActivityType = ContactChannel | 'note' | 'stage' | 'created' | 'followup' | 'pricing';
+
+/** Categoría de venta: porcentaje sobre el precio oficial del servicio. */
+export type PriceTier = 'bronze' | 'silver' | 'gold';
 
 export type MemberRole = 'admin' | 'member';
 
@@ -35,6 +38,77 @@ export interface Invite {
   createdAt: Date | null;
 }
 
+/**
+ * Persona o empresa. Es "cliente" en cuanto gana su primer lead; antes es prospecto.
+ * El estado se deriva de sus leads, no se guarda.
+ */
+export interface Contact {
+  id: string;
+  name: string;
+  company: string;
+  /** En minúsculas, para detectar duplicados. */
+  email: string;
+  phone: string;
+  assigneeId: string;
+  notes: string;
+  createdBy: string;
+  createdAt: Date | null;
+  updatedAt: Date | null;
+  /**
+   * Resumen de compras guardado en el contacto, porque un vendedor no ve los leads de
+   * los demás. null = aún no calculado (contactos anteriores; lo calcula la app de un admin).
+   */
+  stats: ContactStats | null;
+}
+
+export interface ContactStats {
+  wonCount: number;
+  wonTotal: number;
+  firstWonAt: Date | null;
+  /** Negocios abiertos por responsable (uid → cantidad). */
+  openBy: Record<string, number>;
+}
+
+export type ContactDraft = Pick<Contact, 'name' | 'company' | 'email' | 'phone' | 'assigneeId' | 'notes'>;
+
+/** Servicio del catálogo. Solo un admin lo crea o edita. */
+export interface ServiceItem {
+  id: string;
+  name: string;
+  description: string;
+  /** Precio oficial por unidad. */
+  price: number;
+  /** Unidad de cobro ("persona", "noche"…); vacío = precio único. */
+  unit: string;
+  active: boolean;
+}
+
+export type ServiceItemDraft = Pick<ServiceItem, 'name' | 'description' | 'price' | 'unit' | 'active'>;
+
+/** Porcentaje de cada categoría (doc `meta/pricing`). */
+export type TierRates = Record<PriceTier, number>;
+
+export const DEFAULT_TIER_RATES: TierRates = { bronze: 3, silver: 5, gold: 7 };
+
+export const TIERS: readonly { id: PriceTier; readonly label: string }[] = [
+  { id: 'bronze', get label() { return t('tier.bronze'); } },
+  { id: 'silver', get label() { return t('tier.silver'); } },
+  { id: 'gold', get label() { return t('tier.gold'); } },
+];
+
+export function tierLabel(tier: PriceTier): string {
+  return TIERS.find((x) => x.id === tier)?.label ?? tier;
+}
+
+/** Precio de venta: oficial × cantidad + porcentaje de la categoría, redondeado a centavos. */
+export function salePrice(unitPrice: number, quantity: number, pct: number): number {
+  return Math.round(unitPrice * quantity * (100 + pct)) / 100;
+}
+
+/**
+ * Un lead es una oportunidad: un servicio que se le intenta vender a un contacto.
+ * `name`, `company`, `email` y `phone` son copia del contacto (para listas y follow-ups).
+ */
 export interface Lead {
   id: string;
   name: string;
@@ -54,7 +128,25 @@ export interface Lead {
   createdBy: string;
   createdAt: Date | null;
   updatedAt: Date | null;
+  /** Contacto al que pertenece; null en leads anteriores a los contactos. */
+  contactId: string | null;
+  /** Servicio del catálogo; null si se registró sin servicio. */
+  serviceId: string | null;
+  serviceName: string;
+  /** Detalle libre del servicio ("salida en julio"). */
+  detail: string;
+  quantity: number;
+  /** Precio oficial por unidad, copiado del catálogo al crear (o al aceptar un cambio). */
+  unitPrice: number;
+  tier: PriceTier;
+  tierPct: number;
+  /** Precio oficial nuevo que se decidió no aplicar (para no volver a avisar). */
+  priceAck: number | null;
+  wonAt: Date | null;
 }
+
+/** Datos de precio de un lead con servicio. */
+export type LeadPricing = Pick<Lead, 'serviceId' | 'serviceName' | 'quantity' | 'unitPrice' | 'tier' | 'tierPct' | 'value'>;
 
 export type LeadDraft = Pick<
   Lead,

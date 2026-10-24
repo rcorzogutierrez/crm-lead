@@ -3,6 +3,7 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { LucideArrowDown, LucideArrowUp, LucideSearch, LucideX } from '@lucide/angular';
 import { AuthService } from '../../core/auth.service';
+import { CatalogService } from '../../core/catalog.service';
 import { Clock } from '../../core/clock.service';
 import { agoLabel, moneyLabel } from '../../core/dates';
 import { intlLocale, t } from '../../core/i18n/i18n';
@@ -30,10 +31,11 @@ export class LeadsList {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly clock = inject(Clock);
-  private readonly auth = inject(AuthService);
+  protected readonly auth = inject(AuthService);
   protected readonly leadsService = inject(LeadsService);
   protected readonly members = inject(MembersService);
   protected readonly ui = inject(UiService);
+  private readonly catalog = inject(CatalogService);
 
   protected readonly t = t;
   protected readonly stages = STAGES;
@@ -45,6 +47,7 @@ export class LeadsList {
   protected readonly source = computed(() => this.params().get('origen') ?? '');
   protected readonly assignee = computed(() => this.params().get('responsable') ?? '');
   protected readonly onlyOrphans = computed(() => this.params().get('filtro') === 'sin-accion');
+  protected readonly onlyPriceChanges = computed(() => this.params().get('filtro') === 'precio');
 
   protected readonly sortKey = signal<SortKey>('next');
   protected readonly sortAsc = signal(true);
@@ -55,6 +58,7 @@ export class LeadsList {
     const source = this.source();
     const assignee = this.assignee() === 'yo' ? this.auth.uid() : this.assignee();
     const orphans = this.onlyOrphans();
+    const priceChanges = this.onlyPriceChanges();
 
     const list = this.leadsService.leads().filter((l) => {
       if (stage === 'abiertos' && isClosed(l.stage)) return false;
@@ -62,8 +66,9 @@ export class LeadsList {
       if (source && l.source !== source) return false;
       if (assignee && l.assigneeId !== assignee) return false;
       if (orphans && (isClosed(l.stage) || l.nextFollowUpAt)) return false;
+      if (priceChanges && !this.catalog.hasPriceChange(l)) return false;
       if (q) {
-        const hay = normalize(`${l.name} ${l.company} ${l.email} ${l.phone}`);
+        const hay = normalize(`${l.name} ${l.company} ${l.email} ${l.phone} ${l.serviceName}`);
         if (!hay.includes(q)) return false;
       }
       return true;
@@ -94,7 +99,8 @@ export class LeadsList {
 
   protected readonly totalValue = computed(() => moneyLabel(this.filtered().reduce((s, l) => s + l.value, 0)));
   protected readonly hasFilters = computed(
-    () => !!(this.search() || this.source() || this.assignee() || this.onlyOrphans() || this.stage() !== 'abiertos'),
+    () =>
+      !!(this.search() || this.source() || this.assignee() || this.onlyOrphans() || this.onlyPriceChanges() || this.stage() !== 'abiertos'),
   );
 
   protected setParam(key: string, value: string | null): void {

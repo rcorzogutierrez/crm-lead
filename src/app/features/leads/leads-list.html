@@ -34,13 +34,15 @@
         <option [value]="s.id">{{ s.label }}</option>
       }
     </select>
-    <select class="input h-9 w-auto text-sm" [attr.aria-label]="t('field.assignee')" [value]="assignee()" (change)="setParam('responsable', $any($event.target).value)">
-      <option value="">{{ t('today.team') }}</option>
-      <option value="yo">{{ t('list.mine') }}</option>
-      @for (m of members.active(); track m.uid) {
-        <option [value]="m.uid">{{ m.displayName }}</option>
-      }
-    </select>
+    @if (auth.isAdmin()) {
+      <select class="input h-9 w-auto text-sm" [attr.aria-label]="t('field.assignee')" [value]="assignee()" (change)="setParam('responsable', $any($event.target).value)">
+        <option value="">{{ t('today.team') }}</option>
+        <option value="yo">{{ t('list.mine') }}</option>
+        @for (m of members.active(); track m.uid) {
+          <option [value]="m.uid">{{ m.displayName }}</option>
+        }
+      </select>
+    }
     <select class="input h-9 w-auto text-sm" [attr.aria-label]="t('field.source')" [value]="source()" (change)="setParam('origen', $any($event.target).value)">
       <option value="">{{ t('list.anySource') }}</option>
       @for (s of sources; track s.id) {
@@ -106,7 +108,7 @@
             <tr class="cursor-pointer transition-colors duration-100 hover:bg-pen-soft/50" (click)="open(lead)">
               <td class="px-4 py-2.5">
                 <a [routerLink]="['/leads', lead.id]" class="font-semibold text-ink hover:text-pen" (click)="$event.stopPropagation()">{{ lead.name }}</a>
-                <p class="truncate text-xs text-ink-3">{{ lead.company || lead.phone || lead.email || '—' }}</p>
+                <p class="truncate text-xs text-ink-3">{{ lead.serviceName || lead.company || lead.phone || lead.email || '—' }}</p>
               </td>
               <td class="px-3 py-2.5"><app-stage-badge [stage]="lead.stage" /></td>
               <td class="px-3 py-2.5"><app-due-chip [date]="lead.nextFollowUpAt" [closed]="closed(lead.stage)" /></td>
@@ -130,7 +132,7 @@
                 <p class="truncate font-semibold">{{ lead.name }}</p>
                 <p class="mt-1 flex items-center gap-2">
                   <app-stage-badge [stage]="lead.stage" />
-                  <span class="truncate text-xs text-ink-3">{{ lead.company }}</span>
+                  <span class="truncate text-xs text-ink-3">{{ lead.serviceName || lead.company }}</span>
                 </p>
               </div>
               <app-due-chip [date]="lead.nextFollowUpAt" [closed]="closed(lead.stage)" />

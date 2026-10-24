@@ -12,7 +12,8 @@ import {
 } from 'firebase/firestore';
 import { AuthService } from './auth.service';
 import { Clock } from './clock.service';
-import { dayDiff } from './dates';
+import { addDays, dayDiff } from './dates';
+import { t } from './i18n/i18n';
 import { FIRESTORE } from './firebase';
 import { toDate } from './firestore-utils';
 import { ContactChannel, FollowUp, Lead } from './models';
@@ -41,7 +42,7 @@ export interface CompleteInput {
 }
 
 /**
- * Follow-ups pendientes del equipo. Cada lead guarda una copia de su próxima
+ * Follow-ups pendientes: todos para un admin, los propios para un vendedor. Cada lead guarda una copia de su próxima
  * fecha (`nextFollowUpAt`) para ordenar y detectar leads sin próxima acción.
  */
 @Service()
@@ -51,7 +52,14 @@ export class FollowUpsService {
   private readonly clock = inject(Clock);
   private readonly live = teamQuery(
     () =>
-      query(collection(this.db, 'followups'), where('status', '==', 'pending'), orderBy('dueAt', 'asc')),
+      this.auth.isAdmin()
+        ? query(collection(this.db, 'followups'), where('status', '==', 'pending'), orderBy('dueAt', 'asc'))
+        : query(
+            collection(this.db, 'followups'),
+            where('assigneeId', '==', this.auth.uid()),
+            where('status', '==', 'pending'),
+            orderBy('dueAt', 'asc'),
+          ),
     mapFollowUp,
   );
 
@@ -89,6 +97,13 @@ export class FollowUpsService {
       updatedAt: serverTimestamp(),
     });
     await batch.commit();
+  }
+
+  /** Seguimiento de postventa a los 30 días de ganar, para volver a ofrecer algo. */
+  schedulePostSale(lead: Pick<Lead, 'id' | 'name' | 'company' | 'assigneeId'>): Promise<void> {
+    const due = addDays(this.clock.now(), 30);
+    due.setHours(10, 0, 0, 0);
+    return this.schedule(lead, due, 'call', t('postsale.note'));
   }
 
   /** Marca hecho, registra el resultado y, opcionalmente, programa el siguiente. */

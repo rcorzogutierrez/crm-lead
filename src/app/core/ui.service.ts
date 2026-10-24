@@ -5,8 +5,11 @@ import { Service, signal } from '@angular/core';
 export class UiService {
   /** Panel de captura rápida de lead. */
   readonly captureOpen = signal(false);
+  /** Contacto al que se le abre un negocio nuevo desde su ficha (null = captura normal). */
+  readonly captureContactId = signal<string | null>(null);
 
-  openCapture(): void {
+  openCapture(contactId: string | null = null): void {
+    this.captureContactId.set(contactId);
     this.captureOpen.set(true);
   }
 }
