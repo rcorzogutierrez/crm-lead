@@ -1,5 +1,6 @@
 import { DestroyRef, Signal, inject, signal } from '@angular/core';
 import { DocumentData, Query, Timestamp, onSnapshot } from 'firebase/firestore';
+import { t } from './i18n/i18n';
 
 /** Convierte un Timestamp de Firestore (o null) a Date. */
 export function toDate(value: unknown): Date | null {
@@ -57,12 +58,12 @@ export function firestoreErrorMessage(err: unknown): string {
   const code = (err as { code?: string })?.code ?? '';
   switch (code) {
     case 'permission-denied':
-      return 'No tienes permiso para ver o cambiar esto. Pide acceso a un admin del equipo.';
+      return t('db.permission');
     case 'unavailable':
-      return 'Sin conexión. Los cambios se guardarán cuando vuelvas a estar en línea.';
+      return t('db.offline');
     case 'failed-precondition':
-      return 'Falta un índice en Firestore. Despliega firestore.indexes.json.';
+      return t('db.index');
     default:
-      return 'Algo salió mal al hablar con la base de datos. Inténtalo de nuevo.';
+      return t('db.generic');
   }
 }

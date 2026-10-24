@@ -1,9 +1,9 @@
 <div class="mx-auto max-w-[56rem] px-4 pt-6 pb-10 sm:px-6 lg:px-10 lg:pt-10">
-  <h1 class="date-face text-[2rem] leading-tight font-bold">Equipo</h1>
-  <p class="mt-1 text-ink-2">Todos los miembros ven todos los leads. Cada lead tiene un responsable.</p>
+  <h1 class="date-face text-[2rem] leading-tight font-bold">{{ t('nav.team') }}</h1>
+  <p class="mt-1 text-ink-2">{{ t('team.intro') }}</p>
 
   <section class="mt-8" aria-labelledby="members-title">
-    <h2 id="members-title" class="text-sm font-bold">Miembros</h2>
+    <h2 id="members-title" class="text-sm font-bold">{{ t('team.members') }}</h2>
     <ul class="sheet mt-2 divide-y divide-rule">
       @for (m of members.members(); track m.uid) {
         <li class="flex flex-wrap items-center gap-3 px-4 py-3" [class.opacity-60]="!m.active">
@@ -12,31 +12,31 @@
             <p class="truncate font-semibold">
               {{ m.displayName }}
               @if (m.uid === auth.uid()) {
-                <span class="font-normal text-ink-3">(tú)</span>
+                <span class="font-normal text-ink-3">{{ t('team.you') }}</span>
               }
             </p>
             <p class="truncate text-xs text-ink-3">
-              {{ m.email }} · {{ workload().get(m.uid) ?? 0 }} leads activos
+              {{ m.email }} · {{ t('team.activeLeads', { n: workload().get(m.uid) ?? 0 }) }}
               @if (!m.active) {
-                · sin acceso
+                · {{ t('team.noAccess') }}
               }
             </p>
           </div>
           @if (auth.isAdmin() && m.uid !== auth.uid()) {
-            <select class="input h-8 w-auto text-[0.8125rem]" [attr.aria-label]="'Rol de ' + m.displayName" [value]="m.role" (change)="setRole(m, $any($event.target).value)">
-              <option value="member">Miembro</option>
-              <option value="admin">Admin</option>
+            <select class="input h-8 w-auto text-[0.8125rem]" [attr.aria-label]="t('team.roleOf', { name: m.displayName })" [value]="m.role" (change)="setRole(m, $any($event.target).value)">
+              <option value="member">{{ t('role.member') }}</option>
+              <option value="admin">{{ t('role.admin') }}</option>
             </select>
             @if (confirmUid() === m.uid) {
-              <button type="button" class="btn-ghost btn-sm" (click)="confirmUid.set(null)">Cancelar</button>
-              <button type="button" class="btn-danger btn-sm" (click)="toggleActive(m)">Quitar acceso</button>
+              <button type="button" class="btn-ghost btn-sm" (click)="confirmUid.set(null)">{{ t('common.cancel') }}</button>
+              <button type="button" class="btn-danger btn-sm" (click)="toggleActive(m)">{{ t('team.revoke') }}</button>
             } @else if (m.active) {
-              <button type="button" class="btn-ghost btn-sm" (click)="confirmUid.set(m.uid)">Quitar acceso</button>
+              <button type="button" class="btn-ghost btn-sm" (click)="confirmUid.set(m.uid)">{{ t('team.revoke') }}</button>
             } @else {
-              <button type="button" class="btn-secondary btn-sm" (click)="toggleActive(m)">Devolver acceso</button>
+              <button type="button" class="btn-secondary btn-sm" (click)="toggleActive(m)">{{ t('team.restore') }}</button>
             }
           } @else {
-            <span class="rounded-md bg-sheet-2 px-2 py-1 text-xs font-semibold text-ink-2">{{ m.role === 'admin' ? 'Admin' : 'Miembro' }}</span>
+            <span class="rounded-md bg-sheet-2 px-2 py-1 text-xs font-semibold text-ink-2">{{ m.role === 'admin' ? t('role.admin') : t('role.member') }}</span>
           }
         </li>
       }
@@ -45,34 +45,34 @@
 
   @if (auth.isAdmin()) {
     <section class="mt-8" aria-labelledby="invite-title">
-      <h2 id="invite-title" class="text-sm font-bold">Invitar</h2>
+      <h2 id="invite-title" class="text-sm font-bold">{{ t('team.invite') }}</h2>
       <form class="sheet mt-2 flex flex-wrap items-start gap-3 p-4" novalidate (submit)="invite($event)">
         <div class="min-w-64 flex-1">
-          <label class="field-label" for="inv-email">Email de Google</label>
-          <input id="inv-email" type="email" class="input" placeholder="persona@gmail.com" [formField]="inviteForm.email" />
+          <label class="field-label" for="inv-email">{{ t('team.googleEmail') }}</label>
+          <input id="inv-email" type="email" class="input" [placeholder]="t('team.emailPlaceholder')" [formField]="inviteForm.email" />
           @if (inviteForm.email().touched() && inviteForm.email().invalid()) {
-            <p class="field-error">{{ inviteForm.email().errors()[0].message }}</p>
+            <p class="field-error">{{ t($any(inviteForm.email().errors()[0].message)) }}</p>
           }
         </div>
         <div>
-          <label class="field-label" for="inv-role">Rol</label>
+          <label class="field-label" for="inv-role">{{ t('team.role') }}</label>
           <select id="inv-role" class="input w-36" [formField]="inviteForm.role">
-            <option value="member">Miembro</option>
-            <option value="admin">Admin</option>
+            <option value="member">{{ t('role.member') }}</option>
+            <option value="admin">{{ t('role.admin') }}</option>
           </select>
         </div>
-        <button type="submit" class="btn-primary mt-6.5" [disabled]="inviteForm().submitting()">Invitar</button>
-        <p class="w-full text-xs text-ink-3">La persona entra con esa cuenta de Google y queda dentro del equipo automáticamente.</p>
+        <button type="submit" class="btn-primary mt-6.5" [disabled]="inviteForm().submitting()">{{ t('team.invite') }}</button>
+        <p class="w-full text-xs text-ink-3">{{ t('team.inviteHint') }}</p>
       </form>
 
       @if (members.invites().length) {
-        <h3 class="mt-6 text-sm font-bold">Invitaciones pendientes</h3>
+        <h3 class="mt-6 text-sm font-bold">{{ t('team.pending') }}</h3>
         <ul class="sheet mt-2 divide-y divide-rule">
           @for (inv of members.invites(); track inv.email) {
             <li class="flex items-center gap-3 px-4 py-2.5 text-sm">
               <span class="min-w-0 flex-1 truncate">{{ inv.email }}</span>
-              <span class="text-xs text-ink-3">{{ inv.role === 'admin' ? 'Admin' : 'Miembro' }}</span>
-              <button type="button" class="btn-ghost btn-sm" (click)="revoke(inv.email)">Retirar</button>
+              <span class="text-xs text-ink-3">{{ inv.role === 'admin' ? t('role.admin') : t('role.member') }}</span>
+              <button type="button" class="btn-ghost btn-sm" (click)="revoke(inv.email)">{{ t('team.withdraw') }}</button>
             </li>
           }
         </ul>

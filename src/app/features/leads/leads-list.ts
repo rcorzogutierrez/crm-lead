@@ -5,6 +5,7 @@ import { LucideArrowDown, LucideArrowUp, LucideSearch, LucideX } from '@lucide/a
 import { AuthService } from '../../core/auth.service';
 import { Clock } from '../../core/clock.service';
 import { agoLabel, moneyLabel } from '../../core/dates';
+import { intlLocale, t } from '../../core/i18n/i18n';
 import { LeadsService } from '../../core/leads.service';
 import { MembersService } from '../../core/members.service';
 import { Lead, SOURCES, STAGES, isClosed, sourceLabel } from '../../core/models';
@@ -34,6 +35,7 @@ export class LeadsList {
   protected readonly members = inject(MembersService);
   protected readonly ui = inject(UiService);
 
+  protected readonly t = t;
   protected readonly stages = STAGES;
   protected readonly sources = SOURCES;
 
@@ -73,7 +75,7 @@ export class LeadsList {
     return [...list].sort((a, b) => {
       switch (key) {
         case 'name':
-          return dir * a.name.localeCompare(b.name, 'es');
+          return dir * a.name.localeCompare(b.name, intlLocale());
         case 'value':
           return dir * (a.value - b.value);
         case 'created':

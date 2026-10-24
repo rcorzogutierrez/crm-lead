@@ -2,6 +2,7 @@ import { Component, computed, inject, signal } from '@angular/core';
 import { FormField, email, form, required, submit } from '@angular/forms/signals';
 import { AuthService } from '../../core/auth.service';
 import { firestoreErrorMessage } from '../../core/firestore-utils';
+import { t } from '../../core/i18n/i18n';
 import { LeadsService } from '../../core/leads.service';
 import { MembersService } from '../../core/members.service';
 import { Member, MemberRole } from '../../core/models';
@@ -20,10 +21,11 @@ export class Team {
   private readonly leads = inject(LeadsService);
   private readonly toast = inject(ToastService);
 
+  protected readonly t = t;
   protected readonly inviteModel = signal<{ email: string; role: MemberRole }>({ email: '', role: 'member' });
   protected readonly inviteForm = form(this.inviteModel, (p) => {
-    required(p.email, { message: 'Escribe el email de su cuenta de Google.' });
-    email(p.email, { message: 'Ese email no parece válido.' });
+    required(p.email, { message: 'team.emailRequired' });
+    email(p.email, { message: 'form.emailInvalid' });
   });
 
   protected readonly workload = computed(() => {
@@ -39,12 +41,12 @@ export class Team {
     await submit(this.inviteForm, async () => {
       const { email: mail, role } = this.inviteModel();
       if (this.members.members().some((m) => m.email.toLowerCase() === mail.trim().toLowerCase())) {
-        this.toast.error('Esa persona ya está en el equipo.');
+        this.toast.error(t('team.already'));
         return undefined;
       }
       try {
         await this.members.invite(mail, role);
-        this.toast.show(`Invitación lista. Pídele a ${mail} que entre con Google.`);
+        this.toast.show(t('team.invited', { email: mail }));
         this.inviteModel.set({ email: '', role: 'member' });
         this.inviteForm().reset();
       } catch (err) {
@@ -66,7 +68,7 @@ export class Team {
     try {
       await this.members.setActive(m.uid, !m.active);
       this.confirmUid.set(null);
-      this.toast.show(m.active ? `${m.displayName} ya no tiene acceso.` : `${m.displayName} recuperó el acceso.`);
+      this.toast.show(t(m.active ? 'team.revoked' : 'team.restored', { name: m.displayName }));
     } catch (err) {
       this.toast.error(firestoreErrorMessage(err));
     }

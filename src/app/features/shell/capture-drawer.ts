@@ -5,6 +5,7 @@ import { LucideX } from '@lucide/angular';
 import { AuthService } from '../../core/auth.service';
 import { firestoreErrorMessage } from '../../core/firestore-utils';
 import { FollowUpsService } from '../../core/followups.service';
+import { t } from '../../core/i18n/i18n';
 import { LeadsService } from '../../core/leads.service';
 import { MembersService } from '../../core/members.service';
 import { ContactChannel, LeadSource, OPEN_STAGES, SOURCES, Stage } from '../../core/models';
@@ -60,14 +61,15 @@ export class CaptureDrawer {
 
   private readonly dialog = viewChild.required<ElementRef<HTMLDialogElement>>('dialog');
 
+  protected readonly t = t;
   protected readonly sources = SOURCES;
   protected readonly stages = OPEN_STAGES;
 
   protected readonly model = signal<CaptureModel>(emptyModel(''));
   protected readonly f = form(this.model, (p) => {
-    required(p.name, { message: 'Escribe al menos un nombre.' });
-    email(p.email, { message: 'Ese email no parece válido.' });
-    min(p.value, 0, { message: 'El valor no puede ser negativo.' });
+    required(p.name, { message: 'form.nameRequired' });
+    email(p.email, { message: 'form.emailInvalid' });
+    min(p.value, 0, { message: 'form.valueNegative' });
   });
 
   protected readonly scheduleNext = signal(true);
@@ -113,8 +115,8 @@ export class CaptureDrawer {
             this.nextNote(),
           );
         }
-        this.toast.show(`${draft.name} quedó en la agenda.`, {
-          action: openAfter ? undefined : { label: 'Abrir', run: () => this.router.navigate(['/leads', id]) },
+        this.toast.show(t('capture.saved', { name: draft.name }), {
+          action: openAfter ? undefined : { label: t('common.open'), run: () => this.router.navigate(['/leads', id]) },
         });
         this.close();
         if (openAfter) void this.router.navigate(['/leads', id]);

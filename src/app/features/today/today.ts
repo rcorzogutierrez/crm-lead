@@ -4,6 +4,7 @@ import { AuthService } from '../../core/auth.service';
 import { Clock } from '../../core/clock.service';
 import { addDays, agoLabel, dayDiff, moneyLabel, startOfDay } from '../../core/dates';
 import { FollowUpsService } from '../../core/followups.service';
+import { intlLocale, t } from '../../core/i18n/i18n';
 import { LeadsService } from '../../core/leads.service';
 import { FollowUp, Lead } from '../../core/models';
 import { UiService } from '../../core/ui.service';
@@ -35,6 +36,7 @@ export class Today {
   protected readonly ui = inject(UiService);
 
   /** Ver solo lo mío o todo el equipo. */
+  protected readonly t = t;
   protected readonly scope = signal<'mine' | 'team'>('mine');
   protected readonly schedulingFor = signal<string | null>(null);
 
@@ -46,7 +48,7 @@ export class Today {
   protected readonly orphans = computed(() => this.leads.withoutNextStep().filter(this.mineOnly));
 
   protected readonly dateTitle = computed(() =>
-    new Intl.DateTimeFormat('es', { weekday: 'long', day: 'numeric', month: 'long' }).format(this.clock.now()),
+    new Intl.DateTimeFormat(intlLocale(), { weekday: 'long', day: 'numeric', month: 'long' }).format(this.clock.now()),
   );
   protected readonly year = computed(() => this.clock.now().getFullYear());
 
@@ -72,7 +74,7 @@ export class Today {
   protected readonly nowPercent = computed(() => (this.clock.now().getMinutes() / 60) * 100);
 
   protected readonly nowLabel = computed(() =>
-    new Intl.DateTimeFormat('es', { hour: '2-digit', minute: '2-digit' }).format(this.clock.now()),
+    new Intl.DateTimeFormat(intlLocale(), { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(this.clock.now()),
   );
 
   /** Próximos 7 días agrupados por día. */
@@ -88,8 +90,8 @@ export class Today {
           date,
           label:
             i === 1
-              ? 'Mañana'
-              : new Intl.DateTimeFormat('es', { weekday: 'long', day: 'numeric' }).format(date),
+              ? t('due.tomorrow')
+              : new Intl.DateTimeFormat(intlLocale(), { weekday: 'long', day: 'numeric' }).format(date),
           items: dayItems,
         });
       }
@@ -109,11 +111,11 @@ export class Today {
   protected readonly summary = computed(() => {
     const parts: string[] = [];
     const o = this.overdue().length;
-    const t = this.today().length;
-    if (o) parts.push(`${o} vencido${o > 1 ? 's' : ''}`);
-    parts.push(t ? `${t} para hoy` : 'nada agendado para hoy');
+    const d = this.today().length;
+    if (o) parts.push(t(o > 1 ? 'today.sum.overdueN' : 'today.sum.overdue1', { n: o }));
+    parts.push(d ? t('today.sum.today', { n: d }) : t('today.sum.nothing'));
     const n = this.orphans().length;
-    if (n) parts.push(`${n} lead${n > 1 ? 's' : ''} sin próxima acción`);
+    if (n) parts.push(t(n > 1 ? 'today.sum.orphansN' : 'today.sum.orphans1', { n }));
     return parts.join(' · ');
   });
 
@@ -124,6 +126,8 @@ export class Today {
   }
 
   protected ago(l: Lead): string {
-    return l.lastContactAt ? `Último contacto ${agoLabel(l.lastContactAt, this.clock.now())}` : `Creado ${agoLabel(l.createdAt, this.clock.now())}`;
+    return l.lastContactAt
+      ? t('lead.lastContact', { ago: agoLabel(l.lastContactAt, this.clock.now()) })
+      : t('lead.created', { ago: agoLabel(l.createdAt, this.clock.now()) });
   }
 }

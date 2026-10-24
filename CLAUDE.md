@@ -1,10 +1,11 @@
-# CLAUDE.md — CRM de leads y follow-up ("Agenda")
+# CLAUDE.md — CRM Lead (CRM de leads y follow-up)
 
 CRM ligero para un **equipo pequeño compartido** que captura leads y les da seguimiento.
 Idea central: **ningún lead activo se queda sin próxima acción**. Todo gira alrededor del
 follow-up programado, no del registro.
 
-- Idioma de la interfaz y del código de dominio (comentarios, textos): **español**.
+- Idioma del código de dominio (comentarios): **español**. La interfaz es **bilingüe español/inglés** (español por defecto).
+- **i18n en tiempo de ejecución** (`src/app/core/i18n/`), sin librerías y sin recargar: `t('clave', { param })` lee la signal `lang`, así que plantillas y `computed` se actualizan solas. Ningún texto visible va escrito directo en plantillas o servicios: se añade la clave en `es.ts` **y** en `en.ts` (el tipo de `en.ts` obliga a traducirlas todas). Las etiquetas de `STAGES`/`SOURCES`/`CHANNELS` son getters traducidos; fechas y montos usan `intlLocale()`; los `title` de las rutas son claves (`I18nTitleStrategy`). Selector: `shared/lang-switch.ts` (riel, barra móvil, login); la elección se guarda en `localStorage`. No se usa `@angular/localize` porque compila un bundle por idioma y no permite cambiar en caliente.
 - Contexto de producto: `PRODUCT.md`. Sistema visual: `DESIGN.md`. Contrato de dirección de diseño: `.impeccable/surfaces/src-app.md`.
 
 ## Stack (fijado, no cambiar sin pedirlo)
@@ -83,6 +84,7 @@ Reglas de dominio:
 
 ## Convenciones de UI (ver DESIGN.md)
 
+- Marca: **CRM Lead**, icono de embudo (`public/favicon.svg`, mismo dibujo en `shared/logo.ts`; si cambia uno, cambiar el otro y regenerar los PNG de `public/`).
 - Mundo visual "agenda" con paleta **Pizarra**: riel gris pizarra claro, papel blanco frío, renglones, acciones en índigo. Usar los tokens de `@theme` (`bg-rail`, `bg-paper`, `bg-sheet`, `text-ink`, `bg-pen`, `bg-ribbon`, `bg-highlight`, `stage-*`), nunca colores sueltos. El token `pen` es el índigo de acción.
 - Clases base en `@layer components`: `.btn-primary`, `.btn-secondary`, `.btn-ghost`, `.btn-danger`, `.btn-sm`, `.btn-icon`, `.input`, `.field-label`, `.field-error`, `.sheet`, `.date-face`, `.tabular`.
 - Urgencia: vencido = `ribbon` (rojo), hoy = `highlight` (amarillo), sin próxima acción = borde rojo punteado. Siempre con texto, nunca solo color.

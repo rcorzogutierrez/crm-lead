@@ -1,4 +1,5 @@
 import { Component, computed, inject, model, signal } from '@angular/core';
+import { I18nKey, t } from '../core/i18n/i18n';
 import { FormsModule } from '@angular/forms';
 import { Clock } from '../core/clock.service';
 import { presetDate, toLocalInput } from '../core/dates';
@@ -14,7 +15,7 @@ type Preset = 'today' | 'tomorrow' | 'in3' | 'nextWeek' | 'custom';
   host: { class: 'block' },
   imports: [FormsModule],
   template: `
-    <div class="flex flex-wrap gap-1.5" role="radiogroup" aria-label="Cuándo">
+    <div class="flex flex-wrap gap-1.5" role="radiogroup" [attr.aria-label]="t('when.label')">
       @for (p of presets; track p.id) {
         <button
           type="button"
@@ -28,7 +29,7 @@ type Preset = 'today' | 'tomorrow' | 'in3' | 'nextWeek' | 'custom';
               : 'border-rule-strong bg-sheet text-ink-2 hover:border-ink-3 hover:text-ink'
           "
         >
-          {{ p.label }}
+          {{ t(p.label) }}
         </button>
       }
     </div>
@@ -36,7 +37,7 @@ type Preset = 'today' | 'tomorrow' | 'in3' | 'nextWeek' | 'custom';
       <input
         type="datetime-local"
         class="input mt-2"
-        aria-label="Fecha y hora exactas"
+        [attr.aria-label]="t('when.exact')"
         [ngModel]="localValue()"
         (ngModelChange)="setCustom($event)"
       />
@@ -47,12 +48,13 @@ export class WhenPicker {
   private readonly clock = inject(Clock);
   readonly value = model<Date>(presetDate('tomorrow', new Date()));
 
-  protected readonly presets: { id: Preset; label: string }[] = [
-    { id: 'today', label: 'Hoy' },
-    { id: 'tomorrow', label: 'Mañana' },
-    { id: 'in3', label: 'En 3 días' },
-    { id: 'nextWeek', label: 'Próx. semana' },
-    { id: 'custom', label: 'Otra fecha' },
+  protected readonly t = t;
+  protected readonly presets: { id: Preset; label: I18nKey }[] = [
+    { id: 'today', label: 'due.today' },
+    { id: 'tomorrow', label: 'due.tomorrow' },
+    { id: 'in3', label: 'when.in3' },
+    { id: 'nextWeek', label: 'when.nextWeek' },
+    { id: 'custom', label: 'when.custom' },
   ];
 
   protected readonly active = signal<Preset>('tomorrow');

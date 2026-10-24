@@ -34,12 +34,12 @@
       <app-avatar class="mr-1" [name]="members.name(fu().assigneeId)" [photo]="members.byId().get(fu().assigneeId)?.photoURL ?? null" size="sm" />
     }
     @if (tel() && (fu().channel === 'call' || fu().channel === 'meeting')) {
-      <a class="btn-icon btn-ghost size-8" [href]="tel()" aria-label="Llamar a {{ fu().leadName }}" title="Llamar">
+      <a class="btn-icon btn-ghost size-8" [href]="tel()" [attr.aria-label]="t('fu.callName', { name: fu().leadName })" [title]="t('channel.call.verb')">
         <svg lucidePhone [size]="16"></svg>
       </a>
     }
     @if (wa() && fu().channel === 'whatsapp') {
-      <a class="btn-icon btn-ghost size-8" [href]="wa()" target="_blank" rel="noopener" aria-label="Abrir WhatsApp con {{ fu().leadName }}" title="WhatsApp">
+      <a class="btn-icon btn-ghost size-8" [href]="wa()" target="_blank" rel="noopener" [attr.aria-label]="t('fu.waName', { name: fu().leadName })" title="WhatsApp">
         <svg lucideMessageCircle [size]="16"></svg>
       </a>
     }
@@ -48,10 +48,10 @@
       class="btn-ghost btn-sm"
       [attr.aria-expanded]="mode() === 'snooze'"
       (click)="open('snooze')"
-      title="Posponer"
+      [title]="t('fu.snooze')"
     >
       <svg lucideCalendarClock [size]="16"></svg>
-      Posponer
+      {{ t('fu.snooze') }}
     </button>
     <button
       type="button"
@@ -60,20 +60,20 @@
       (click)="open('complete')"
     >
       <svg lucideCheck [size]="16"></svg>
-      Hecho
+      {{ t('fu.doneBtn') }}
     </button>
   </div>
 </div>
 
 @if (mode() === 'snooze') {
   <div class="mb-3 ml-11 flex flex-wrap max-sm:ml-0 items-center gap-1.5 rounded-lg bg-sheet-2 p-2">
-    <span class="px-1 text-[0.8125rem] font-semibold text-ink-2">Mover a</span>
-    <button type="button" class="btn-secondary btn-sm" [disabled]="busy()" (click)="snooze('tomorrow')">Mañana</button>
-    <button type="button" class="btn-secondary btn-sm" [disabled]="busy()" (click)="snooze('in3')">En 3 días</button>
-    <button type="button" class="btn-secondary btn-sm" [disabled]="busy()" (click)="snooze('nextWeek')">Próx. semana</button>
+    <span class="px-1 text-[0.8125rem] font-semibold text-ink-2">{{ t('fu.moveTo') }}</span>
+    <button type="button" class="btn-secondary btn-sm" [disabled]="busy()" (click)="snooze('tomorrow')">{{ t('due.tomorrow') }}</button>
+    <button type="button" class="btn-secondary btn-sm" [disabled]="busy()" (click)="snooze('in3')">{{ t('when.in3') }}</button>
+    <button type="button" class="btn-secondary btn-sm" [disabled]="busy()" (click)="snooze('nextWeek')">{{ t('when.nextWeek') }}</button>
     <button type="button" class="btn-ghost btn-sm ml-auto text-ribbon hover:text-ribbon" (click)="cancel()">
       <svg lucideX [size]="14"></svg>
-      Descartar
+      {{ t('fu.discard') }}
     </button>
   </div>
 }
@@ -81,34 +81,34 @@
 @if (mode() === 'complete') {
   <form class="mb-3 ml-11 space-y-3 max-sm:ml-0 rounded-lg border border-rule bg-paper p-3" (submit)="complete($event)">
     <div>
-      <label class="field-label" [attr.for]="'outcome-' + fu().id">¿Qué pasó?</label>
+      <label class="field-label" [attr.for]="'outcome-' + fu().id">{{ t('fu.whatHappened') }}</label>
       <textarea
         [id]="'outcome-' + fu().id"
         class="input"
         rows="2"
-        placeholder="Contestó, pidió cotización para el viernes…"
+        [placeholder]="t('fu.outcomePlaceholder')"
         [value]="outcome()"
         (input)="outcome.set($any($event.target).value)"
       ></textarea>
     </div>
     <label class="inline-flex items-center gap-2 text-sm font-semibold">
       <input type="checkbox" class="size-4" [checked]="scheduleNext()" (change)="scheduleNext.set(!scheduleNext())" />
-      Programar el siguiente paso
+      {{ t('fu.scheduleNext') }}
     </label>
     @if (scheduleNext()) {
       <app-channel-picker [(value)]="nextChannel" />
       <app-when-picker [(value)]="nextAt" />
       <input
         class="input"
-        aria-label="Nota del siguiente paso"
-        placeholder="Siguiente paso (opcional)"
+        [attr.aria-label]="t('fu.nextNote')"
+        [placeholder]="t('fu.nextPlaceholder')"
         [value]="nextNote()"
         (input)="nextNote.set($any($event.target).value)"
       />
     }
     <div class="flex justify-end gap-2">
-      <button type="button" class="btn-ghost btn-sm" (click)="mode.set('idle')">Cancelar</button>
-      <button type="submit" class="btn-primary btn-sm" [disabled]="busy()">{{ busy() ? 'Guardando…' : 'Guardar' }}</button>
+      <button type="button" class="btn-ghost btn-sm" (click)="mode.set('idle')">{{ t('common.cancel') }}</button>
+      <button type="submit" class="btn-primary btn-sm" [disabled]="busy()">{{ busy() ? t('common.saving') : t('common.save') }}</button>
     </div>
   </form>
 }

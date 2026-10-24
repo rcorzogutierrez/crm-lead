@@ -1,4 +1,5 @@
 import { Component, model } from '@angular/core';
+import { t } from '../core/i18n/i18n';
 import { CHANNELS, ContactChannel } from '../core/models';
 import { ChannelIcon } from './channel-icon';
 
@@ -8,7 +9,7 @@ import { ChannelIcon } from './channel-icon';
   host: { class: 'block' },
   imports: [ChannelIcon],
   template: `
-    <div class="flex flex-wrap gap-1.5" role="radiogroup" aria-label="Canal">
+    <div class="flex flex-wrap gap-1.5" role="radiogroup" [attr.aria-label]="t('next.channel')">
       @for (c of channels; track c.id) {
         <button
           type="button"
@@ -32,4 +33,5 @@ import { ChannelIcon } from './channel-icon';
 export class ChannelPicker {
   readonly value = model<ContactChannel>('call');
   protected readonly channels = CHANNELS;
+  protected readonly t = t;
 }

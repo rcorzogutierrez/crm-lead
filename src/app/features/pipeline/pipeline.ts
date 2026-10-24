@@ -3,6 +3,7 @@ import { RouterLink } from '@angular/router';
 import { AuthService } from '../../core/auth.service';
 import { moneyLabel } from '../../core/dates';
 import { firestoreErrorMessage } from '../../core/firestore-utils';
+import { t } from '../../core/i18n/i18n';
 import { LeadsService } from '../../core/leads.service';
 import { MembersService } from '../../core/members.service';
 import { Lead, STAGES, Stage, stageMeta } from '../../core/models';
@@ -25,6 +26,8 @@ export class Pipeline {
   private readonly auth = inject(AuthService);
   private readonly toast = inject(ToastService);
 
+  protected readonly t = t;
+  protected readonly money = moneyLabel;
   protected readonly scope = signal<'mine' | 'team'>('team');
   protected readonly dragging = signal<string | null>(null);
   protected readonly over = signal<Stage | null>(null);
@@ -88,7 +91,7 @@ export class Pipeline {
     try {
       await this.leadsService.moveToStage(lead, stage);
       this.toast.show(`${lead.name} → ${stageMeta(stage).label}`, {
-        action: { label: 'Deshacer', run: () => void this.leadsService.moveToStage({ ...lead, stage }, from) },
+        action: { label: t('common.undo'), run: () => void this.leadsService.moveToStage({ ...lead, stage }, from) },
       });
     } catch (err) {
       this.toast.error(firestoreErrorMessage(err));
