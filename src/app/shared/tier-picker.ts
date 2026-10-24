@@ -21,9 +21,13 @@ import { PriceTier, TIERS, salePrice } from '../core/models';
           [disabled]="disabled()"
           (click)="value.set(o.id)"
           class="flex min-h-14 flex-col items-start justify-center rounded-lg border px-3 py-2 text-left transition-colors duration-150 disabled:opacity-60"
-          [class]="value() === o.id ? 'border-2 border-pen bg-pen-soft' : 'border-rule-strong bg-sheet hover:border-ink-3'"
+          [class]="value() === o.id ? 'border-pen bg-pen-soft ring-1 ring-pen' : 'border-rule-strong bg-sheet hover:border-ink-3'"
         >
-          <span class="text-sm font-bold">{{ o.label }} · +{{ o.pct }} %</span>
+          <!-- Nombre y porcentaje en un renglón que no se parte; el precio final debajo. -->
+          <span class="flex w-full items-baseline justify-between gap-1">
+            <span class="text-sm font-bold">{{ o.label }}</span>
+            <span class="text-xs font-semibold whitespace-nowrap text-ink-2 tabular">+{{ o.pct }} %</span>
+          </span>
           <span class="text-[0.8125rem] text-ink-2 tabular">{{ o.price }}</span>
         </button>
       }

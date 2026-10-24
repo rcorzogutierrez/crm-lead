@@ -76,9 +76,33 @@
   <span class="date-face text-base font-bold">CRM Lead</span>
   <app-lang-switch tone="rail" class="ml-auto" />
   @if (auth.member(); as me) {
-    <button type="button" class="rounded-full" (click)="signOut()" [attr.aria-label]="t('shell.signOut')">
-      <app-avatar [name]="me.displayName" [photo]="me.photoURL" size="sm" />
-    </button>
+    <div class="relative -mr-2">
+      <button
+        type="button"
+        class="grid size-11 place-items-center rounded-full hover:bg-rail-ink/10"
+        [attr.aria-label]="t('shell.account')"
+        [attr.aria-expanded]="accountOpen()"
+        aria-controls="account-menu"
+        (click)="moreOpen.set(false); accountOpen.set(!accountOpen())"
+      >
+        <app-avatar [name]="me.displayName" [photo]="me.photoURL" />
+      </button>
+      @if (accountOpen()) {
+        <div id="account-menu" class="sheet absolute top-[calc(100%+0.25rem)] right-0 w-64 overflow-hidden text-ink shadow-lift">
+          <div class="flex items-center gap-3 border-b border-rule px-4 py-3">
+            <app-avatar [name]="me.displayName" [photo]="me.photoURL" />
+            <div class="min-w-0">
+              <p class="truncate text-sm font-semibold">{{ me.displayName }}</p>
+              <p class="truncate text-xs text-ink-2">{{ me.role === 'admin' ? t('role.admin') : t('role.member') }} · {{ me.email }}</p>
+            </div>
+          </div>
+          <button type="button" class="flex h-11 w-full items-center gap-3 px-4 text-sm font-semibold hover:bg-sheet-2" (click)="accountOpen.set(false); signOut()">
+            <svg lucideLogOut [size]="18" [strokeWidth]="1.75"></svg>
+            {{ t('shell.signOut') }}
+          </button>
+        </div>
+      }
+    </div>
   }
 </header>
 
@@ -110,7 +134,7 @@
     {{ t('nav.pipeline') }}
   </a>
   <div class="relative">
-    <button type="button" class="flex h-16 w-full flex-col items-center justify-center gap-1 text-[0.6875rem] font-semibold" [class]="moreOpen() ? 'text-pen' : 'text-ink-3'" [attr.aria-expanded]="moreOpen()" aria-controls="more-menu" (click)="moreOpen.set(!moreOpen())">
+    <button type="button" class="flex h-16 w-full flex-col items-center justify-center gap-1 text-[0.6875rem] font-semibold" [class]="moreOpen() ? 'text-pen' : 'text-ink-3'" [attr.aria-expanded]="moreOpen()" aria-controls="more-menu" (click)="accountOpen.set(false); moreOpen.set(!moreOpen())">
       <svg lucideEllipsis [size]="20" [strokeWidth]="1.75"></svg>
       {{ t('nav.more') }}
     </button>

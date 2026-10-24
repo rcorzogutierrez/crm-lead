@@ -87,57 +87,96 @@
         </app-empty-state>
       }
     } @else {
-      <div class="overflow-x-auto">
-        <table class="w-full min-w-[44rem] text-sm">
-          <thead class="border-b border-rule-strong bg-sheet-2 text-left text-xs font-semibold text-ink-2">
-            <tr>
-              <th scope="col" class="px-4 py-2.5">{{ t('field.service') }}</th>
-              <th scope="col" class="px-3 py-2.5">{{ t('svc.description') }}</th>
-              <th scope="col" class="px-3 py-2.5 text-right">{{ t('svc.price') }}</th>
-              <th scope="col" class="px-3 py-2.5 text-right">{{ t('svc.open') }}</th>
-              <th scope="col" class="px-3 py-2.5 text-right">{{ t('svc.sold') }}</th>
-              <th scope="col" class="px-3 py-2.5">{{ t('svc.status') }}</th>
-              @if (auth.isAdmin()) {
-                <th scope="col" class="px-4 py-2.5"><span class="sr-only">{{ t('svc.actions') }}</span></th>
-              }
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-rule">
-            @for (s of rows(); track s.id) {
-              @if (editing() === s.id) {
-                <tr class="bg-pen-soft/40">
-                  <td [attr.colspan]="7"><ng-container [ngTemplateOutlet]="editor" /></td>
-                </tr>
-              } @else {
-                <tr [class.text-ink-2]="!s.active">
-                  <td class="px-4 py-2.5 font-semibold">{{ s.name }}</td>
-                  <td class="px-3 py-2.5 text-ink-2">{{ s.description || '—' }}</td>
-                  <td class="px-3 py-2.5 text-right tabular">{{ priceLabel(s) }}</td>
-                  <td class="px-3 py-2.5 text-right tabular">{{ s.open }}</td>
-                  <td class="px-3 py-2.5 text-right tabular">{{ s.won }}</td>
-                  <td class="px-3 py-2.5">
-                    @if (s.active) {
-                      <span class="inline-flex h-6 items-center rounded-md bg-ok-soft px-2 text-xs font-semibold text-ok">{{ t('svc.active') }}</span>
-                    } @else {
-                      <span class="inline-flex h-6 items-center rounded-md border border-rule-strong bg-sheet-2 px-2 text-xs font-semibold text-ink-2">{{ t('svc.archivedBadge') }}</span>
+      @if (narrow()) {
+        <ul class="divide-y divide-rule">
+          @for (s of rows(); track s.id) {
+            @if (editing() === s.id) {
+              <li class="bg-pen-soft/40"><ng-container [ngTemplateOutlet]="editor" /></li>
+            } @else {
+              <li class="px-4 py-3" [class.text-ink-2]="!s.active">
+                <div class="flex items-start justify-between gap-3">
+                  <div class="min-w-0">
+                    <p class="font-semibold">
+                      {{ s.name }}
+                      @if (!s.active) {
+                        <span class="ml-1 inline-flex h-5 items-center rounded border border-rule-strong bg-sheet-2 px-1.5 align-[1px] text-xs font-semibold text-ink-2">{{ t('svc.archivedBadge') }}</span>
+                      }
+                    </p>
+                    @if (s.description) {
+                      <p class="mt-0.5 text-[0.8125rem] text-ink-2">{{ s.description }}</p>
                     }
-                  </td>
-                  @if (auth.isAdmin()) {
-                    <td class="px-4 py-1.5 text-right whitespace-nowrap">
-                      <button type="button" class="btn-ghost btn-sm" (click)="startEdit(s)" [attr.aria-label]="t('svc.editName', { name: s.name })">{{ t('svc.editShort') }}</button>
+                    <p class="mt-1 text-xs text-ink-2 tabular">{{ t('svc.open') }} {{ s.open }} · {{ t('svc.sold') }} {{ s.won }}</p>
+                  </div>
+                  <p class="shrink-0 text-right font-semibold tabular">{{ priceLabel(s) }}</p>
+                </div>
+                @if (auth.isAdmin()) {
+                  <div class="mt-2 -ml-2.5 flex gap-1">
+                    <button type="button" class="btn-ghost btn-sm" (click)="startEdit(s)" [attr.aria-label]="t('svc.editName', { name: s.name })">{{ t('svc.editShort') }}</button>
+                    @if (s.active) {
+                      <button type="button" class="btn-ghost btn-sm" (click)="setActive(s, false)">{{ t('svc.archive') }}</button>
+                    } @else {
+                      <button type="button" class="btn-ghost btn-sm" (click)="setActive(s, true)">{{ t('svc.restore') }}</button>
+                    }
+                  </div>
+                }
+              </li>
+            }
+          }
+        </ul>
+      } @else {
+        <!-- relative: el texto sr-only de las cabeceras no debe escaparse del scroll. -->
+        <div class="relative overflow-x-auto">
+          <table class="w-full min-w-[44rem] text-sm">
+            <thead class="border-b border-rule-strong bg-sheet-2 text-left text-xs font-semibold text-ink-2">
+              <tr>
+                <th scope="col" class="px-4 py-2.5">{{ t('field.service') }}</th>
+                <th scope="col" class="px-3 py-2.5">{{ t('svc.description') }}</th>
+                <th scope="col" class="px-3 py-2.5 text-right">{{ t('svc.price') }}</th>
+                <th scope="col" class="px-3 py-2.5 text-right">{{ t('svc.open') }}</th>
+                <th scope="col" class="px-3 py-2.5 text-right">{{ t('svc.sold') }}</th>
+                <th scope="col" class="px-3 py-2.5">{{ t('svc.status') }}</th>
+                @if (auth.isAdmin()) {
+                  <th scope="col" class="px-4 py-2.5"><span class="sr-only">{{ t('svc.actions') }}</span></th>
+                }
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-rule">
+              @for (s of rows(); track s.id) {
+                @if (editing() === s.id) {
+                  <tr class="bg-pen-soft/40">
+                    <td [attr.colspan]="7"><ng-container [ngTemplateOutlet]="editor" /></td>
+                  </tr>
+                } @else {
+                  <tr [class.text-ink-2]="!s.active">
+                    <td class="px-4 py-2.5 font-semibold">{{ s.name }}</td>
+                    <td class="px-3 py-2.5 text-ink-2">{{ s.description || '—' }}</td>
+                    <td class="px-3 py-2.5 text-right tabular">{{ priceLabel(s) }}</td>
+                    <td class="px-3 py-2.5 text-right tabular">{{ s.open }}</td>
+                    <td class="px-3 py-2.5 text-right tabular">{{ s.won }}</td>
+                    <td class="px-3 py-2.5">
                       @if (s.active) {
-                        <button type="button" class="btn-ghost btn-sm" (click)="setActive(s, false)">{{ t('svc.archive') }}</button>
+                        <span class="inline-flex h-6 items-center rounded-md bg-ok-soft px-2 text-xs font-semibold text-ok">{{ t('svc.active') }}</span>
                       } @else {
-                        <button type="button" class="btn-ghost btn-sm" (click)="setActive(s, true)">{{ t('svc.restore') }}</button>
+                        <span class="inline-flex h-6 items-center rounded-md border border-rule-strong bg-sheet-2 px-2 text-xs font-semibold text-ink-2">{{ t('svc.archivedBadge') }}</span>
                       }
                     </td>
-                  }
-                </tr>
+                    @if (auth.isAdmin()) {
+                      <td class="px-4 py-1.5 text-right whitespace-nowrap">
+                        <button type="button" class="btn-ghost btn-sm" (click)="startEdit(s)" [attr.aria-label]="t('svc.editName', { name: s.name })">{{ t('svc.editShort') }}</button>
+                        @if (s.active) {
+                          <button type="button" class="btn-ghost btn-sm" (click)="setActive(s, false)">{{ t('svc.archive') }}</button>
+                        } @else {
+                          <button type="button" class="btn-ghost btn-sm" (click)="setActive(s, true)">{{ t('svc.restore') }}</button>
+                        }
+                      </td>
+                    }
+                  </tr>
+                }
               }
-            }
-          </tbody>
-        </table>
-      </div>
+            </tbody>
+          </table>
+        </div>
+      }
     }
   </div>
 

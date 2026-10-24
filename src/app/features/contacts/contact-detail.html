@@ -8,10 +8,11 @@
     <header class="mt-4 flex flex-wrap items-start justify-between gap-4">
       <div class="min-w-0">
         <h1 class="date-face text-[2rem] leading-tight font-bold break-words">{{ c.name }}</h1>
-        <p class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-ink-2">
+        <!-- En móvil la línea se parte: sin separadores para que ningún "·" quede colgando. -->
+        <p class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-ink-2 sm:gap-x-2">
           @if (c.company) {
             <span>{{ c.company }}</span>
-            <span aria-hidden="true">·</span>
+            <span class="max-sm:hidden" aria-hidden="true">·</span>
           }
           @if (summary().wonCount) {
             <span class="inline-flex h-6 items-center gap-1 rounded-md bg-ok-soft px-2 text-[0.8125rem] font-semibold text-ok">
@@ -21,7 +22,7 @@
           } @else {
             <span class="inline-flex h-6 items-center rounded-md bg-sheet-2 px-2 text-[0.8125rem] font-semibold">{{ t('contacts.prospect') }}</span>
           }
-          <span aria-hidden="true">·</span>
+          <span class="max-sm:hidden" aria-hidden="true">·</span>
           <span>{{ t('field.assignee') }}: {{ members.name(c.assigneeId) }}</span>
         </p>
       </div>
@@ -129,7 +130,21 @@
           }
           <div class="sheet mt-2 overflow-hidden" [class.hidden]="!summary().won.length && summary().wonCount">
             @if (summary().won.length) {
-              <div class="overflow-x-auto">
+              <ul class="divide-y divide-rule sm:hidden">
+                @for (l of summary().won; track l.id) {
+                  <li class="flex items-start justify-between gap-3 px-4 py-3 text-sm">
+                    <div class="min-w-0">
+                      <a [routerLink]="['/leads', l.id]" class="font-semibold hover:text-pen hover:underline">{{ dealTitle(l) }}</a>
+                      @if (l.detail) { <span class="text-ink-3">· {{ l.detail }}</span> }
+                      <p class="mt-0.5 text-xs text-ink-2">
+                        <span class="tabular">{{ wonOn(l) }}</span> · {{ members.name(l.assigneeId) }}@if (l.serviceId) { · {{ tierName(l.tier) }}}
+                      </p>
+                    </div>
+                    <span class="shrink-0 font-semibold tabular">{{ money(l.value) }}</span>
+                  </li>
+                }
+              </ul>
+              <div class="relative overflow-x-auto max-sm:hidden">
                 <table class="w-full min-w-[32rem] text-sm">
                   <thead class="border-b border-rule-strong bg-sheet-2 text-left text-xs font-semibold text-ink-2">
                     <tr>

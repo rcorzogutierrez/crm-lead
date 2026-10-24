@@ -80,8 +80,15 @@ export class Shell {
   protected readonly mobileMain = this.nav.filter((n) => ['today', 'contacts', 'pipeline'].includes(n.icon));
   protected readonly mobileMore = this.nav.filter((n) => !['today', 'contacts', 'pipeline'].includes(n.icon));
   protected readonly moreOpen = signal(false);
+  /** Menú de la cuenta en la barra superior móvil (nombre, rol y cerrar sesión). */
+  protected readonly accountOpen = signal(false);
 
   protected onKey(event: KeyboardEvent): void {
+    if (event.key === 'Escape' && (this.moreOpen() || this.accountOpen())) {
+      this.moreOpen.set(false);
+      this.accountOpen.set(false);
+      return;
+    }
     if (event.metaKey || event.ctrlKey || event.altKey || this.ui.captureOpen()) return;
     const target = event.target as HTMLElement;
     if (target.closest('input, textarea, select, [contenteditable="true"], dialog')) return;
