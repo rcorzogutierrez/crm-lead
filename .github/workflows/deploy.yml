@@ -1,0 +1,78 @@
+# Compila, prueba y publica en Firebase (Hosting + reglas e índices de Firestore).
+# - push a main: build + tests + deploy (lo mismo que `npm run deploy`).
+# - pull request: solo build + tests, para ver si el cambio rompe algo antes de fusionarlo.
+# - Actions → "Deploy" → Run workflow: vuelve a publicar main a mano.
+# Necesita el secreto FIREBASE_SERVICE_ACCOUNT (JSON de una cuenta de servicio del proyecto).
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# Un solo deploy a la vez; si llegan dos pushes seguidos, gana el último.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || 'main' }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+
+      # Angular CLI 22 exige Node ≥ 22.22.3
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+      - run: npx ng test --watch=false
+      - run: npm run build
+
+      - uses: actions/upload-artifact@v4
+        if: github.event_name != 'pull_request'
+        with:
+          name: dist
+          path: dist/crm-lead/browser
+          retention-days: 7
+
+  deploy:
+    needs: build
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: production
+      url: https://crm-lead-follow-up.web.app
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/crm-lead/browser
+
+      - name: Credenciales de Firebase
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          if [ -z "$FIREBASE_SERVICE_ACCOUNT" ]; then
+            echo "::error::Falta el secreto FIREBASE_SERVICE_ACCOUNT (Settings → Secrets and variables → Actions)."
+            exit 1
+          fi
+          printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > "$RUNNER_TEMP/firebase-sa.json"
+          echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/firebase-sa.json" >> "$GITHUB_ENV"
+
+      - name: Deploy (hosting + reglas + índices)
+        run: npx -y firebase-tools@latest deploy --only hosting,firestore --project crm-lead-follow-up --non-interactive
