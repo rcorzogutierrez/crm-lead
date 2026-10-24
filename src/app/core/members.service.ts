@@ -71,6 +71,11 @@ export class MembersService {
     return deleteDoc(doc(this.db, 'invites', email));
   }
 
+  setInviteRole(email: string, role: MemberRole): Promise<void> {
+    return updateDoc(doc(this.db, 'invites', email), { role });
+  }
+
+  /** Solo para otros miembros: las reglas no dejan que un admin cambie su propio rol. */
   setRole(uid: string, role: MemberRole): Promise<void> {
     return updateDoc(doc(this.db, 'members', uid), { role });
   }

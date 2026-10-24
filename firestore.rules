@@ -87,6 +87,8 @@ service cloud.firestore {
         );
 
       // Admins cambian rol/acceso de otros; cada uno puede actualizar su nombre y foto.
+      // Nadie cambia su propio rol ni acceso: quien quita un admin sigue siéndolo,
+      // así el equipo nunca se queda sin un admin activo.
       allow update: if (isAdmin() && uid != request.auth.uid && changedOnly(['role', 'active'])
                         && request.resource.data.role in ['admin', 'member']
                         && request.resource.data.active is bool)
@@ -103,7 +105,10 @@ service cloud.firestore {
         && request.resource.data.invitedBy == request.auth.uid;
       // El invitado la consume al entrar; un admin la puede retirar.
       allow delete: if isAdmin() || (signedIn() && myEmail() == email);
-      allow update: if false;
+      // Un admin puede cambiar el rol de una invitación aún no usada.
+      allow update: if isAdmin()
+        && changedOnly(['role'])
+        && request.resource.data.role in ['admin', 'member'];
     }
 
     // ---- Catálogo de servicios y categorías de venta (solo admin escribe) ----
