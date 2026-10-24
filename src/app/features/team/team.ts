@@ -107,6 +107,7 @@ export class Team {
   protected async revoke(mail: string): Promise<void> {
     try {
       await this.members.revokeInvite(mail);
+      this.toast.show(t('team.withdrawn', { email: mail }));
     } catch (err) {
       this.toast.error(firestoreErrorMessage(err));
     }
