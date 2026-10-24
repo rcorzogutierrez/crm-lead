@@ -27,11 +27,13 @@ npm run emulators         # Firebase Emulator Suite (auth + firestore, proyecto 
 npm run start:emulator    # ng serve conectado a los emuladores
 npm run build             # build de producción → dist/crm-lead/browser
 npm test                  # Vitest
+npm run lint              # ESLint (angular-eslint), también plantillas y accesibilidad
+npm run test:rules        # pruebas de firestore.rules contra el emulador (necesita Java)
 npm run deploy:rules      # publica firestore.rules + firestore.indexes.json
 npm run deploy            # build + Firebase Hosting + reglas
 ```
 
-CI/CD: `.github/workflows/deploy.yml` publica en cada push a `main` (build + tests + `firebase deploy --only hosting,firestore`) con el secreto `FIREBASE_SERVICE_ACCOUNT`; en los PR solo compila y prueba.
+CI/CD: `.github/workflows/deploy.yml` publica en cada push a `main` (lint + tests + pruebas de reglas + build, y luego `firebase deploy --only hosting,firestore`) con el secreto `FIREBASE_SERVICE_ACCOUNT`; en los PR hace lo mismo sin publicar. Las pruebas de reglas viven en `tests/rules/`: un cambio en `firestore.rules` va con su caso.
 
 Con emuladores, `window.__emulatorSignIn(email, nombre)` hace login sin popup (solo existe en la configuración `emulator`).
 
@@ -95,7 +97,7 @@ Reglas de dominio:
 - Roles (`admin` / `member` = vendedor): solo un admin cambia el rol o el acceso de **otro** miembro, con confirmación en línea en *Equipo*, y el de una invitación pendiente. Nadie cambia su propio rol ni acceso: así el equipo nunca se queda sin admin activo.
 - Solo un admin reasigna (`LeadsService.reassign`, que arrastra los follow-ups pendientes) o cambia el responsable de un contacto. Un vendedor crea leads siempre a su nombre.
 - Borrar un lead: admin, o su creador si sigue siendo el responsable.
-- Cambios en reglas: probarlos contra el emulador antes de `deploy:rules`.
+- Cambios en reglas: añadir o ajustar su caso en `tests/rules/firestore.rules.test.ts` y pasar `npm run test:rules`.
 - Configuración necesaria en la consola de Firebase: habilitar el proveedor Google en Authentication y añadir el dominio de hosting a *Authorized domains*.
 
 ## Convenciones de UI (ver DESIGN.md)

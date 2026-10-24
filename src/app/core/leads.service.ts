@@ -2,7 +2,6 @@ import { Service, computed, inject } from '@angular/core';
 import {
   DocumentData,
   collection,
-  deleteDoc,
   doc,
   getDoc,
   getDocs,

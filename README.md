@@ -21,11 +21,19 @@ npm run emulators        # en una terminal
 npm run start:emulator   # en otra
 ```
 
+Antes de subir un cambio:
+
+```bash
+npm run lint             # ESLint
+npm test                 # tests de la app
+npm run test:rules       # pruebas de firestore.rules (arranca el emulador; necesita Java)
+```
+
 ## Publicar
 
-Automático: cada push a `main` (por ejemplo, al fusionar un PR) compila, pasa los tests y publica
-Hosting + reglas + índices con GitHub Actions (`.github/workflows/deploy.yml`). Los PR solo compilan y
-pasan tests. Requiere el secreto de repositorio `FIREBASE_SERVICE_ACCOUNT` (JSON de una cuenta de
+Automático: cada push a `main` (por ejemplo, al fusionar un PR) pasa lint, tests y pruebas de reglas, compila y publica
+Hosting + reglas + índices con GitHub Actions (`.github/workflows/deploy.yml`). Los PR pasan lo mismo sin
+publicar. Requiere el secreto de repositorio `FIREBASE_SERVICE_ACCOUNT` (JSON de una cuenta de
 servicio de `crm-lead-follow-up` con los roles *Firebase Admin* y *Service Usage Consumer*).
 
 Manual: `npm run deploy` (build + Firebase Hosting + reglas).

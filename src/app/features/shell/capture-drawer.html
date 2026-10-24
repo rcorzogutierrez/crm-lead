@@ -1,3 +1,5 @@
+<!-- El clic en el fondo cierra el panel; con teclado se cierra con Esc (nativo de <dialog>). -->
+<!-- eslint-disable-next-line @angular-eslint/template/click-events-have-key-events, @angular-eslint/template/interactive-supports-focus -->
 <dialog
   #dialog
   class="drawer m-0 ml-auto h-dvh max-h-dvh w-full max-w-[34rem] bg-transparent p-0 backdrop:bg-ink/35 sm:p-3"
@@ -63,6 +65,8 @@
                 class="absolute inset-x-0 top-[4.25rem] z-10 max-h-80 overflow-y-auto rounded-lg border border-rule-strong bg-sheet py-1 shadow-lg"
               >
                 @for (s of suggestions(); track s.id; let i = $index) {
+                  <!-- Las flechas y Enter se manejan en el campo (combobox con aria-activedescendant). -->
+                  <!-- eslint-disable-next-line @angular-eslint/template/click-events-have-key-events, @angular-eslint/template/interactive-supports-focus -->
                   <li
                     [id]="'c-opt-' + i"
                     role="option"
@@ -87,6 +91,7 @@
                     }
                   </li>
                 }
+                <!-- eslint-disable-next-line @angular-eslint/template/click-events-have-key-events, @angular-eslint/template/interactive-supports-focus -->
                 <li
                   [id]="'c-opt-' + suggestions().length"
                   role="option"
