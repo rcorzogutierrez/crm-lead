@@ -1,4 +1,5 @@
 import { Service, signal } from '@angular/core';
+import { firestoreErrorMessage } from './firestore-utils';
 
 export interface Toast {
   id: number;
@@ -21,6 +22,14 @@ export class ToastService {
 
   error(text: string): void {
     this.show(text, { tone: 'error' });
+  }
+
+  /** Avisa del resultado de una escritura lanzada desde un aviso (p. ej. "Deshacer"). */
+  follow(task: Promise<unknown>, ok: string): void {
+    task.then(
+      () => this.show(ok),
+      (err: unknown) => this.error(firestoreErrorMessage(err)),
+    );
   }
 
   dismiss(id: number): void {

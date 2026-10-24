@@ -40,7 +40,7 @@ Estrategia: Restrained. Base neutra gris azulada; el índigo solo para acciones 
 - Toggles segmentados para "Lo mío / Todo el equipo".
 - Panel de captura: `<dialog>` lateral derecho, entra 240ms ease-out-quart.
 - Cerrar la captura con algo escrito (Esc, fondo, Cancelar, X) pregunta en el pie del panel: "Seguir editando" o "Descartar". Nunca se pierde lo escrito sin aviso.
-- Confirmaciones en línea (archivar, eliminar, quitar acceso): el foco pasa a la confirmación y vuelve al botón al cancelar. El botón que confirma usa `.btn-danger` si la acción pierde datos o cierra negocios.
+- Confirmaciones en línea (archivar, eliminar, quitar acceso): el foco pasa a la confirmación y vuelve al botón al cancelar. Solo lo irreversible (eliminar) confirma con `.btn-danger`; archivar es reversible y usa `.btn-secondary`.
 - Móvil: las tablas anchas (Servicios, servicios comprados) se vuelven listas apiladas; los filtros segmentados van en una fila que se desliza; los controles de una fila bajan a su propio renglón antes de cortar un nombre. La cuenta se abre desde el avatar (botón de 44px con menú), no cierra sesión al tocarlo.
 
 ## Movimiento

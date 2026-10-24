@@ -108,11 +108,14 @@ export class Pipeline {
       await this.leadsService.moveToStage(lead, stage);
       if (stage === 'won') {
         this.toast.show(t('detail.won', { name: this.title(lead) }), {
-          action: { label: t('postsale.short'), run: () => void this.followUps.schedulePostSale(lead) },
+          action: { label: t('postsale.short'), run: () => this.toast.follow(this.followUps.schedulePostSale(lead), t('postsale.done')) },
         });
       } else {
-        this.toast.show(`${this.title(lead)} → ${stageMeta(stage).label}`, {
-          action: { label: t('common.undo'), run: () => void this.leadsService.moveToStage({ ...lead, stage }, from) },
+        this.toast.show(t('detail.movedTo', { name: this.title(lead), stage: stageMeta(stage).label }), {
+          action: {
+            label: t('common.undo'),
+            run: () => this.toast.follow(this.leadsService.moveToStage({ ...lead, stage }, from), t('common.undone')),
+          },
         });
       }
     } catch (err) {

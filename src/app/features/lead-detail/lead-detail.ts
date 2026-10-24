@@ -253,10 +253,18 @@ export class LeadDetail {
       return;
     }
     try {
+      const from = lead.stage;
       await this.leadsService.moveToStage(lead, stage);
       if (stage === 'won') {
         this.toast.show(t('detail.won', { name: lead.serviceName || lead.name }));
         this.offerPostSale.set(true);
+      } else {
+        this.toast.show(t('detail.movedTo', { name: lead.serviceName || lead.name, stage: stageMeta(stage).label }), {
+          action: {
+            label: t('common.undo'),
+            run: () => this.toast.follow(this.leadsService.moveToStage({ ...lead, stage }, from), t('common.undone')),
+          },
+        });
       }
     } catch (err) {
       this.toast.error(firestoreErrorMessage(err));
@@ -349,6 +357,7 @@ export class LeadDetail {
     try {
       await this.leadsService.keepPrice(lead, change.to);
       await this.activitiesService.log(lead.id, 'pricing', t('pricing.noteKept', { price: moneyLabel(change.from), ignored: moneyLabel(change.to) }));
+      this.toast.show(t('pricing.kept'));
     } catch (err) {
       this.toast.error(firestoreErrorMessage(err));
     }
@@ -362,6 +371,7 @@ export class LeadDetail {
       await this.leadsService.moveToStage(lead, 'lost', this.lostReason().trim());
       this.askLostReason.set(false);
       this.lostReason.set('');
+      this.toast.show(t('detail.lostMsg', { name: lead.serviceName || lead.name }));
     } catch (err) {
       this.toast.error(firestoreErrorMessage(err));
     }
@@ -375,6 +385,7 @@ export class LeadDetail {
     try {
       await this.activitiesService.log(this.id(), this.logType(), body);
       this.logBody.set('');
+      this.toast.show(t('detail.logged'));
     } catch (err) {
       this.toast.error(firestoreErrorMessage(err));
     } finally {
