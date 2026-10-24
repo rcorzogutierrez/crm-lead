@@ -13,7 +13,7 @@ export const es = {
   'ago.now': 'ahora',
   'ago.year': 'hace {n} año',
   'ago.years': 'hace {n} años',
-  'auth.err.domain': 'Este dominio no está autorizado en Firebase Auth. Agrégalo en la consola.',
+  'auth.err.domain': 'Este dominio no está autorizado para iniciar sesión. Agrégalo en los dominios autorizados.',
   'auth.err.google': 'No se pudo iniciar sesión con Google. Inténtalo de nuevo.',
   'auth.err.verify': 'No pudimos verificar tu acceso al equipo.',
   'capture.more': 'Más detalles',

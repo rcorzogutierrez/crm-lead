@@ -15,7 +15,7 @@ export const en: Record<I18nKey, string> = {
   'ago.now': 'just now',
   'ago.year': '{n} year ago',
   'ago.years': '{n} years ago',
-  'auth.err.domain': 'This domain is not authorized in Firebase Auth. Add it in the console.',
+  'auth.err.domain': 'This domain is not authorized for sign-in. Add it to the authorized domains.',
   'auth.err.google': 'Couldn\'t sign in with Google. Please try again.',
   'auth.err.verify': 'We couldn\'t verify your access to the team.',
   'capture.more': 'More details',
