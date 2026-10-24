@@ -1,0 +1,136 @@
+<dialog
+  #dialog
+  class="drawer m-0 ml-auto h-dvh max-h-dvh w-full max-w-[34rem] bg-transparent p-0 backdrop:bg-ink/35 sm:p-3"
+  aria-labelledby="capture-title"
+  (close)="close()"
+  (click)="onBackdrop($event)"
+>
+  <form
+    class="sheet flex h-full flex-col overflow-hidden sm:rounded-xl"
+    novalidate
+    (submit)="save($event, false)"
+  >
+    <header class="flex items-center justify-between border-b border-rule px-5 py-3.5">
+      <h2 id="capture-title" class="date-face text-lg font-bold">Nuevo lead</h2>
+      <button type="button" class="btn-icon btn-ghost" (click)="close()" aria-label="Cerrar">
+        <svg lucideX [size]="18"></svg>
+      </button>
+    </header>
+
+    <div class="flex-1 space-y-5 overflow-y-auto px-5 py-5">
+      <div class="grid gap-4 sm:grid-cols-2">
+        <div class="sm:col-span-2">
+          <label class="field-label" for="c-name">Nombre</label>
+          <input
+            id="c-name"
+            class="input"
+            autocomplete="off"
+            autofocus
+            placeholder="Ana Morales"
+            [formField]="f.name"
+          />
+          @if (f.name().touched() && f.name().invalid()) {
+            <p class="field-error">{{ f.name().errors()[0].message }}</p>
+          }
+        </div>
+        <div>
+          <label class="field-label" for="c-phone">Teléfono / WhatsApp</label>
+          <input id="c-phone" class="input tabular" type="tel" autocomplete="off" placeholder="+52 55 1234 5678" [formField]="f.phone" />
+        </div>
+        <div>
+          <label class="field-label" for="c-email">Email</label>
+          <input id="c-email" class="input" type="email" autocomplete="off" placeholder="ana@empresa.com" [formField]="f.email" />
+          @if (f.email().touched() && f.email().invalid()) {
+            <p class="field-error">{{ f.email().errors()[0].message }}</p>
+          }
+        </div>
+        <div>
+          <label class="field-label" for="c-company">Empresa</label>
+          <input id="c-company" class="input" autocomplete="off" placeholder="Opcional" [formField]="f.company" />
+        </div>
+        <div>
+          <label class="field-label" for="c-source">Origen</label>
+          <select id="c-source" class="input" [formField]="f.source">
+            @for (s of sources; track s.id) {
+              <option [value]="s.id">{{ s.label }}</option>
+            }
+          </select>
+        </div>
+      </div>
+
+      <fieldset class="rounded-lg border border-rule bg-paper px-4 pt-3 pb-4">
+        <legend class="sr-only">Próxima acción</legend>
+        <div class="flex items-center justify-between gap-3">
+          <p class="text-sm font-bold">Próxima acción</p>
+          <label class="inline-flex items-center gap-2 text-[0.8125rem] font-medium text-ink-2">
+            <input type="checkbox" class="size-4" [checked]="scheduleNext()" (change)="scheduleNext.set(!scheduleNext())" />
+            Programar ahora
+          </label>
+        </div>
+        @if (scheduleNext()) {
+          <div class="mt-3 space-y-3">
+            <app-channel-picker [(value)]="nextChannel" />
+            <app-when-picker [(value)]="nextAt" />
+            <input
+              class="input"
+              aria-label="Nota para la próxima acción"
+              placeholder="Qué hay que hacer (opcional)"
+              [value]="nextNote()"
+              (input)="nextNote.set($any($event.target).value)"
+            />
+          </div>
+        } @else {
+          <p class="mt-2 text-[0.8125rem] text-ribbon">
+            Este lead aparecerá en "Sin próxima acción" hasta que le programes algo.
+          </p>
+        }
+      </fieldset>
+
+      <details class="group">
+        <summary class="cursor-pointer text-sm font-semibold text-pen select-none hover:text-pen-strong">
+          Más detalles
+        </summary>
+        <div class="mt-4 grid gap-4 sm:grid-cols-2">
+          <div>
+            <label class="field-label" for="c-stage">Etapa</label>
+            <select id="c-stage" class="input" [formField]="f.stage">
+              @for (s of stages; track s.id) {
+                <option [value]="s.id">{{ s.label }}</option>
+              }
+            </select>
+          </div>
+          <div>
+            <label class="field-label" for="c-value">Valor estimado</label>
+            <input id="c-value" class="input tabular" type="number" step="100" [formField]="f.value" />
+          </div>
+          <div class="sm:col-span-2">
+            <label class="field-label" for="c-assignee">Responsable</label>
+            <select id="c-assignee" class="input" [formField]="f.assigneeId">
+              @for (m of members.active(); track m.uid) {
+                <option [value]="m.uid">{{ m.displayName }}</option>
+              }
+            </select>
+          </div>
+          <div class="sm:col-span-2">
+            <label class="field-label" for="c-notes">Notas</label>
+            <textarea id="c-notes" class="input" rows="3" placeholder="Qué busca, presupuesto, contexto…" [formField]="f.notes"></textarea>
+          </div>
+        </div>
+      </details>
+
+      @if (saveError()) {
+        <p class="rounded-lg bg-ribbon-soft px-3 py-2 text-sm font-medium text-ribbon" role="alert">{{ saveError() }}</p>
+      }
+    </div>
+
+    <footer class="flex items-center justify-end gap-2 border-t border-rule bg-paper px-5 py-3">
+      <button type="button" class="btn-ghost" (click)="close()">Cancelar</button>
+      <button type="button" class="btn-secondary" [disabled]="f().submitting()" (click)="save($event, true)">
+        Guardar y abrir
+      </button>
+      <button type="submit" class="btn-primary" [disabled]="f().submitting()">
+        {{ f().submitting() ? 'Guardando…' : 'Guardar lead' }}
+      </button>
+    </footer>
+  </form>
+</dialog>

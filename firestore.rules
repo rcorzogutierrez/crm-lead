@@ -1,0 +1,146 @@
+rules_version = '2';
+
+// Reglas del CRM para un equipo pequeño compartido.
+// - Solo miembros activos (members/{uid}.active == true) leen y escriben datos.
+// - El primer usuario crea meta/team y queda como admin.
+// - Los demás entran si un admin creó invites/{email}.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null && request.auth.token.email_verified == true;
+    }
+    function memberPath(uid) {
+      return /databases/$(database)/documents/members/$(uid);
+    }
+    function isMember() {
+      return signedIn()
+        && exists(memberPath(request.auth.uid))
+        && get(memberPath(request.auth.uid)).data.active == true;
+    }
+    function isAdmin() {
+      return isMember() && get(memberPath(request.auth.uid)).data.role == 'admin';
+    }
+    function myEmail() {
+      return request.auth.token.email.lower();
+    }
+    function invitePath() {
+      return /databases/$(database)/documents/invites/$(myEmail());
+    }
+    function teamPath() {
+      return /databases/$(database)/documents/meta/team;
+    }
+    function isString(v, max) {
+      return v is string && v.size() <= max;
+    }
+    function changedOnly(keys) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(keys);
+    }
+
+    // ---- Equipo ----
+    match /meta/team {
+      allow read: if signedIn();
+      // Solo el primero: crea el equipo junto con su ficha de admin (en el mismo batch).
+      allow create: if signedIn()
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.keys().hasOnly(['ownerUid', 'name', 'createdAt'])
+        && getAfter(memberPath(request.auth.uid)).data.role == 'admin';
+      allow update: if isAdmin() && changedOnly(['name']);
+      allow delete: if false;
+    }
+
+    match /members/{uid} {
+      allow read: if isMember() || (signedIn() && request.auth.uid == uid);
+
+      allow create: if signedIn()
+        && request.auth.uid == uid
+        && request.resource.data.uid == uid
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.active == true
+        && request.resource.data.keys().hasOnly(['uid', 'email', 'displayName', 'photoURL', 'role', 'active', 'createdAt'])
+        && (
+          // Fundador: no existe equipo y lo crea en el mismo batch.
+          (request.resource.data.role == 'admin'
+            && !exists(teamPath())
+            && getAfter(teamPath()).data.ownerUid == uid)
+          ||
+          // Invitado: el rol debe coincidir con la invitación.
+          (exists(invitePath())
+            && request.resource.data.role == get(invitePath()).data.role)
+        );
+
+      // Admins cambian rol/acceso de otros; cada uno puede actualizar su nombre y foto.
+      allow update: if (isAdmin() && uid != request.auth.uid && changedOnly(['role', 'active'])
+                        && request.resource.data.role in ['admin', 'member']
+                        && request.resource.data.active is bool)
+                    || (isMember() && uid == request.auth.uid && changedOnly(['displayName', 'photoURL']));
+      allow delete: if false;
+    }
+
+    match /invites/{email} {
+      allow read: if isAdmin() || (signedIn() && myEmail() == email);
+      allow create: if isAdmin()
+        && email == email.lower()
+        && request.resource.data.email == email
+        && request.resource.data.role in ['admin', 'member']
+        && request.resource.data.invitedBy == request.auth.uid;
+      // El invitado la consume al entrar; un admin la puede retirar.
+      allow delete: if isAdmin() || (signedIn() && myEmail() == email);
+      allow update: if false;
+    }
+
+    // ---- Datos del CRM ----
+    function validLead(d) {
+      return isString(d.name, 200) && d.name.size() > 0
+        && isString(d.company, 200)
+        && isString(d.email, 200)
+        && isString(d.phone, 50)
+        && isString(d.notes, 5000)
+        && d.stage in ['new', 'contacted', 'qualified', 'proposal', 'negotiation', 'won', 'lost']
+        && d.source in ['web', 'whatsapp', 'phone', 'referral', 'social', 'event', 'email', 'other']
+        && d.value is number && d.value >= 0
+        && d.assigneeId is string;
+    }
+
+    match /leads/{leadId} {
+      allow read: if isMember();
+      allow create: if isMember()
+        && validLead(request.resource.data)
+        && request.resource.data.createdBy == request.auth.uid;
+      allow update: if isMember()
+        && validLead(request.resource.data)
+        && request.resource.data.createdBy == resource.data.createdBy;
+      allow delete: if isAdmin() || (isMember() && resource.data.createdBy == request.auth.uid);
+
+      match /activities/{activityId} {
+        allow read: if isMember();
+        allow create: if isMember()
+          && request.resource.data.createdBy == request.auth.uid
+          && isString(request.resource.data.body, 5000);
+        allow update: if isMember() && resource.data.createdBy == request.auth.uid
+          && request.resource.data.createdBy == resource.data.createdBy;
+        // Borrado: el autor, o quien borra el lead completo (admin o creador del lead).
+        allow delete: if isMember() && (
+          resource.data.createdBy == request.auth.uid
+          || isAdmin()
+          || get(/databases/$(database)/documents/leads/$(leadId)).data.createdBy == request.auth.uid
+        );
+      }
+    }
+
+    match /followups/{followUpId} {
+      allow read: if isMember();
+      allow create: if isMember()
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.status == 'pending'
+        && request.resource.data.dueAt is timestamp
+        && request.resource.data.channel in ['call', 'whatsapp', 'email', 'meeting', 'task']
+        && isString(request.resource.data.note, 1000);
+      allow update: if isMember()
+        && request.resource.data.status in ['pending', 'done', 'cancelled']
+        && request.resource.data.leadId == resource.data.leadId
+        && request.resource.data.createdBy == resource.data.createdBy;
+      allow delete: if isMember();
+    }
+  }
+}

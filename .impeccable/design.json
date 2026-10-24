@@ -1,0 +1,20 @@
+{
+  "world": "agenda", "palette": "Pizarra",
+  "mode": "operate",
+  "tokensSource": "src/styles.css",
+  "colors": {
+    "rail": "oklch(0.38 0.02 262)",
+    "paper": "oklch(0.982 0.003 262)",
+    "sheet": "oklch(1 0 0)",
+    "rule": "oklch(0.92 0.006 262)",
+    "margin": "oklch(0.8 0.015 262)",
+    "ink": "oklch(0.22 0.02 262)",
+    "pen": "oklch(0.5 0.2 275)",
+    "ribbon": "oklch(0.55 0.2 25)",
+    "highlight": "oklch(0.92 0.11 92)",
+    "ok": "oklch(0.52 0.13 155)"
+  },
+  "typography": { "family": "Archivo Variable", "display": "wdth 82, bold", "base": "15px/24px" },
+  "radius": { "control": "8px", "page": "10px" },
+  "motion": { "duration": "150-250ms", "easing": "cubic-bezier(0.25, 1, 0.5, 1)" }
+}

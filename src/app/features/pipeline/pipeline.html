@@ -1,0 +1,68 @@
+<div class="flex h-[calc(100dvh-3.5rem)] flex-col pt-6 lg:h-dvh lg:pt-10">
+  <header class="flex flex-wrap items-end justify-between gap-4 px-4 sm:px-6 lg:px-10">
+    <div>
+      <h1 class="date-face text-[2rem] leading-tight font-bold">Pipeline</h1>
+      <p class="mt-1 text-sm text-ink-2 max-lg:hidden">Arrastra una tarjeta para cambiarla de etapa. Con teclado: Alt + ← / →.</p>
+      <p class="mt-1 text-sm text-ink-2 lg:hidden">Desliza entre etapas. Abre un lead para cambiarlo de etapa.</p>
+    </div>
+    <div class="inline-flex rounded-lg border border-rule-strong bg-sheet p-0.5" role="radiogroup" aria-label="Qué mostrar">
+      <button type="button" role="radio" [attr.aria-checked]="scope() === 'mine'" (click)="scope.set('mine')" class="h-8 rounded-md px-3 text-sm font-semibold transition-colors" [class]="scope() === 'mine' ? 'bg-ink text-white' : 'text-ink-2 hover:text-ink'">Lo mío</button>
+      <button type="button" role="radio" [attr.aria-checked]="scope() === 'team'" (click)="scope.set('team')" class="h-8 rounded-md px-3 text-sm font-semibold transition-colors" [class]="scope() === 'team' ? 'bg-ink text-white' : 'text-ink-2 hover:text-ink'">Todo el equipo</button>
+    </div>
+  </header>
+
+  @if (leadsService.error(); as err) {
+    <p class="mx-4 mt-4 rounded-lg bg-ribbon-soft px-4 py-3 text-sm font-medium text-ribbon sm:mx-6 lg:mx-10" role="alert">{{ err }}</p>
+  }
+
+  <div class="mt-6 flex min-h-0 flex-1 snap-x snap-proximity scroll-px-4 gap-3 overflow-x-auto px-4 sm:scroll-px-6 lg:scroll-px-10 pb-24 sm:px-6 lg:px-10 lg:pb-8">
+    @for (col of columns(); track col.id) {
+      <section
+        class="flex w-[16rem] shrink-0 snap-start flex-col rounded-page border bg-sheet-2/70 transition-colors duration-150"
+        [class]="over() === col.id ? 'border-pen bg-pen-soft' : 'border-rule'"
+        [attr.aria-labelledby]="'col-' + col.id"
+        (dragover)="onDragOver($event, col.id)"
+        (dragleave)="over.set(null)"
+        (drop)="onDrop($event, col.id)"
+      >
+        <header class="flex items-center gap-2 px-3 pt-3 pb-2">
+          <span class="size-2.5 rounded-full" [class]="col.dot" aria-hidden="true"></span>
+          <h2 [id]="'col-' + col.id" class="text-sm font-bold">{{ col.label }}</h2>
+          <span class="text-xs font-semibold text-ink-3 tabular">{{ col.items.length }}</span>
+          <span class="ml-auto text-xs font-semibold text-ink-2 tabular">{{ col.total }}</span>
+        </header>
+        <ul class="flex-1 space-y-2 overflow-y-auto px-2 pb-2">
+          @for (lead of col.items; track lead.id) {
+            <li
+              [id]="'card-' + lead.id"
+              tabindex="0"
+              draggable="true"
+              class="group cursor-grab rounded-lg border border-rule bg-sheet p-3 shadow-[0_1px_1px_oklch(0.25_0.04_265/0.05)] transition-[box-shadow,transform,opacity] duration-150 hover:shadow-page active:cursor-grabbing"
+              [class.opacity-40]="dragging() === lead.id"
+              [attr.aria-label]="lead.name + ', ' + col.label"
+              (dragstart)="onDragStart($event, lead)"
+              (dragend)="onDragEnd()"
+              (keydown)="onCardKey($event, lead)"
+            >
+              <div class="flex items-start gap-2">
+                <a [routerLink]="['/leads', lead.id]" class="min-w-0 flex-1 truncate font-semibold hover:text-pen hover:underline" draggable="false">{{ lead.name }}</a>
+                <app-avatar [name]="members.name(lead.assigneeId)" [photo]="members.byId().get(lead.assigneeId)?.photoURL ?? null" size="sm" />
+              </div>
+              @if (lead.company) {
+                <p class="truncate text-xs text-ink-3">{{ lead.company }}</p>
+              }
+              <div class="mt-2.5 flex items-center justify-between gap-2">
+                <app-due-chip [date]="lead.nextFollowUpAt" [closed]="col.closed" />
+                @if (lead.value) {
+                  <span class="text-xs font-bold tabular">{{ '$' }}{{ lead.value.toLocaleString('es') }}</span>
+                }
+              </div>
+            </li>
+          } @empty {
+            <li class="rounded-lg border border-dashed border-rule-strong px-3 py-6 text-center text-xs text-ink-3">Suelta aquí</li>
+          }
+        </ul>
+      </section>
+    }
+  </div>
+</div>
