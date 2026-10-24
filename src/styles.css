@@ -245,3 +245,32 @@ dialog.drawer[open]::backdrop {
 ::view-transition-new(root) {
   animation-duration: 140ms;
 }
+
+/* Selector de idioma: el indicador se desliza y la página cambia con un fundido suave */
+.lang-thumb {
+  view-transition-name: lang-thumb;
+  transition: transform 380ms cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+::view-transition-group(lang-thumb) {
+  animation-duration: 380ms;
+  animation-timing-function: cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+html.lang-vt::view-transition-old(root) {
+  animation: lang-out 200ms var(--ease-out-quart) both;
+}
+html.lang-vt::view-transition-new(root) {
+  animation: lang-in 340ms var(--ease-out-quart) 80ms both;
+}
+@keyframes lang-out {
+  to {
+    opacity: 0;
+    filter: blur(3px);
+  }
+}
+@keyframes lang-in {
+  from {
+    opacity: 0;
+    filter: blur(3px);
+    transform: translateY(4px);
+  }
+}
