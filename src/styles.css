@@ -2,62 +2,60 @@
 @import 'tailwindcss';
 
 /*
- * Mundo visual: agenda de cuero.
- * Riel de cuero cordobán, páginas de papel blanco frío con renglones,
- * margen rojo de agenda, tinta azul-negra y azul de pluma para acciones.
+ * Paleta "Pizarra": riel gris pizarra, papel blanco frío con renglones,
+ * tinta gris azulada, acciones en índigo. Rojo = vencido, amarillo = hoy, verde = hecho.
  */
 @theme {
   --font-sans: 'Archivo Variable', ui-sans-serif, system-ui, sans-serif;
 
-  /* Cuero */
-  --color-leather: oklch(0.3 0.055 38);
-  --color-leather-deep: oklch(0.24 0.045 36);
-  --color-leather-ink: oklch(0.94 0.018 70);
-  --color-leather-muted: oklch(0.78 0.03 60);
-  --color-stitch: oklch(0.62 0.06 65);
+  /* Riel */
+  --color-rail: oklch(0.38 0.02 262);
+  --color-rail-deep: oklch(0.31 0.02 262);
+  --color-rail-ink: oklch(0.97 0.004 262);
+  --color-rail-muted: oklch(0.84 0.012 262);
 
   /* Papel */
-  --color-paper: oklch(0.982 0.004 250);
+  --color-paper: oklch(0.982 0.003 262);
   --color-sheet: oklch(1 0 0);
-  --color-sheet-2: oklch(0.965 0.007 250);
-  --color-rule: oklch(0.915 0.014 250);
-  --color-rule-strong: oklch(0.85 0.02 250);
-  --color-margin: oklch(0.7 0.13 22);
+  --color-sheet-2: oklch(0.965 0.005 262);
+  --color-rule: oklch(0.92 0.006 262);
+  --color-rule-strong: oklch(0.86 0.01 262);
+  --color-margin: oklch(0.8 0.015 262);
 
   /* Tinta */
-  --color-ink: oklch(0.25 0.04 265);
-  --color-ink-2: oklch(0.42 0.03 265);
-  --color-ink-3: oklch(0.52 0.025 265);
-  --color-pen: oklch(0.47 0.16 262);
-  --color-pen-strong: oklch(0.4 0.15 262);
-  --color-pen-soft: oklch(0.95 0.025 262);
+  --color-ink: oklch(0.22 0.02 262);
+  --color-ink-2: oklch(0.45 0.02 262);
+  --color-ink-3: oklch(0.53 0.018 262);
+  --color-pen: oklch(0.5 0.2 275);
+  --color-pen-strong: oklch(0.43 0.19 275);
+  --color-pen-soft: oklch(0.95 0.03 275);
 
   /* Estados */
-  --color-ribbon: oklch(0.53 0.19 25);
-  --color-ribbon-soft: oklch(0.965 0.022 25);
-  --color-highlight: oklch(0.93 0.12 98);
-  --color-highlight-soft: oklch(0.975 0.05 98);
-  --color-ok: oklch(0.52 0.12 155);
+  --color-ribbon: oklch(0.55 0.2 25);
+  --color-ribbon-soft: oklch(0.965 0.02 25);
+  --color-highlight: oklch(0.92 0.11 92);
+  --color-highlight-soft: oklch(0.975 0.045 92);
+  --color-ok: oklch(0.52 0.13 155);
   --color-ok-soft: oklch(0.96 0.03 155);
   --color-warn: oklch(0.6 0.13 70);
 
-  /* Etapas del pipeline: de tinta clara a tinta firme; ganado en verde, perdido en gris */
-  --color-stage-new: oklch(0.62 0.09 240);
-  --color-stage-new-ink: oklch(0.42 0.1 240);
-  --color-stage-contacted: oklch(0.58 0.12 255);
-  --color-stage-contacted-ink: oklch(0.42 0.13 258);
-  --color-stage-qualified: oklch(0.52 0.15 268);
-  --color-stage-qualified-ink: oklch(0.4 0.15 270);
+  /* Etapas del pipeline: azules hacia índigo; propuesta y negociación cálidas; ganado verde; perdido gris */
+  --color-stage-new: oklch(0.62 0.08 250);
+  --color-stage-new-ink: oklch(0.44 0.09 250);
+  --color-stage-contacted: oklch(0.55 0.13 265);
+  --color-stage-contacted-ink: oklch(0.42 0.13 265);
+  --color-stage-qualified: oklch(0.5 0.18 275);
+  --color-stage-qualified-ink: oklch(0.42 0.18 275);
   --color-stage-proposal: oklch(0.6 0.13 70);
   --color-stage-proposal-ink: oklch(0.45 0.1 60);
   --color-stage-negotiation: oklch(0.6 0.16 40);
   --color-stage-negotiation-ink: oklch(0.45 0.14 38);
-  --color-stage-won: oklch(0.5 0.12 155);
-  --color-stage-lost: oklch(0.6 0.015 265);
+  --color-stage-won: oklch(0.52 0.13 155);
+  --color-stage-lost: oklch(0.6 0.012 262);
 
   --radius-page: 0.625rem;
-  --shadow-page: 0 1px 2px oklch(0.25 0.04 265 / 0.06), 0 4px 14px -6px oklch(0.25 0.04 265 / 0.12);
-  --shadow-lift: 0 2px 4px oklch(0.25 0.04 265 / 0.08), 0 12px 32px -8px oklch(0.25 0.04 265 / 0.22);
+  --shadow-page: 0 1px 2px oklch(0.22 0.02 262 / 0.06), 0 4px 14px -6px oklch(0.22 0.02 262 / 0.12);
+  --shadow-lift: 0 2px 4px oklch(0.22 0.02 262 / 0.08), 0 12px 32px -8px oklch(0.22 0.02 262 / 0.22);
 
   --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
 }
@@ -184,26 +182,15 @@
   }
 }
 
-/* Cuero del riel: textura sutil de grano con la costura a la derecha */
-.leather {
-  background-color: var(--color-leather);
-  background-image:
-    radial-gradient(circle at 20% 10%, oklch(1 0 0 / 0.05), transparent 45%),
-    radial-gradient(circle at 80% 90%, oklch(0 0 0 / 0.12), transparent 50%);
-}
-aside.leather::after {
-  content: '';
-  position: absolute;
-  inset: 0.75rem 0.5rem 0.75rem auto;
-  border-right: 1.5px dashed var(--color-stitch);
-  opacity: 0.45;
-  pointer-events: none;
+/* Riel lateral y barra superior móvil */
+.rail-surface {
+  background-color: var(--color-rail);
 }
 .rail-active {
   background: oklch(1 0 0 / 0.09);
-  color: var(--color-leather-ink) !important;
+  color: var(--color-rail-ink) !important;
 }
-/* Cinta de agenda marcando la sección activa */
+/* Marca roja de la sección activa */
 .rail-active::before {
   content: '';
   position: absolute;

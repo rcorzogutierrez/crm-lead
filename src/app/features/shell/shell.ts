@@ -15,7 +15,7 @@ import { UiService } from '../../core/ui.service';
 import { Avatar } from '../../shared/avatar';
 import { CaptureDrawer } from './capture-drawer';
 
-/** Marco de la app: riel de cuero (escritorio) o barra inferior (móvil). */
+/** Marco de la app: riel pizarra (escritorio) o barra inferior (móvil). */
 @Component({
   selector: 'app-shell',
   imports: [

@@ -1,18 +1,18 @@
 {
-  "world": "agenda de cuero",
+  "world": "agenda", "palette": "Pizarra",
   "mode": "operate",
   "tokensSource": "src/styles.css",
   "colors": {
-    "leather": "oklch(0.3 0.055 38)",
-    "paper": "oklch(0.982 0.004 250)",
+    "rail": "oklch(0.38 0.02 262)",
+    "paper": "oklch(0.982 0.003 262)",
     "sheet": "oklch(1 0 0)",
-    "rule": "oklch(0.915 0.014 250)",
-    "margin": "oklch(0.7 0.13 22)",
-    "ink": "oklch(0.25 0.04 265)",
-    "pen": "oklch(0.47 0.16 262)",
-    "ribbon": "oklch(0.53 0.19 25)",
-    "highlight": "oklch(0.93 0.12 98)",
-    "ok": "oklch(0.52 0.12 155)"
+    "rule": "oklch(0.92 0.006 262)",
+    "margin": "oklch(0.8 0.015 262)",
+    "ink": "oklch(0.22 0.02 262)",
+    "pen": "oklch(0.5 0.2 275)",
+    "ribbon": "oklch(0.55 0.2 25)",
+    "highlight": "oklch(0.92 0.11 92)",
+    "ok": "oklch(0.52 0.13 155)"
   },
   "typography": { "family": "Archivo Variable", "display": "wdth 82, bold", "base": "15px/24px" },
   "radius": { "control": "8px", "page": "10px" },

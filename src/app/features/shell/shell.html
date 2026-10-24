@@ -4,23 +4,23 @@
   >Saltar al contenido</a
 >
 
-<!-- Riel de cuero (escritorio) -->
+<!-- Riel pizarra (escritorio) -->
 <aside
-  class="leather fixed inset-y-0 left-0 z-30 hidden w-60 flex-col text-leather-ink lg:flex"
+  class="rail-surface fixed inset-y-0 left-0 z-30 hidden w-60 flex-col text-rail-ink lg:flex"
   aria-label="Navegación principal"
 >
   <div class="flex items-center gap-2.5 px-5 pt-6 pb-5">
-    <span class="grid size-8 place-items-center rounded-md bg-leather-ink/10 text-leather-ink">
+    <span class="grid size-8 place-items-center rounded-md bg-rail-ink/10 text-rail-ink">
       <svg lucideBookOpen [size]="18" [strokeWidth]="1.75"></svg>
     </span>
     <span class="date-face text-[1.0625rem] font-bold tracking-tight">Agenda</span>
   </div>
 
   <div class="px-3">
-    <button type="button" class="btn w-full justify-start bg-leather-ink text-leather-deep hover:bg-white" (click)="ui.openCapture()">
+    <button type="button" class="btn w-full justify-start bg-rail-ink text-rail-deep hover:bg-white" (click)="ui.openCapture()">
       <svg lucidePlus [size]="18"></svg>
       Nuevo lead
-      <kbd class="ml-auto rounded border border-leather-deep/20 px-1.5 text-[0.6875rem] font-semibold text-leather-deep/70">N</kbd>
+      <kbd class="ml-auto rounded border border-rail-deep/20 px-1.5 text-[0.6875rem] font-semibold text-rail-deep/70">N</kbd>
     </button>
   </div>
 
@@ -31,7 +31,7 @@
         routerLinkActive="rail-active"
         #rla="routerLinkActive"
         [attr.aria-current]="rla.isActive ? 'page' : null"
-        class="rail-link group relative flex h-10 items-center gap-3 rounded-md px-3 text-[0.9375rem] font-medium text-leather-muted transition-colors duration-150 hover:bg-leather-ink/8 hover:text-leather-ink"
+        class="rail-link group relative flex h-10 items-center gap-3 rounded-md px-3 text-[0.9375rem] font-medium text-rail-muted transition-colors duration-150 hover:bg-rail-ink/8 hover:text-rail-ink"
       >
         @switch (item.icon) {
           @case ('today') { <svg lucideCalendarDays [size]="18" [strokeWidth]="1.75"></svg> }
@@ -53,13 +53,13 @@
   </nav>
 
   @if (auth.member(); as me) {
-    <div class="flex items-center gap-3 border-t border-leather-ink/10 px-4 py-4">
+    <div class="flex items-center gap-3 border-t border-rail-ink/10 px-4 py-4">
       <app-avatar [name]="me.displayName" [photo]="me.photoURL" />
       <div class="min-w-0 flex-1">
         <p class="truncate text-sm font-semibold">{{ me.displayName }}</p>
-        <p class="truncate text-xs text-leather-muted">{{ me.role === 'admin' ? 'Admin' : 'Miembro' }}</p>
+        <p class="truncate text-xs text-rail-muted">{{ me.role === 'admin' ? 'Admin' : 'Miembro' }}</p>
       </div>
-      <button type="button" class="btn-icon size-8 text-leather-muted hover:bg-leather-ink/10 hover:text-leather-ink" (click)="signOut()" aria-label="Cerrar sesión" title="Cerrar sesión">
+      <button type="button" class="btn-icon size-8 text-rail-muted hover:bg-rail-ink/10 hover:text-rail-ink" (click)="signOut()" aria-label="Cerrar sesión" title="Cerrar sesión">
         <svg lucideLogOut [size]="16"></svg>
       </button>
     </div>
@@ -67,7 +67,7 @@
 </aside>
 
 <!-- Barra superior (móvil) -->
-<header class="leather sticky top-0 z-30 flex h-14 items-center gap-2.5 px-4 text-leather-ink lg:hidden">
+<header class="rail-surface sticky top-0 z-30 flex h-14 items-center gap-2.5 px-4 text-rail-ink lg:hidden">
   <svg lucideBookOpen [size]="18" [strokeWidth]="1.75"></svg>
   <span class="date-face text-base font-bold">Agenda</span>
   @if (auth.member(); as me) {

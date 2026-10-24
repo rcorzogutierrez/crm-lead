@@ -8,16 +8,16 @@ import { AuthService } from '../../core/auth.service';
   imports: [LucideBookOpen],
   template: `
     <div class="grid min-h-dvh lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
-      <section class="leather relative hidden flex-col justify-between p-12 text-leather-ink lg:flex">
+      <section class="rail-surface relative hidden flex-col justify-between p-12 text-rail-ink lg:flex">
         <div class="flex items-center gap-2.5">
           <svg lucideBookOpen [size]="22" [strokeWidth]="1.75"></svg>
           <span class="date-face text-xl font-bold">Agenda</span>
         </div>
         <div>
           <p class="date-face max-w-[16ch] text-[2.75rem] leading-[1.05] font-bold">Ningún lead se queda sin próxima acción.</p>
-          <p class="mt-4 max-w-[42ch] text-leather-muted">Captura en segundos, revisa tu día como una página de agenda y deja cada contacto con su siguiente paso.</p>
+          <p class="mt-4 max-w-[42ch] text-rail-muted">Captura en segundos, revisa tu día como una página de agenda y deja cada contacto con su siguiente paso.</p>
         </div>
-        <p class="text-sm text-leather-muted">CRM de leads y follow-up para el equipo</p>
+        <p class="text-sm text-rail-muted">CRM de leads y follow-up para el equipo</p>
       </section>
 
       <section class="flex items-center justify-center px-6 py-16">

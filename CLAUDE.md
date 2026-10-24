@@ -83,7 +83,7 @@ Reglas de dominio:
 
 ## Convenciones de UI (ver DESIGN.md)
 
-- Mundo visual "agenda de cuero": riel cordobán, papel blanco frío, renglones, margen rojo, tinta azul. Usar los tokens de `@theme` (`bg-paper`, `bg-sheet`, `text-ink`, `bg-pen`, `bg-ribbon`, `bg-highlight`, `stage-*`), nunca colores sueltos.
+- Mundo visual "agenda" con paleta **Pizarra**: riel gris pizarra claro, papel blanco frío, renglones, acciones en índigo. Usar los tokens de `@theme` (`bg-rail`, `bg-paper`, `bg-sheet`, `text-ink`, `bg-pen`, `bg-ribbon`, `bg-highlight`, `stage-*`), nunca colores sueltos. El token `pen` es el índigo de acción.
 - Clases base en `@layer components`: `.btn-primary`, `.btn-secondary`, `.btn-ghost`, `.btn-danger`, `.btn-sm`, `.btn-icon`, `.input`, `.field-label`, `.field-error`, `.sheet`, `.date-face`, `.tabular`.
 - Urgencia: vencido = `ribbon` (rojo), hoy = `highlight` (amarillo), sin próxima acción = borde rojo punteado. Siempre con texto, nunca solo color.
 - Nada de modales para tareas en línea: completar/posponer/programar se abre debajo del elemento. El único diálogo es el panel de captura (tecla **N**); **/** abre la búsqueda.
