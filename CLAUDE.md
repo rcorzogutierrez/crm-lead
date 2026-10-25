@@ -34,7 +34,7 @@ npm run deploy:rules      # publica firestore.rules + firestore.indexes.json
 npm run deploy            # build + Firebase Hosting + reglas
 ```
 
-CI/CD: `.github/workflows/deploy.yml` publica en cada push a `main` (lint + tests + pruebas de reglas + build, y luego `firebase deploy --only hosting,firestore`) con el secreto `FIREBASE_SERVICE_ACCOUNT`; en los PR hace lo mismo sin publicar. Las pruebas de reglas viven en `tests/rules/`: un cambio en `firestore.rules` va con su caso.
+CI/CD: `.github/workflows/deploy.yml` publica en cada push a `main` que no sea solo documentación (`paths-ignore`: `*.md`, `docs/`, `LICENSE`, `.claude/`, `.impeccable/`, `.vscode/`) (lint + tests + pruebas de reglas + build, y luego `firebase deploy --only hosting,firestore`) con el secreto `FIREBASE_SERVICE_ACCOUNT`; en los PR hace lo mismo sin publicar. Las pruebas de reglas viven en `tests/rules/`: un cambio en `firestore.rules` va con su caso.
 
 Con emuladores, `window.__emulatorSignIn(email, nombre)` hace login sin popup (solo existe en la configuración `emulator`).
 

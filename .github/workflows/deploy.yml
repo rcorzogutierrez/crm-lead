@@ -1,5 +1,6 @@
 # Compila, prueba y publica en Firebase (Hosting + reglas e índices de Firestore).
 # - push a main: lint + tests + pruebas de reglas + build, y luego deploy (como `npm run deploy`).
+#   Si el push solo toca documentación (paths-ignore), no corre: no hay nada nuevo que publicar.
 # - pull request: lo mismo sin deploy, para ver si el cambio rompe algo antes de fusionarlo.
 # - Actions → "Deploy" → Run workflow: vuelve a publicar main a mano.
 # Necesita el secreto FIREBASE_SERVICE_ACCOUNT (JSON de una cuenta de servicio del proyecto).
@@ -8,6 +9,13 @@ name: Deploy
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'LICENSE'
+      - '.claude/**'
+      - '.impeccable/**'
+      - '.vscode/**'
   pull_request:
   workflow_dispatch:
 
