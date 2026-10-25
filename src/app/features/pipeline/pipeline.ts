@@ -1,5 +1,6 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { LucideLock } from '@lucide/angular';
 import { AuthService } from '../../core/auth.service';
 import { ContactsService } from '../../core/contacts.service';
 import { FollowUpsService } from '../../core/followups.service';
@@ -19,7 +20,7 @@ import { DueChip } from '../../shared/due-chip';
  */
 @Component({
   selector: 'app-pipeline',
-  imports: [RouterLink, DueChip, Avatar],
+  imports: [RouterLink, DueChip, Avatar, LucideLock],
   templateUrl: './pipeline.html',
 })
 export class Pipeline {
@@ -65,6 +66,10 @@ export class Pipeline {
   }
 
   protected onDragStart(event: DragEvent, lead: Lead): void {
+    if (this.leadsService.locked(lead)) {
+      event.preventDefault();
+      return;
+    }
     event.dataTransfer?.setData('text/plain', lead.id);
     if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move';
     this.dragging.set(lead.id);
@@ -92,6 +97,10 @@ export class Pipeline {
   protected onCardKey(event: KeyboardEvent, lead: Lead): void {
     if (!event.altKey || (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft')) return;
     event.preventDefault();
+    if (this.leadsService.locked(lead)) {
+      this.toast.show(t('detail.wonLocked'));
+      return;
+    }
     const idx = STAGES.findIndex((s) => s.id === lead.stage);
     const next = STAGES[idx + (event.key === 'ArrowRight' ? 1 : -1)];
     if (next) {

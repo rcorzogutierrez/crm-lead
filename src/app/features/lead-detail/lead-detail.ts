@@ -3,6 +3,7 @@ import { FormField, email, form, min, required, submit } from '@angular/forms/si
 import { Router, RouterLink } from '@angular/router';
 import {
   LucideArrowLeft,
+  LucideLock,
   LucideMail,
   LucideMessageCircle,
   LucidePhone,
@@ -70,6 +71,7 @@ const LOG_TYPES: { id: ActivityType; label: I18nKey }[] = [
     LucideUserRound,
     LucidePhone,
     LucideMessageCircle,
+    LucideLock,
     LucideMail,
     LucideTrash2,
   ],
@@ -98,6 +100,11 @@ export class LeadDetail {
   protected readonly lead = computed(() => this.leadsService.byId().get(this.id()));
   protected readonly loading = this.leadsService.loading;
   protected readonly pending = computed(() => this.followUps.pending().filter((f) => f.leadId === this.id()));
+  /** Venta ganada y quien mira no es admin: no se reabre ni se borra. */
+  protected readonly locked = computed(() => {
+    const lead = this.lead();
+    return !!lead && this.leadsService.locked(lead);
+  });
   protected readonly stageIndex = computed(() => STAGES.findIndex((s) => s.id === this.lead()?.stage));
 
   protected readonly money = moneyLabel;
@@ -451,8 +458,11 @@ export class LeadDetail {
 
   protected canDelete(): boolean {
     const lead = this.lead();
-    // Igual que las reglas: el admin, o su creador si sigue siendo el responsable.
-    return !!lead && (this.auth.isAdmin() || (lead.createdBy === this.auth.uid() && lead.assigneeId === this.auth.uid()));
+    // Igual que las reglas: el admin, o su creador si sigue siendo el responsable y no está ganado.
+    return (
+      !!lead &&
+      (this.auth.isAdmin() || (lead.createdBy === this.auth.uid() && lead.assigneeId === this.auth.uid() && lead.stage !== 'won'))
+    );
   }
 
   protected activityLabel(a: Activity): string {

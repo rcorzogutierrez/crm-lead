@@ -174,6 +174,7 @@ export const en: Record<I18nKey, string> = {
   'detail.saveChanges': 'Save changes',
   'detail.saved': 'Details saved.',
   'detail.stageNav': 'Lead stage',
+  'detail.wonLocked': 'Closed sale: only an admin can reopen or delete it.',
   'detail.updated': 'Updated',
   'detail.won': '{name} won!',
   'due.none': 'No date',

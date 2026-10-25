@@ -46,16 +46,20 @@
             <li
               [id]="'card-' + lead.id"
               tabindex="0"
-              draggable="true"
+              [attr.draggable]="leadsService.locked(lead) ? 'false' : 'true'"
+              [style.cursor]="leadsService.locked(lead) ? 'default' : null"
               class="group cursor-grab rounded-lg border border-rule bg-sheet p-3 shadow-[0_1px_1px_oklch(0.25_0.04_265/0.05)] transition-[box-shadow,transform,opacity] duration-150 hover:shadow-page active:cursor-grabbing"
               [class.opacity-40]="dragging() === lead.id"
-              [attr.aria-label]="title(lead) + ', ' + col.label"
+              [attr.aria-label]="title(lead) + ', ' + col.label + (leadsService.locked(lead) ? '. ' + t('detail.wonLocked') : '')"
               (dragstart)="onDragStart($event, lead)"
               (dragend)="onDragEnd()"
               (keydown)="onCardKey($event, lead)"
             >
               <div class="flex items-start gap-2">
                 <a [routerLink]="['/leads', lead.id]" class="min-w-0 flex-1 font-semibold leading-snug hover:text-pen hover:underline" draggable="false">{{ title(lead) }}</a>
+                @if (leadsService.locked(lead)) {
+                  <svg lucideLock [size]="13" aria-hidden="true" class="mt-1 shrink-0 text-ink-3"></svg>
+                }
                 <app-avatar [name]="members.name(lead.assigneeId)" [photo]="members.byId().get(lead.assigneeId)?.photoURL ?? null" size="sm" />
               </div>
               <p class="mt-0.5 flex min-w-0 items-center gap-1.5 text-xs text-ink-3">

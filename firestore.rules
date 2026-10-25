@@ -291,15 +291,19 @@ service cloud.firestore {
         && validLead(request.resource.data)
         && pricingOnCreate(request.resource.data)
         && request.resource.data.createdBy == request.auth.uid;
-      // Solo un admin cambia el responsable (reasignar) o el contacto del lead.
+      // Solo un admin cambia el responsable (reasignar) o el contacto del lead,
+      // y solo un admin reabre una venta ganada.
       allow update: if isMember()
         && (isAdmin() || (isMine(resource.data) && isMine(request.resource.data)
-            && request.resource.data.get('contactId', null) == resource.data.get('contactId', null)))
+            && request.resource.data.get('contactId', null) == resource.data.get('contactId', null)
+            && (resource.data.stage != 'won' || request.resource.data.stage == 'won')))
         && validLead(request.resource.data)
         && pricingOnUpdate(request.resource.data, resource.data)
         && request.resource.data.createdBy == resource.data.createdBy;
+      // Una venta ganada solo la borra un admin.
       allow delete: if isAdmin()
-        || (isMember() && isMine(resource.data) && resource.data.createdBy == request.auth.uid);
+        || (isMember() && isMine(resource.data) && resource.data.createdBy == request.auth.uid
+            && resource.data.stage != 'won');
 
       match /activities/{activityId} {
         // Si el lead aún no existe en el servidor (la app ya lo muestra mientras se guarda),

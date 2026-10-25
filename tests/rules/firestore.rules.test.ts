@@ -545,3 +545,23 @@ describe('Validación al editar', () => {
     await assertFails(updateDoc(ref, { photoURL: 42 }));
   });
 });
+
+describe('Venta ganada: solo un admin la reabre o la borra', () => {
+  beforeEach(async () => {
+    await seed({ 'leads/luis-won': lead(LUIS, { stage: 'won' }) });
+  });
+
+  it('un vendedor no la devuelve a otra etapa ni la borra', async () => {
+    await assertFails(updateDoc(doc(db(LUIS), 'leads/luis-won'), { stage: 'negotiation', wonAt: null }));
+    await assertFails(updateDoc(doc(db(LUIS), 'leads/luis-won'), { stage: 'lost' }));
+    await assertFails(deleteDoc(doc(db(LUIS), 'leads/luis-won')));
+    // Sí puede ganar un lead suyo y seguir editando la venta.
+    await assertSucceeds(updateDoc(doc(db(LUIS), 'leads/luis-1'), { stage: 'won' }));
+    await assertSucceeds(updateDoc(doc(db(LUIS), 'leads/luis-won'), { notes: 'pagado' }));
+  });
+
+  it('un admin la reabre y la borra', async () => {
+    await assertSucceeds(updateDoc(doc(db(ANA), 'leads/luis-won'), { stage: 'negotiation', wonAt: null }));
+    await assertSucceeds(deleteDoc(doc(db(ANA), 'leads/luis-won')));
+  });
+});

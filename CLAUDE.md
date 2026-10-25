@@ -98,6 +98,7 @@ Reglas de dominio:
 - Roles (`admin` / `member` = vendedor): solo un admin cambia el rol o el acceso de **otro** miembro, con confirmación en línea en *Equipo*, y el de una invitación pendiente. Nadie cambia su propio rol ni acceso: así el equipo nunca se queda sin admin activo.
 - Solo un admin reasigna (`LeadsService.reassign`, que arrastra los follow-ups pendientes) o cambia el responsable de un contacto. Un vendedor crea leads siempre a su nombre.
 - Borrar un lead: admin, o su creador si sigue siendo el responsable.
+- Una venta ganada solo la reabre (cambia de etapa) o la borra un admin (`LeadsService.locked`; las reglas lo exigen). El vendedor ve las etapas bloqueadas con aviso y la tarjeta fija en el pipeline.
 - Archivar un contacto: solo admin (`ContactsService.archive`); sus negocios abiertos pasan a Perdido y sus follow-ups pendientes se cancelan en el mismo batch. Se oculta de *Clientes* salvo con el filtro *Archivados*. Reactivar lo puede hacer cualquiera: abrir un negocio nuevo con él lo reactiva.
 - Borrar un contacto: solo admin y solo si no tiene ventas ganadas (las reglas miran `wonCount`); se llevan sus negocios con historial y follow-ups. Un cliente con ventas se archiva.
 - Cambios en reglas: añadir o ajustar su caso en `tests/rules/firestore.rules.test.ts` y pasar `npm run test:rules`.

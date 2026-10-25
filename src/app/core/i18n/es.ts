@@ -172,6 +172,7 @@ export const es = {
   'detail.saveChanges': 'Guardar cambios',
   'detail.saved': 'Datos guardados.',
   'detail.stageNav': 'Etapa del lead',
+  'detail.wonLocked': 'Venta cerrada: solo un admin puede reabrirla o eliminarla.',
   'detail.updated': 'Actualizado',
   'detail.won': '¡{name} ganado!',
   'due.none': 'Sin fecha',

@@ -17,6 +17,7 @@ import { AuthService } from './auth.service';
 import { DealState, initialStats, statsPatch } from './contact-stats';
 import { FIRESTORE } from './firebase';
 import { toDate } from './firestore-utils';
+import { t } from './i18n/i18n';
 import { ContactChannel, ContactDraft, Lead, LeadDraft, LeadPricing, LeadSource, PriceTier, Stage, isClosed, stageMeta } from './models';
 import { teamQuery } from './team-query';
 
@@ -93,6 +94,11 @@ export class LeadsService {
   readonly open = computed(() => this.leads().filter((l) => !isClosed(l.stage)));
   /** Leads activos sin ningún follow-up programado: el error que este CRM no perdona. */
   readonly withoutNextStep = computed(() => this.open().filter((l) => !l.nextFollowUpAt));
+
+  /** Una venta ganada solo la reabre o la borra un admin (las reglas también lo exigen). */
+  locked(lead: Pick<Lead, 'stage'>): boolean {
+    return lead.stage === 'won' && !this.auth.isAdmin();
+  }
 
   /**
    * Crea el lead (y el contacto si es nuevo) en un solo batch, con su actividad de alta
@@ -230,6 +236,7 @@ export class LeadsService {
   /** Cambia de etapa y deja constancia en el historial. */
   async moveToStage(lead: Lead, to: Stage, lostReason = ''): Promise<void> {
     if (lead.stage === to) return;
+    if (this.locked(lead)) throw new Error(t('detail.wonLocked'));
     const after: DealState = { ...lead, stage: to };
     const batch = writeBatch(this.db);
     this.patchContact(batch, lead, after, await this.firstWonMissing(lead.contactId, after));
@@ -255,6 +262,7 @@ export class LeadsService {
    * borra también el contacto (no hace falta corregir su resumen).
    */
   async remove(lead: Lead, patchContact = true): Promise<void> {
+    if (this.locked(lead)) throw new Error(t('detail.wonLocked'));
     const id = lead.id;
     // Un vendedor solo puede consultar sus follow-ups: la consulta debe decirlo.
     const fuQuery = this.auth.isAdmin()
