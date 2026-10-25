@@ -14,7 +14,7 @@ import {
 import { AuthService } from './auth.service';
 import { FIRESTORE } from './firebase';
 import { toDate } from './firestore-utils';
-import { Invite, Member, MemberRole } from './models';
+import { Invite, Member, MemberRole, SessionLog } from './models';
 import { teamQuery } from './team-query';
 
 /** Miembros del equipo e invitaciones pendientes. */
@@ -46,10 +46,25 @@ export class MembersService {
     () => this.auth.isAdmin(),
   );
 
+  /** Última entrada y salida de cada uno: solo la lee un admin. */
+  private readonly liveSessions = teamQuery(
+    () => query(collection(this.db, 'sessions')),
+    (uid: string, d: DocumentData): SessionLog => ({
+      uid,
+      signInAt: toDate(d['signInAt']),
+      signOutAt: toDate(d['signOutAt']),
+      signOutReason: d['signOutReason'] ?? null,
+    }),
+    () => this.auth.isAdmin(),
+  );
+
   readonly members = this.liveMembers.data;
   readonly active = computed(() => this.members().filter((m) => m.active));
   readonly invites = this.liveInvites.data;
   readonly invitesError = this.liveInvites.error;
+  readonly sessions = computed(() => new Map(this.liveSessions.data().map((s) => [s.uid, s])));
+  readonly sessionsLoading = this.liveSessions.loading;
+  readonly sessionsError = this.liveSessions.error;
   readonly byId = computed(() => new Map(this.members().map((m) => [m.uid, m])));
 
   name(uid: string): string {

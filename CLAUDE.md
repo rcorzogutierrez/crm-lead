@@ -69,6 +69,7 @@ src/app/
 |---|---|---|
 | `meta/team` | único | `ownerUid`, `name` — existe desde que entra el primer usuario |
 | `members/{uid}` | miembro | `email`, `displayName`, `photoURL`, `role: admin\|member`, `active` |
+| `sessions/{uid}` | última entrada/salida | `signInAt`, `signOutAt`, `signOutReason: manual\|idle` — cada uno escribe solo el suyo con `serverTimestamp()`; solo el admin lee (se muestra en *Equipo*) |
 | `invites/{emailEnMinúsculas}` | invitación | `email`, `role`, `invitedBy` — se consume al entrar |
 | `contacts/{id}` | persona/empresa | `name`, `company`, `email` (minúsculas), `phone`, `assigneeId`, `notes`, `createdBy` + resumen `statsV`, `wonCount`, `wonTotal`, `firstWonAt`, `openBy` (uid → nº abiertos), `archived`, `archivedAt` — "cliente" si `wonCount > 0` |
 | `leads/{id}` | lead = oportunidad (un servicio para un contacto) | `contactId`, copia del contacto (`name`, `company`, `email`, `phone`), `serviceId`, `serviceName`, `detail`, `quantity`, `unitPrice`, `tier`, `tierPct`, `value`, `priceAck`, `source`, `stage`, `wonAt`, `assigneeId`, `notes`, `lostReason`, `nextFollowUpAt`, `lastContactAt`, `createdBy`, timestamps |
@@ -103,6 +104,7 @@ Reglas de dominio:
 - Borrar un contacto: solo admin y solo si no tiene ventas ganadas (las reglas miran `wonCount`); se llevan sus negocios con historial y follow-ups. Un cliente con ventas se archiva.
 - Cambios en reglas: añadir o ajustar su caso en `tests/rules/firestore.rules.test.ts` y pasar `npm run test:rules`.
 - Cierre por inactividad (`core/idle.service.ts`, arrancado por el shell): 10 min sin ratón, teclado, toque o scroll cierran la sesión y llevan a `/login`, que explica el motivo. El último minuto muestra una cuenta atrás con "Seguir conectado". La última actividad se comparte entre pestañas en `localStorage` (`crm-lead.lastActivity`).
+- Última entrada y salida (`sessions/{uid}`): `AuthService` anota la entrada solo si es un inicio nuevo (`metadata.lastSignInTime` de hace < 5 min, sin repetir en recargas) y la salida antes de `signOut` (botón o inactividad, máx. 2 s de espera). Una sesión restaurada ya caducada se cierra sin anotar salida, y cerrar el navegador no deja salida: *Equipo* lo muestra como "Salida sin registrar".
 - Cabeceras de seguridad en `firebase.json` (nosniff, `frame-ancestors`, Referrer/Permissions-Policy, HSTS). Si cambia el dominio de hosting, actualizar `frame-ancestors`.
 - Configuración necesaria en la consola de Firebase: habilitar el proveedor Google en Authentication y añadir el dominio de hosting a *Authorized domains*.
 

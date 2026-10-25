@@ -6,13 +6,21 @@ import {
   getDoc,
   onSnapshot,
   serverTimestamp,
+  setDoc,
   writeBatch,
 } from 'firebase/firestore';
 import { AUTH, FIRESTORE } from './firebase';
 import { I18nKey } from './i18n/i18n';
-import { Member, MemberRole } from './models';
+import { Member, MemberRole, SignOutReason } from './models';
 
 export type AuthStatus = 'loading' | 'signedOut' | 'pending' | 'member';
+
+/** Último inicio de sesión ya anotado (Auth lo da en `metadata.lastSignInTime`), compartido entre pestañas. */
+const SIGN_IN_KEY = 'crm-lead.recordedSignIn';
+/** Un inicio más antiguo es una sesión restaurada al abrir el navegador, no una entrada nueva. */
+const FRESH_SIGN_IN = 5 * 60_000;
+/** Lo máximo que se espera a anotar la salida antes de cerrar la sesión (sin red no llega). */
+const SIGN_OUT_WAIT = 2_000;
 
 /**
  * Sesión del usuario y su pertenencia al equipo.
@@ -88,8 +96,40 @@ export class AuthService {
     }
   }
 
-  signOut(): Promise<void> {
+  /**
+   * Cierra la sesión. Si es miembro, antes anota la hora y el motivo en `sessions/{uid}`
+   * (lo ve el admin en Equipo); sin red no se espera más de 2 s.
+   * `reason: null` cierra sin anotar nada (sesión que ya había terminado al cerrar el navegador).
+   */
+  async signOut(reason: SignOutReason | null = 'manual'): Promise<void> {
+    const uid = this.uid();
+    if (reason && uid && this._status() === 'member') {
+      const write = setDoc(
+        doc(this.db, 'sessions', uid),
+        { signOutAt: serverTimestamp(), signOutReason: reason },
+        { merge: true },
+      );
+      await Promise.race([write, new Promise((r) => setTimeout(r, SIGN_OUT_WAIT))]).catch((err) =>
+        console.error(err),
+      );
+    }
     return signOut(this.auth);
+  }
+
+  /** Anota un inicio de sesión nuevo una sola vez (no las sesiones restauradas ni las recargas). */
+  private recordSignIn(user: User): void {
+    const at = user.metadata.lastSignInTime ?? '';
+    const time = Date.parse(at);
+    if (!time || Date.now() - time > FRESH_SIGN_IN) return;
+    try {
+      if (localStorage.getItem(SIGN_IN_KEY) === user.uid + '|' + at) return;
+      localStorage.setItem(SIGN_IN_KEY, user.uid + '|' + at);
+    } catch {
+      // Sin localStorage: puede anotarse dos veces el mismo inicio, con segundos de diferencia.
+    }
+    void setDoc(doc(this.db, 'sessions', user.uid), { signInAt: serverTimestamp() }, { merge: true }).catch(
+      (err) => console.error(err),
+    );
   }
 
   /** Vuelve a comprobar si ya fue invitado (botón en la pantalla de acceso pendiente). */
@@ -175,7 +215,10 @@ export class AuthService {
           role: data['role'],
           active: true,
         });
+        const first = this._status() !== 'member';
         this.setStatus('member');
+        const user = this._user();
+        if (first && user) this.recordSignIn(user);
       },
       () => this.setStatus('pending'),
     );

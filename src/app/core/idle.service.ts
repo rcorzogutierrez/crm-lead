@@ -63,7 +63,8 @@ export class IdleService {
     const now = Date.now();
     const stored = readShared();
     if (stored && now - stored >= LIMIT) {
-      this.expire();
+      // Se cerró el navegador sin salir: la sesión acabó entonces, no ahora; no se anota salida.
+      this.expire(false);
       return () => undefined;
     }
     this.last = now;
@@ -142,10 +143,10 @@ export class IdleService {
     this._remaining.set(left <= WARN ? Math.ceil(left / 1_000) : null);
   }
 
-  private expire(): void {
+  private expire(record = true): void {
     this.stopWatch?.();
     this._endedByIdle.set(true);
     writeShared(null);
-    void this.auth.signOut().finally(() => this.router.navigateByUrl('/login'));
+    void this.auth.signOut(record ? 'idle' : null).finally(() => this.router.navigateByUrl('/login'));
   }
 }
