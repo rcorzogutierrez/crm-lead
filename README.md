@@ -19,6 +19,7 @@ y deja cada contacto con su siguiente paso.
 [![Vitest](https://img.shields.io/badge/tests-Vitest-6e9f18?logo=vitest&logoColor=white)](https://vitest.dev)
 [![Node](https://img.shields.io/badge/Node-%E2%89%A5%2022.22.3-5fa04e?logo=nodedotjs&logoColor=white)](https://nodejs.org)
 [![Idiomas](https://img.shields.io/badge/idiomas-ES%20%C2%B7%20EN-475569)](#idiomas)
+[![Licencia MIT](https://img.shields.io/badge/licencia-MIT-16a34a)](LICENSE)
 
 [Funciones](#funciones) · [Stack](#stack) · [Puesta en marcha](#puesta-en-marcha) · [Pruebas](#pruebas) · [Publicar](#publicar) · [Seguridad](#acceso-y-seguridad)
 
@@ -138,7 +139,8 @@ Un cambio en `firestore.rules` va con su caso en `tests/rules/firestore.rules.te
 
 **Automático.** Cada push a `main`, por ejemplo al fusionar un PR, pasa lint, tests, pruebas de reglas y build,
 y publica Hosting, reglas e índices con GitHub Actions ([`deploy.yml`](.github/workflows/deploy.yml)).
-Los PR pasan las mismas comprobaciones sin publicar. El workflow usa el secreto de repositorio
+Los PR pasan las mismas comprobaciones sin publicar. Un push que solo cambia documentación
+(`*.md`, `docs/`, `LICENSE`, `.claude/`, `.impeccable/`, `.vscode/`) no dispara el workflow. El workflow usa el secreto de repositorio
 `FIREBASE_SERVICE_ACCOUNT`, la clave JSON de una cuenta de servicio del proyecto con los roles
 *Firebase Admin* y *Service Usage Consumer*.
 
@@ -167,3 +169,7 @@ tests/rules/   pruebas de firestore.rules
 - [PRODUCT.md](PRODUCT.md): para quién es y qué problema resuelve.
 - [DESIGN.md](DESIGN.md): sistema visual "agenda" con la paleta Pizarra.
 - [CLAUDE.md](CLAUDE.md): modelo de datos, reglas de dominio y convenciones del código.
+
+## Licencia
+
+[MIT](LICENSE) © 2026 Rafa Corzo
