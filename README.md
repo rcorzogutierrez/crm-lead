@@ -172,4 +172,4 @@ tests/rules/   pruebas de firestore.rules
 
 ## Licencia
 
-[MIT](LICENSE) © 2026 Rafa Corzo
+[MIT](LICENSE) © 2026 Rafael Corzo
