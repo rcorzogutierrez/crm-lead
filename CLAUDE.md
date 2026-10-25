@@ -102,6 +102,7 @@ Reglas de dominio:
 - Archivar un contacto: solo admin (`ContactsService.archive`); sus negocios abiertos pasan a Perdido y sus follow-ups pendientes se cancelan en el mismo batch. Se oculta de *Clientes* salvo con el filtro *Archivados*. Reactivar lo puede hacer cualquiera: abrir un negocio nuevo con él lo reactiva.
 - Borrar un contacto: solo admin y solo si no tiene ventas ganadas (las reglas miran `wonCount`); se llevan sus negocios con historial y follow-ups. Un cliente con ventas se archiva.
 - Cambios en reglas: añadir o ajustar su caso en `tests/rules/firestore.rules.test.ts` y pasar `npm run test:rules`.
+- Cierre por inactividad (`core/idle.service.ts`, arrancado por el shell): 10 min sin ratón, teclado, toque o scroll cierran la sesión y llevan a `/login`, que explica el motivo. El último minuto muestra una cuenta atrás con "Seguir conectado". La última actividad se comparte entre pestañas en `localStorage` (`crm-lead.lastActivity`).
 - Cabeceras de seguridad en `firebase.json` (nosniff, `frame-ancestors`, Referrer/Permissions-Policy, HSTS). Si cambia el dominio de hosting, actualizar `frame-ancestors`.
 - Configuración necesaria en la consola de Firebase: habilitar el proveedor Google en Authentication y añadir el dominio de hosting a *Authorized domains*.
 

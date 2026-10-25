@@ -1,7 +1,8 @@
 import { Component, DestroyRef, effect, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
-import { LucideCheck } from '@lucide/angular';
+import { LucideCheck, LucideClock } from '@lucide/angular';
 import { AuthService } from '../../core/auth.service';
+import { IDLE_MINUTES, IdleService } from '../../core/idle.service';
 import { I18nKey, t } from '../../core/i18n/i18n';
 import { LangSwitch } from '../../shared/lang-switch';
 import { Logo } from '../../shared/logo';
@@ -13,7 +14,7 @@ import { Logo } from '../../shared/logo';
  */
 @Component({
   selector: 'app-login',
-  imports: [Logo, LangSwitch, LucideCheck],
+  imports: [Logo, LangSwitch, LucideCheck, LucideClock],
   template: `
     <div class="login-board relative isolate flex min-h-dvh flex-col overflow-hidden text-rail-ink" (pointermove)="follow($event)">
       <span class="login-glow" aria-hidden="true"></span>
@@ -29,10 +30,21 @@ import { Logo } from '../../shared/logo';
 
       <main class="flex flex-1 items-center justify-center px-4 pt-6 pb-16 text-center">
         <div class="w-full max-w-3xl">
-          <span class="login-in login-badge inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-[0.8125rem] font-semibold" style="--d: 60ms">
-            <span class="login-badge-dot size-1.5 rounded-full" aria-hidden="true"></span>
-            {{ t('login.badge') }}
-          </span>
+          <!-- Tras un cierre por inactividad, el motivo ocupa el lugar de la insignia -->
+          @if (idle.endedByIdle()) {
+            <div class="login-in login-notice mx-auto flex max-w-md items-start gap-3 rounded-xl px-4 py-3 text-left" style="--d: 60ms" role="status">
+              <svg lucideClock [size]="20" class="mt-0.5 shrink-0 text-highlight" aria-hidden="true"></svg>
+              <p class="text-sm leading-snug">
+                <strong class="block font-semibold text-rail-ink">{{ t('idle.notice.title') }}</strong>
+                <span class="text-rail-muted">{{ t('idle.notice.body', { n: idleMinutes }) }}</span>
+              </p>
+            </div>
+          } @else {
+            <span class="login-in login-badge inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-[0.8125rem] font-semibold" style="--d: 60ms">
+              <span class="login-badge-dot size-1.5 rounded-full" aria-hidden="true"></span>
+              {{ t('login.badge') }}
+            </span>
+          }
 
           <h1 class="login-in date-face mt-6 text-[clamp(2.125rem,6vw,4rem)] leading-[1.04] font-bold tracking-tight text-balance" style="--d: 120ms">
             {{ t('login.headline') }}
@@ -78,6 +90,8 @@ import { Logo } from '../../shared/logo';
 })
 export class Login {
   protected readonly auth = inject(AuthService);
+  protected readonly idle = inject(IdleService);
+  protected readonly idleMinutes = IDLE_MINUTES;
   private readonly router = inject(Router);
   protected readonly busy = signal(false);
   protected readonly t = t;
@@ -115,6 +129,7 @@ export class Login {
 
   protected async signIn(): Promise<void> {
     this.busy.set(true);
+    this.idle.reset();
     await this.auth.signInWithGoogle();
     this.busy.set(false);
   }

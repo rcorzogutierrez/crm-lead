@@ -158,3 +158,20 @@
 </nav>
 
 <app-capture-drawer />
+
+<!-- Aviso de cierre por inactividad: el último minuto, con una acción para seguir -->
+@if (idle.remaining() !== null) {
+  <div
+    class="toast fixed inset-x-4 bottom-20 z-50 mx-auto flex max-w-md items-center gap-3 rounded-lg bg-ink py-2.5 pr-2.5 pl-4 text-sm text-white shadow-lift lg:right-6 lg:bottom-6 lg:left-auto lg:mx-0 lg:w-md"
+    role="alert"
+  >
+    <svg lucideClock [size]="18" class="shrink-0 text-highlight" aria-hidden="true"></svg>
+    <p class="flex-1 font-medium">
+      <span class="sr-only">{{ t('idle.warnSr') }}</span>
+      <span aria-hidden="true">{{ t('idle.warn', { time: idleLeft() }) }}</span>
+    </p>
+    <button type="button" class="btn btn-sm shrink-0 bg-white px-3 font-bold text-ink hover:bg-white/90" (click)="idle.stayActive()">
+      {{ t('idle.stay') }}
+    </button>
+  </div>
+}
