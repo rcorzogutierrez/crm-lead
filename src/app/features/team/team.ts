@@ -1,18 +1,27 @@
 import { Component, Injector, afterNextRender, computed, inject, signal } from '@angular/core';
 import { FormField, email, form, required, submit } from '@angular/forms/signals';
+import { LucideLogIn, LucideLogOut } from '@lucide/angular';
 import { AuthService } from '../../core/auth.service';
+import { Clock } from '../../core/clock.service';
+import { fullLabel, stampLabel } from '../../core/dates';
 import { firestoreErrorMessage } from '../../core/firestore-utils';
 import { t } from '../../core/i18n/i18n';
 import { LeadsService } from '../../core/leads.service';
 import { MembersService } from '../../core/members.service';
-import { Invite, Member, MemberRole } from '../../core/models';
+import { Invite, Member, MemberRole, SessionLog } from '../../core/models';
 import { ToastService } from '../../core/toast.service';
 import { Avatar } from '../../shared/avatar';
+
+interface Stamp {
+  label: string;
+  full: string;
+  iso: string;
+}
 
 /** Equipo: miembros, roles e invitaciones (solo admins pueden cambiar). */
 @Component({
   selector: 'app-team',
-  imports: [FormField, Avatar],
+  imports: [FormField, Avatar, LucideLogIn, LucideLogOut],
   templateUrl: './team.html',
 })
 export class Team {
@@ -21,6 +30,7 @@ export class Team {
   private readonly leads = inject(LeadsService);
   private readonly toast = inject(ToastService);
   private readonly injector = inject(Injector);
+  private readonly clock = inject(Clock);
 
   protected readonly t = t;
   protected readonly inviteModel = signal<{ email: string; role: MemberRole }>({ email: '', role: 'member' });
@@ -53,6 +63,26 @@ export class Team {
   /** Mueve el foco cuando el cambio ya está pintado. */
   private focusLater(focus: () => void): void {
     afterNextRender(focus, { injector: this.injector });
+  }
+
+  /**
+   * Última entrada y salida para la fila de un miembro (solo admin).
+   * Si entró después de su última salida, esa sesión aún no tiene salida: o sigue dentro
+   * o cerró el navegador sin salir. No se puede saber cuál, así que se dice tal cual.
+   */
+  protected sessionLine(m: Member): { signIn: Stamp | null; signOut: Stamp | null; idle: boolean } | null {
+    const s: SessionLog | undefined = this.members.sessions().get(m.uid);
+    if (!s || (!s.signInAt && !s.signOutAt)) return null;
+    const closed = !!s.signOutAt && (!s.signInAt || s.signOutAt >= s.signInAt);
+    return {
+      signIn: s.signInAt && this.stamp(s.signInAt),
+      signOut: closed && s.signOutAt ? this.stamp(s.signOutAt) : null,
+      idle: closed && s.signOutReason === 'idle',
+    };
+  }
+
+  private stamp(d: Date): Stamp {
+    return { label: stampLabel(d, this.clock.now()), full: fullLabel(d), iso: d.toISOString() };
   }
 
   protected roleLabel(role: MemberRole): string {

@@ -37,7 +37,7 @@ describe('cierre de sesión por inactividad', () => {
     await vi.advanceTimersByTimeAsync(1.5 * MIN);
     expect(idle.remaining()).toBe(30);
     await vi.advanceTimersByTimeAsync(0.5 * MIN);
-    expect(signOut).toHaveBeenCalledOnce();
+    expect(signOut).toHaveBeenCalledExactlyOnceWith('idle');
     expect(navigate).toHaveBeenCalledWith('/login');
     expect(idle.endedByIdle()).toBe(true);
     expect(localStorage.getItem('crm-lead.lastActivity')).toBeNull();
@@ -70,6 +70,7 @@ describe('cierre de sesión por inactividad', () => {
     stop();
     localStorage.setItem('crm-lead.lastActivity', String(Date.now() - 20 * MIN));
     stop = idle.watch();
-    expect(signOut).toHaveBeenCalledOnce();
+    // La sesión terminó al cerrar el navegador, no ahora: no se anota una salida falsa.
+    expect(signOut).toHaveBeenCalledExactlyOnceWith(null);
   });
 });

@@ -25,6 +25,33 @@
             <p class="truncate text-xs text-ink-2">
               {{ m.email }}@if (auth.isAdmin()) { · {{ t('team.activeLeads', { n: workload().get(m.uid) ?? 0 }) }}}
             </p>
+            @if (auth.isAdmin() && !members.sessionsLoading() && !members.sessionsError()) {
+              @let s = sessionLine(m);
+              <p class="mt-0.5 flex flex-wrap gap-x-3 text-xs text-ink-2 tabular">
+                @if (!s) {
+                  <span class="text-ink-3">{{ t('team.noSessions') }}</span>
+                } @else {
+                  <span class="inline-flex items-center gap-1">
+                    <svg lucideLogIn [size]="12" class="shrink-0 text-ink-3" aria-hidden="true"></svg>
+                    @if (s.signIn; as at) {
+                      <time [attr.datetime]="at.iso" [attr.title]="at.full">{{ t('team.signedIn', { when: at.label }) }}</time>
+                    } @else {
+                      <span class="text-ink-3">{{ t('team.noSignIn') }}</span>
+                    }
+                  </span>
+                  <span class="inline-flex items-center gap-1">
+                    <svg lucideLogOut [size]="12" class="shrink-0 text-ink-3" aria-hidden="true"></svg>
+                    @if (s.signOut; as at) {
+                      <time [attr.datetime]="at.iso" [attr.title]="at.full">{{ t(s.idle ? 'team.signedOutIdle' : 'team.signedOut', { when: at.label }) }}</time>
+                    } @else if (m.uid === auth.uid()) {
+                      <span>{{ t('team.currentSession') }}</span>
+                    } @else {
+                      <span class="text-ink-3">{{ t('team.noSignOut') }}</span>
+                    }
+                  </span>
+                }
+              </p>
+            }
           </div>
           <!-- En móvil los controles bajan a su propio renglón para que el nombre se lea entero. -->
           <div class="flex w-full flex-wrap items-center gap-2 pl-11 sm:w-auto sm:pl-0">
@@ -60,6 +87,13 @@
         </li>
       }
     </ul>
+    @if (auth.isAdmin()) {
+      @if (members.sessionsError(); as err) {
+        <p class="mt-2 rounded-lg bg-ribbon-soft px-3 py-2 text-xs font-medium text-ribbon" role="alert">{{ err }}</p>
+      } @else {
+        <p class="mt-2 text-xs text-ink-3">{{ t('team.sessionsNote') }}</p>
+      }
+    }
   </section>
 
   @if (auth.isAdmin()) {

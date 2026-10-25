@@ -89,6 +89,15 @@ export function timeLabel(d: Date): string {
   return fmt().time.format(d);
 }
 
+/** Día y hora de algo ya ocurrido: "hoy 09:14", "ayer 18:02", "22 oct, 18:02". */
+export function stampLabel(d: Date, now: Date): string {
+  const time = timeLabel(d);
+  const diff = dayDiff(d, now);
+  if (diff === 0) return t('stamp.today', { time });
+  if (diff === 1) return t('stamp.yesterday', { time });
+  return t('stamp.day', { day: fmt().dayMonth.format(d).replace('.', ''), time });
+}
+
 export function fullLabel(d: Date | null): string {
   return d ? fmt().full.format(d) : '';
 }

@@ -565,3 +565,47 @@ describe('Venta ganada: solo un admin la reabre o la borra', () => {
     await assertSucceeds(deleteDoc(doc(db(ANA), 'leads/luis-won')));
   });
 });
+
+describe('Última entrada y salida (sessions)', () => {
+  const now = serverTimestamp;
+
+  it('cada miembro anota su entrada y su salida con la hora del servidor', async () => {
+    const ref = doc(db(LUIS), `sessions/${LUIS}`);
+    await assertSucceeds(setDoc(ref, { signInAt: now() }, { merge: true }));
+    await assertSucceeds(setDoc(ref, { signOutAt: now(), signOutReason: 'manual' }, { merge: true }));
+    await assertSucceeds(setDoc(ref, { signOutAt: now(), signOutReason: 'idle' }, { merge: true }));
+    await assertSucceeds(setDoc(ref, { signInAt: now() }, { merge: true }));
+  });
+
+  it('nadie anota ni cambia la de otro, ni siquiera un admin', async () => {
+    await assertFails(setDoc(doc(db(LUIS), `sessions/${PEDRO}`), { signInAt: now() }, { merge: true }));
+    await assertFails(setDoc(doc(db(ANA), `sessions/${LUIS}`), { signOutAt: now(), signOutReason: 'manual' }, { merge: true }));
+    await seed({ [`sessions/${PEDRO}`]: { signInAt: Timestamp.now() } });
+    await assertFails(deleteDoc(doc(db(ANA), `sessions/${PEDRO}`)));
+    await assertFails(deleteDoc(doc(db(PEDRO), `sessions/${PEDRO}`)));
+  });
+
+  it('no se puede inventar la fecha, el motivo ni otros campos', async () => {
+    const ref = doc(db(LUIS), `sessions/${LUIS}`);
+    const ayer = Timestamp.fromMillis(Date.now() - 86_400_000);
+    await assertFails(setDoc(ref, { signInAt: ayer }, { merge: true }));
+    await assertFails(setDoc(ref, { signOutAt: ayer, signOutReason: 'manual' }, { merge: true }));
+    await assertFails(setDoc(ref, { signOutAt: now(), signOutReason: 'otro' }, { merge: true }));
+    await assertFails(setDoc(ref, { signOutAt: now() }, { merge: true }));
+    await assertFails(setDoc(ref, { signInAt: now(), ip: '1.2.3.4' }, { merge: true }));
+  });
+
+  it('quien no es miembro activo no anota nada', async () => {
+    await assertFails(setDoc(doc(db(INES), `sessions/${INES}`), { signInAt: now() }, { merge: true }));
+    await assertFails(setDoc(doc(db(STRANGER), `sessions/${STRANGER}`), { signInAt: now() }, { merge: true }));
+  });
+
+  it('solo un admin lo lee', async () => {
+    await seed({ [`sessions/${LUIS}`]: { signInAt: Timestamp.now() } });
+    await assertSucceeds(getDoc(doc(db(ANA), `sessions/${LUIS}`)));
+    await assertSucceeds(getDocs(collection(db(ANA), 'sessions')));
+    await assertFails(getDoc(doc(db(LUIS), `sessions/${LUIS}`)));
+    await assertFails(getDoc(doc(db(PEDRO), `sessions/${LUIS}`)));
+    await assertFails(getDocs(collection(db(PEDRO), 'sessions')));
+  });
+});

@@ -31,6 +31,17 @@ export interface Member {
   active: boolean;
 }
 
+/** Cómo terminó la última sesión: botón "Cerrar sesión" o cierre automático por inactividad. */
+export type SignOutReason = 'manual' | 'idle';
+
+/** Última entrada y salida de un miembro (`sessions/{uid}`; solo la lee un admin). */
+export interface SessionLog {
+  uid: string;
+  signInAt: Date | null;
+  signOutAt: Date | null;
+  signOutReason: SignOutReason | null;
+}
+
 export interface Invite {
   email: string;
   role: MemberRole;
