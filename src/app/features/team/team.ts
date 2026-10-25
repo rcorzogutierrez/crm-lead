@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, Injector, afterNextRender, computed, inject, signal } from '@angular/core';
 import { FormField, email, form, required, submit } from '@angular/forms/signals';
 import { AuthService } from '../../core/auth.service';
 import { firestoreErrorMessage } from '../../core/firestore-utils';
@@ -20,6 +20,7 @@ export class Team {
   protected readonly members = inject(MembersService);
   private readonly leads = inject(LeadsService);
   private readonly toast = inject(ToastService);
+  private readonly injector = inject(Injector);
 
   protected readonly t = t;
   protected readonly inviteModel = signal<{ email: string; role: MemberRole }>({ email: '', role: 'member' });
@@ -41,12 +42,17 @@ export class Team {
   /** Pide confirmar en línea y lleva el foco al botón que confirma. */
   protected askRevoke(m: Member): void {
     this.confirmUid.set(m.uid);
-    setTimeout(() => document.getElementById('revoke-ok-' + m.uid)?.focus());
+    this.focusLater(() => document.getElementById('revoke-ok-' + m.uid)?.focus());
   }
 
   protected cancelRevoke(m: Member): void {
     this.confirmUid.set(null);
-    setTimeout(() => document.getElementById('revoke-' + m.uid)?.focus());
+    this.focusLater(() => document.getElementById('revoke-' + m.uid)?.focus());
+  }
+
+  /** Mueve el foco cuando el cambio ya está pintado. */
+  private focusLater(focus: () => void): void {
+    afterNextRender(focus, { injector: this.injector });
   }
 
   protected roleLabel(role: MemberRole): string {

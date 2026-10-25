@@ -1,4 +1,4 @@
-import { Component, DestroyRef, Injector, afterNextRender, computed, effect, inject, input, signal, untracked } from '@angular/core';
+import { Component, Injector, afterNextRender, computed, effect, inject, input, signal, untracked } from '@angular/core';
 import { FormField, email, form, required, submit } from '@angular/forms/signals';
 import { Router, RouterLink } from '@angular/router';
 import {
@@ -20,9 +20,9 @@ import { ContactsService, wonDate } from '../../core/contacts.service';
 import { agoLabel, fullLabel, moneyLabel } from '../../core/dates';
 import { LiveQuery, firestoreErrorMessage } from '../../core/firestore-utils';
 import { FollowUpsService } from '../../core/followups.service';
-import { I18nKey, intlLocale, t } from '../../core/i18n/i18n';
+import { intlLocale, t } from '../../core/i18n/i18n';
 import { MembersService } from '../../core/members.service';
-import { Activity, ActivityType, Contact, ContactDraft, Lead, stageMeta, tierLabel } from '../../core/models';
+import { Activity, Contact, ContactDraft, Lead, activityLabel, stageMeta, tierLabel } from '../../core/models';
 import { ToastService } from '../../core/toast.service';
 import { UiService } from '../../core/ui.service';
 import { ChannelIcon } from '../../shared/channel-icon';
@@ -31,18 +31,6 @@ import { EmptyState } from '../../shared/empty-state';
 import { FollowUpItem } from '../../shared/followup-item';
 import { StageBadge } from '../../shared/stage-badge';
 
-const ACTIVITY_LABEL: Record<ActivityType, I18nKey> = {
-  note: 'act.note',
-  call: 'channel.call',
-  whatsapp: 'channel.whatsapp',
-  email: 'channel.email',
-  meeting: 'channel.meeting',
-  task: 'channel.task',
-  stage: 'act.stage',
-  created: 'act.created',
-  followup: 'act.followup',
-  pricing: 'act.pricing',
-};
 
 interface HistoryEntry extends Activity {
   lead: Lead;
@@ -75,7 +63,6 @@ export class ContactDetail {
   /** Viene de la ruta `/contacts/:id`. */
   readonly id = input.required<string>();
 
-  private readonly destroyRef = inject(DestroyRef);
   private readonly clock = inject(Clock);
   protected readonly contacts = inject(ContactsService);
   private readonly activitiesService = inject(ActivitiesService);
@@ -140,7 +127,7 @@ export class ContactDetail {
       this.leadIds();
       const s = untracked(() => this.summary());
       const leads = [...s.open, ...s.won, ...s.lost];
-      const entries = leads.map((lead) => ({ lead, q: this.activitiesService.watch(lead.id, this.destroyRef, 50) }));
+      const entries = leads.map((lead) => ({ lead, q: this.activitiesService.watch(lead.id, 50) }));
       this.histories.set(entries);
       onCleanup(() => entries.forEach((e) => e.q.stop()));
     });
@@ -243,7 +230,7 @@ export class ContactDetail {
     return agoLabel(d, this.clock.now());
   }
   protected activityLabel(a: Activity): string {
-    return t(ACTIVITY_LABEL[a.type] ?? 'act.note');
+    return activityLabel(a.type);
   }
   protected activityBody(a: HistoryEntry): string {
     if (a.type === 'created' && a.body === a.lead.serviceName) return '';

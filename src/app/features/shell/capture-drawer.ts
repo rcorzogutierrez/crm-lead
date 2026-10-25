@@ -1,4 +1,4 @@
-import { Component, ElementRef, computed, effect, inject, signal, untracked, viewChild } from '@angular/core';
+import { Component, ElementRef, Injector, afterNextRender, computed, effect, inject, signal, untracked, viewChild } from '@angular/core';
 import { FormField, email, form, min, required, submit } from '@angular/forms/signals';
 import { Router } from '@angular/router';
 import { RouterLink } from '@angular/router';
@@ -8,7 +8,6 @@ import { ContactsService } from '../../core/contacts.service';
 import { moneyLabel } from '../../core/dates';
 import { AuthService } from '../../core/auth.service';
 import { firestoreErrorMessage } from '../../core/firestore-utils';
-import { FollowUpsService } from '../../core/followups.service';
 import { t } from '../../core/i18n/i18n';
 import { LeadsService } from '../../core/leads.service';
 import { MembersService } from '../../core/members.service';
@@ -64,12 +63,12 @@ export class CaptureDrawer {
   protected readonly ui = inject(UiService);
   protected readonly auth = inject(AuthService);
   private readonly leads = inject(LeadsService);
-  private readonly followUps = inject(FollowUpsService);
   protected readonly members = inject(MembersService);
   protected readonly catalog = inject(CatalogService);
   protected readonly contacts = inject(ContactsService);
   private readonly toast = inject(ToastService);
   private readonly router = inject(Router);
+  private readonly injector = inject(Injector);
 
   private readonly dialog = viewChild.required<ElementRef<HTMLDialogElement>>('dialog');
 
@@ -174,14 +173,14 @@ export class CaptureDrawer {
     this.suggestOpen.set(false);
     this.model.update((m) => ({ ...m, name: c.name, company: c.company, email: c.email, phone: c.phone }));
     // Directo a "qué quiere comprar".
-    setTimeout(() => document.getElementById('c-service')?.focus());
+    this.focusLater(() => document.getElementById('c-service')?.focus());
   }
 
   /** Vuelve a la búsqueda (solo si no se abrió desde la ficha del contacto). */
   protected unchoose(): void {
     this.chosenId.set(null);
     this.model.update((m) => ({ ...m, name: '', company: '', email: '', phone: '' }));
-    setTimeout(() => document.getElementById('c-name')?.focus());
+    this.focusLater(() => document.getElementById('c-name')?.focus());
   }
 
   protected boughtLabel(n: number): string {
@@ -200,7 +199,7 @@ export class CaptureDrawer {
       return;
     }
     this.confirmDiscard.set(true);
-    setTimeout(() => document.getElementById('c-keep')?.focus());
+    this.focusLater(() => document.getElementById('c-keep')?.focus());
   }
 
   /** Esc nativo del <dialog>: se detiene para preguntar; un segundo Esc ya cierra. */
@@ -213,7 +212,7 @@ export class CaptureDrawer {
 
   protected keepEditing(): void {
     this.confirmDiscard.set(false);
-    setTimeout(() => document.getElementById('c-name')?.focus() ?? document.getElementById('c-service')?.focus());
+    this.focusLater(() => document.getElementById('c-name')?.focus() ?? document.getElementById('c-service')?.focus());
   }
 
   protected onBackdrop(event: MouseEvent): void {
@@ -241,7 +240,6 @@ export class CaptureDrawer {
             }
           : null;
         const person = contact ?? m;
-        const draft = { name: person.name, company: person.company, assigneeId: m.assigneeId || this.auth.uid() };
         const { leadId: id } = await this.leads.create({
           contactId: contact?.id ?? null,
           contact: {
@@ -258,16 +256,11 @@ export class CaptureDrawer {
           notes: m.notes,
           detail: m.detail,
           pricing,
+          firstFollowUp: this.scheduleNext()
+            ? { dueAt: this.nextAt(), channel: this.nextChannel(), note: this.nextNote() }
+            : null,
         });
-        if (this.scheduleNext()) {
-          await this.followUps.schedule(
-            { id, name: draft.name, company: draft.company, assigneeId: draft.assigneeId },
-            this.nextAt(),
-            this.nextChannel(),
-            this.nextNote(),
-          );
-        }
-        this.toast.show(t('capture.saved', { name: draft.name }), {
+        this.toast.show(t('capture.saved', { name: person.name }), {
           action: openAfter ? undefined : { label: t('common.open'), run: () => this.router.navigate(['/leads', id]) },
         });
         this.close();
@@ -277,6 +270,11 @@ export class CaptureDrawer {
       }
       return undefined;
     });
+  }
+
+  /** Mueve el foco cuando el cambio ya está pintado. */
+  private focusLater(focus: () => void): void {
+    afterNextRender(focus, { injector: this.injector });
   }
 
   private reset(): void {

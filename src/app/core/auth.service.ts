@@ -52,14 +52,7 @@ export class AuthService {
         this.setStatus('signedOut');
         return;
       }
-      this.setStatus('loading');
-      try {
-        await this.ensureMembership(user);
-      } catch (err) {
-        console.error(err);
-        this._error.set('auth.err.verify');
-        this.setStatus('pending');
-      }
+      await this.checkMembership(user);
     });
   }
 
@@ -103,8 +96,23 @@ export class AuthService {
   async recheck(): Promise<void> {
     const user = this._user();
     if (!user) return;
+    this.stopMember?.();
+    this.stopMember = null;
+    await this.checkMembership(user);
+  }
+
+  /** Comprueba el alta; si falla, queda en `pending` con el error (nunca en `loading`). */
+  private async checkMembership(user: User): Promise<void> {
+    this._error.set(null);
     this.setStatus('loading');
-    await this.ensureMembership(user);
+    try {
+      await this.ensureMembership(user);
+    } catch (err) {
+      console.error(err);
+      if (this._user() !== user) return;
+      this._error.set('auth.err.verify');
+      this.setStatus('pending');
+    }
   }
 
   private async ensureMembership(user: User): Promise<void> {
@@ -134,7 +142,7 @@ export class AuthService {
         const inviteRef = doc(this.db, 'invites', email);
         const invite = await getDoc(inviteRef).catch(() => null);
         if (!invite?.exists()) {
-          this.setStatus('pending');
+          if (this._user() === user) this.setStatus('pending');
           return;
         }
         const batch = writeBatch(this.db);
@@ -144,6 +152,8 @@ export class AuthService {
       }
     }
 
+    // Si entretanto cerró sesión o entró otra cuenta, esta comprobación ya no vale.
+    if (this._user() !== user) return;
     this.watchMember(user.uid);
   }
 

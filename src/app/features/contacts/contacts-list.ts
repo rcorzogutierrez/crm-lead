@@ -3,7 +3,7 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { LucidePlus, LucideSearch } from '@lucide/angular';
 import { AuthService } from '../../core/auth.service';
-import { ContactSummary, ContactsService, phoneDigits } from '../../core/contacts.service';
+import { ContactSummary, ContactsService, normalizeText, phoneDigits } from '../../core/contacts.service';
 import { moneyLabel } from '../../core/dates';
 import { firestoreErrorMessage } from '../../core/firestore-utils';
 import { I18nKey, intlLocale, t } from '../../core/i18n/i18n';
@@ -25,7 +25,6 @@ const KINDS: { id: Kind; label: I18nKey }[] = [
   { id: 'archived', label: 'contacts.archived' },
 ];
 
-const normalize = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 
 /** Clientes y prospectos, con lo que han comprado y lo que tienen abierto. */
 @Component({
@@ -55,7 +54,7 @@ export class ContactsList {
   protected readonly migrating = signal(false);
 
   protected readonly rows = computed(() => {
-    const q = normalize(this.search().trim());
+    const q = normalizeText(this.search().trim());
     const digits = phoneDigits(this.search());
     const kind = this.kind();
     return this.contacts
@@ -70,7 +69,7 @@ export class ContactsList {
         if (kind === 'idle' && (!customer || s.openCount > 0)) return false;
         // El teléfono se compara por dígitos: "55 1234" encuentra "+52 (55) 1234-5678".
         const phoneHit = digits.length >= 3 && phoneDigits(c.phone).includes(digits);
-        if (q && !phoneHit && !normalize(`${c.name} ${c.company} ${c.email} ${c.phone}`).includes(q)) return false;
+        if (q && !phoneHit && !normalizeText(`${c.name} ${c.company} ${c.email} ${c.phone}`).includes(q)) return false;
         return true;
       })
       .sort((a, b) => a.c.name.localeCompare(b.c.name, intlLocale()));

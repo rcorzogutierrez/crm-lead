@@ -3,6 +3,7 @@ import { NgTemplateOutlet } from '@angular/common';
 import { FormField, form, min, required, submit } from '@angular/forms/signals';
 import { LucideLock, LucidePlus, LucideSearch } from '@lucide/angular';
 import { AuthService } from '../../core/auth.service';
+import { normalizeText } from '../../core/contacts.service';
 import { CatalogService } from '../../core/catalog.service';
 import { moneyLabel } from '../../core/dates';
 import { firestoreErrorMessage } from '../../core/firestore-utils';
@@ -13,7 +14,6 @@ import { ServiceItem, ServiceItemDraft, TIERS, TierRates, isClosed } from '../..
 import { ToastService } from '../../core/toast.service';
 import { EmptyState } from '../../shared/empty-state';
 
-const normalize = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 
 function emptyDraft(): ServiceItemDraft {
   return { name: '', description: '', price: 0, unit: '', active: true };
@@ -73,10 +73,10 @@ export class ServicesPage {
   });
 
   protected readonly rows = computed(() => {
-    const q = normalize(this.search().trim());
+    const q = normalizeText(this.search().trim());
     return this.catalog
       .services()
-      .filter((s) => !q || normalize(`${s.name} ${s.description}`).includes(q))
+      .filter((s) => !q || normalizeText(`${s.name} ${s.description}`).includes(q))
       .sort((a, b) => Number(b.active) - Number(a.active))
       .map((s) => ({ ...s, ...(this.stats().get(s.id) ?? { open: 0, won: 0 }) }));
   });

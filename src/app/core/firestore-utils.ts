@@ -1,4 +1,4 @@
-import { DestroyRef, Signal, inject, signal } from '@angular/core';
+import { Signal, signal } from '@angular/core';
 import { DocumentData, Query, Timestamp, onSnapshot } from 'firebase/firestore';
 import { t } from './i18n/i18n';
 
@@ -16,15 +16,8 @@ export interface LiveQuery<T> {
   stop: () => void;
 }
 
-/**
- * Escucha una consulta en tiempo real y la expone como signals.
- * Si se llama dentro de un contexto de inyección, se cancela al destruirse.
- */
-export function liveQuery<T>(
-  query: Query<DocumentData>,
-  map: (id: string, data: DocumentData) => T,
-  destroyRef: DestroyRef | null = null,
-): LiveQuery<T> {
+/** Escucha una consulta en tiempo real y la expone como signals. Se cierra con `stop()`. */
+export function liveQuery<T>(query: Query<DocumentData>, map: (id: string, data: DocumentData) => T): LiveQuery<T> {
   const data = signal<T[]>([]);
   const loading = signal(true);
   const error = signal<string | null>(null);
@@ -42,16 +35,7 @@ export function liveQuery<T>(
       loading.set(false);
     },
   );
-  destroyRef?.onDestroy(stop);
   return { data: data.asReadonly(), loading: loading.asReadonly(), error: error.asReadonly(), stop };
-}
-
-/** Versión que usa el DestroyRef del contexto de inyección actual. */
-export function injectLiveQuery<T>(
-  query: Query<DocumentData>,
-  map: (id: string, data: DocumentData) => T,
-): LiveQuery<T> {
-  return liveQuery(query, map, inject(DestroyRef));
 }
 
 export function firestoreErrorMessage(err: unknown): string {
