@@ -1,15 +1,5 @@
-import { DestroyRef, Service, inject } from '@angular/core';
-import {
-  DocumentData,
-  addDoc,
-  collection,
-  doc,
-  limit,
-  orderBy,
-  query,
-  serverTimestamp,
-  updateDoc,
-} from 'firebase/firestore';
+import { Service, inject } from '@angular/core';
+import { DocumentData, collection, doc, limit, orderBy, query, serverTimestamp, writeBatch } from 'firebase/firestore';
 import { AuthService } from './auth.service';
 import { FIRESTORE } from './firebase';
 import { LiveQuery, liveQuery, toDate } from './firestore-utils';
@@ -35,18 +25,18 @@ export class ActivitiesService {
   private readonly db = inject(FIRESTORE);
   private readonly auth = inject(AuthService);
 
-  /** Escucha el historial de un lead; se cancela con el DestroyRef dado. */
-  watch(leadId: string, destroyRef: DestroyRef, max = 200): LiveQuery<Activity> {
+  /** Escucha el historial de un lead; quien la abre la cierra con `stop()` (p. ej. en la limpieza de un effect). */
+  watch(leadId: string, max = 200): LiveQuery<Activity> {
     return liveQuery(
       query(collection(this.db, 'leads', leadId, 'activities'), orderBy('createdAt', 'desc'), limit(max)),
       mapActivity,
-      destroyRef,
     );
   }
 
-  /** Registra una interacción. Si es un contacto, actualiza la fecha de último contacto. */
+  /** Registra una interacción. Si es un contacto, actualiza la fecha de último contacto (en el mismo batch). */
   async log(leadId: string, type: ActivityType, body: string): Promise<void> {
-    await addDoc(collection(this.db, 'leads', leadId, 'activities'), {
+    const batch = writeBatch(this.db);
+    batch.set(doc(collection(this.db, 'leads', leadId, 'activities')), {
       type,
       body: body.trim(),
       createdBy: this.auth.uid(),
@@ -54,6 +44,7 @@ export class ActivitiesService {
     });
     const patch: Record<string, unknown> = { updatedAt: serverTimestamp() };
     if (CONTACT_TYPES.includes(type)) patch['lastContactAt'] = serverTimestamp();
-    await updateDoc(doc(this.db, 'leads', leadId), patch);
+    batch.update(doc(this.db, 'leads', leadId), patch);
+    await batch.commit();
   }
 }

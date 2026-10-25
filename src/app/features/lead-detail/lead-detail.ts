@@ -1,4 +1,4 @@
-import { Component, DestroyRef, computed, effect, inject, input, signal, untracked } from '@angular/core';
+import { Component, computed, effect, inject, input, linkedSignal, signal, untracked } from '@angular/core';
 import { FormField, email, form, min, required, submit } from '@angular/forms/signals';
 import { Router, RouterLink } from '@angular/router';
 import {
@@ -25,6 +25,7 @@ import { MembersService } from '../../core/members.service';
 import {
   Activity,
   ActivityType,
+  activityLabel,
   LeadDraft,
   PriceTier,
   SOURCES,
@@ -52,18 +53,6 @@ const LOG_TYPES: { id: ActivityType; label: I18nKey }[] = [
   { id: 'meeting', label: 'channel.meeting' },
 ];
 
-const ACTIVITY_LABEL: Record<ActivityType, I18nKey> = {
-  note: 'act.note',
-  call: 'channel.call',
-  whatsapp: 'channel.whatsapp',
-  email: 'channel.email',
-  meeting: 'channel.meeting',
-  task: 'channel.task',
-  stage: 'act.stage',
-  created: 'act.created',
-  followup: 'act.followup',
-  pricing: 'act.pricing',
-};
 
 /** Ficha del lead: próxima acción, historial tipo diario y datos editables. */
 @Component({
@@ -90,7 +79,6 @@ export class LeadDetail {
   /** Viene de la ruta `/leads/:id`. */
   readonly id = input.required<string>();
 
-  private readonly destroyRef = inject(DestroyRef);
   private readonly router = inject(Router);
   private readonly clock = inject(Clock);
   protected readonly auth = inject(AuthService);
@@ -114,7 +102,10 @@ export class LeadDetail {
 
   protected readonly money = moneyLabel;
   protected readonly tierName = tierLabel;
-  protected readonly isOpen = computed(() => !!this.lead() && !isClosed(this.lead()!.stage));
+  protected readonly isOpen = computed(() => {
+    const lead = this.lead();
+    return !!lead && !isClosed(lead.stage);
+  });
   protected readonly contact = computed(() => {
     const id = this.lead()?.contactId;
     return id ? (this.contacts.byId().get(id) ?? null) : null;
@@ -133,9 +124,21 @@ export class LeadDetail {
   });
 
   // Edición del precio: servicio, cantidad y categoría (solo mientras el lead está abierto).
-  protected readonly pServiceId = signal('');
-  protected readonly pQuantity = signal(1);
-  protected readonly pTier = signal<PriceTier>('bronze');
+  // Cada uno vuelve al valor guardado cuando cambia el precio pactado del lead (no con cualquier cambio del lead).
+  private readonly savedPricing = computed(
+    () => {
+      const lead = this.lead();
+      return {
+        serviceId: lead?.serviceId ?? '',
+        quantity: lead?.quantity || 1,
+        tier: (lead?.serviceId ? lead.tier : 'bronze') as PriceTier,
+      };
+    },
+    { equal: (a, b) => a.serviceId === b.serviceId && a.quantity === b.quantity && a.tier === b.tier },
+  );
+  protected readonly pServiceId = linkedSignal(() => this.savedPricing().serviceId);
+  protected readonly pQuantity = linkedSignal(() => this.savedPricing().quantity);
+  protected readonly pTier = linkedSignal(() => this.savedPricing().tier);
   protected readonly pService = computed(() => this.catalog.byId().get(this.pServiceId()) ?? null);
   /** Si no cambia la categoría se conserva el % pactado; si cambia, se usa el vigente. */
   protected readonly pPct = computed(() => {
@@ -212,16 +215,10 @@ export class LeadDetail {
     // Historial en vivo del lead actual.
     effect((onCleanup) => {
       const id = this.id();
-      const q = untracked(() => this.activitiesService.watch(id, this.destroyRef));
+      // La limpieza del effect corta la escucha al cambiar de lead y al destruirse la vista.
+      const q = untracked(() => this.activitiesService.watch(id));
       this.activitiesQuery.set(q);
       onCleanup(() => q.stop());
-    });
-
-    // Precio en edición = el guardado, cada vez que cambia el lead.
-    effect(() => {
-      const lead = this.lead();
-      if (!lead) return;
-      untracked(() => this.resetPricing());
     });
 
     // Carga el formulario cuando cambia el lead (sin pisar ediciones en curso).
@@ -284,11 +281,10 @@ export class LeadDetail {
   }
 
   protected resetPricing(): void {
-    const lead = this.lead();
-    if (!lead) return;
-    this.pServiceId.set(lead.serviceId ?? '');
-    this.pQuantity.set(lead.quantity || 1);
-    this.pTier.set(lead.serviceId ? lead.tier : 'bronze');
+    const saved = this.savedPricing();
+    this.pServiceId.set(saved.serviceId);
+    this.pQuantity.set(saved.quantity);
+    this.pTier.set(saved.tier);
   }
 
   protected async savePricing(): Promise<void> {
@@ -355,8 +351,11 @@ export class LeadDetail {
     const change = this.priceChange();
     if (!lead || !change) return;
     try {
-      await this.leadsService.keepPrice(lead, change.to);
-      await this.activitiesService.log(lead.id, 'pricing', t('pricing.noteKept', { price: moneyLabel(change.from), ignored: moneyLabel(change.to) }));
+      await this.leadsService.keepPrice(
+        lead,
+        change.to,
+        t('pricing.noteKept', { price: moneyLabel(change.from), ignored: moneyLabel(change.to) }),
+      );
       this.toast.show(t('pricing.kept'));
     } catch (err) {
       this.toast.error(firestoreErrorMessage(err));
@@ -457,7 +456,7 @@ export class LeadDetail {
   }
 
   protected activityLabel(a: Activity): string {
-    return t(ACTIVITY_LABEL[a.type] ?? 'act.note');
+    return activityLabel(a.type);
   }
   /** Los cambios de etapa se muestran en el idioma actual, no en el que se guardaron. */
   protected activityBody(a: Activity): string {

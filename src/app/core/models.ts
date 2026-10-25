@@ -1,4 +1,4 @@
-import { t } from './i18n/i18n';
+import { I18nKey, t } from './i18n/i18n';
 
 /** Etapas del pipeline, en orden. `won` y `lost` son etapas cerradas. */
 export type Stage = 'new' | 'contacted' | 'qualified' | 'proposal' | 'negotiation' | 'won' | 'lost';
@@ -236,4 +236,22 @@ export function channelLabel(channel: ContactChannel): string {
 
 export function isClosed(stage: Stage): boolean {
   return stage === 'won' || stage === 'lost';
+}
+
+const ACTIVITY_LABEL: Record<ActivityType, I18nKey> = {
+  note: 'act.note',
+  call: 'channel.call',
+  whatsapp: 'channel.whatsapp',
+  email: 'channel.email',
+  meeting: 'channel.meeting',
+  task: 'channel.task',
+  stage: 'act.stage',
+  created: 'act.created',
+  followup: 'act.followup',
+  pricing: 'act.pricing',
+};
+
+/** Nombre de un tipo de actividad en el idioma actual. */
+export function activityLabel(type: ActivityType): string {
+  return t(ACTIVITY_LABEL[type] ?? 'act.note');
 }

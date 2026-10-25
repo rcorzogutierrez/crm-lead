@@ -3,6 +3,7 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { LucideArrowDown, LucideArrowUp, LucideSearch, LucideX } from '@lucide/angular';
 import { AuthService } from '../../core/auth.service';
+import { normalizeText } from '../../core/contacts.service';
 import { CatalogService } from '../../core/catalog.service';
 import { Clock } from '../../core/clock.service';
 import { agoLabel, moneyLabel } from '../../core/dates';
@@ -18,8 +19,6 @@ import { StageBadge } from '../../shared/stage-badge';
 
 type SortKey = 'next' | 'name' | 'value' | 'created' | 'contact';
 
-const normalize = (s: string) =>
-  s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 
 /** Lista de leads con búsqueda, filtros y orden, sincronizados con la URL. */
 @Component({
@@ -53,7 +52,7 @@ export class LeadsList {
   protected readonly sortAsc = signal(true);
 
   protected readonly filtered = computed(() => {
-    const q = normalize(this.search().trim());
+    const q = normalizeText(this.search().trim());
     const stage = this.stage();
     const source = this.source();
     const assignee = this.assignee() === 'me' ? this.auth.uid() : this.assignee();
@@ -68,7 +67,7 @@ export class LeadsList {
       if (orphans && (isClosed(l.stage) || l.nextFollowUpAt)) return false;
       if (priceChanges && !this.catalog.hasPriceChange(l)) return false;
       if (q) {
-        const hay = normalize(`${l.name} ${l.company} ${l.email} ${l.phone} ${l.serviceName}`);
+        const hay = normalizeText(`${l.name} ${l.company} ${l.email} ${l.phone} ${l.serviceName}`);
         if (!hay.includes(q)) return false;
       }
       return true;
