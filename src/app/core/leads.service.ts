@@ -49,6 +49,7 @@ function mapLead(id: string, d: DocumentData): Lead {
     tierPct: Number(d['tierPct'] ?? 0),
     priceAck: typeof d['priceAck'] === 'number' ? d['priceAck'] : null,
     wonAt: toDate(d['wonAt']),
+    lostAt: toDate(d['lostAt']),
   };
 }
 
@@ -244,6 +245,7 @@ export class LeadsService {
       stage: to,
       lostReason: to === 'lost' ? lostReason : '',
       wonAt: to === 'won' ? serverTimestamp() : null,
+      lostAt: to === 'lost' ? serverTimestamp() : null,
       updatedAt: serverTimestamp(),
     });
     batch.set(doc(collection(this.db, 'leads', lead.id, 'activities')), {

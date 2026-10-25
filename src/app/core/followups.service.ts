@@ -4,6 +4,7 @@ import {
   Timestamp,
   collection,
   doc,
+  getDocs,
   orderBy,
   query,
   serverTimestamp,
@@ -31,6 +32,7 @@ function mapFollowUp(id: string, d: DocumentData): FollowUp {
     note: d['note'] ?? '',
     status: d['status'] ?? 'pending',
     createdBy: d['createdBy'] ?? '',
+    completedAt: toDate(d['completedAt']),
   };
 }
 
@@ -70,6 +72,24 @@ export class FollowUpsService {
   readonly overdue = computed(() => this.pending().filter((f) => dayDiff(this.clock.now(), f.dueAt) < 0));
   readonly today = computed(() => this.pending().filter((f) => dayDiff(this.clock.now(), f.dueAt) === 0));
   readonly upcoming = computed(() => this.pending().filter((f) => dayDiff(this.clock.now(), f.dueAt) > 0));
+
+  /**
+   * Follow-ups hechos de una persona cuya fecha caía en [start, end). Consulta puntual (no en vivo)
+   * para los reportes; usa el índice (assigneeId, status, dueAt).
+   */
+  async doneBetween(assigneeId: string, start: Date, end: Date): Promise<FollowUp[]> {
+    const snap = await getDocs(
+      query(
+        collection(this.db, 'followups'),
+        where('assigneeId', '==', assigneeId),
+        where('status', '==', 'done'),
+        where('dueAt', '>=', Timestamp.fromDate(start)),
+        where('dueAt', '<', Timestamp.fromDate(end)),
+        orderBy('dueAt', 'asc'),
+      ),
+    );
+    return snap.docs.map((d) => mapFollowUp(d.id, d.data()));
+  }
 
   forLead(leadId: string): FollowUp[] {
     return this.pending().filter((f) => f.leadId === leadId);

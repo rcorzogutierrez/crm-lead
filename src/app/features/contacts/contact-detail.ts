@@ -16,13 +16,13 @@ import {
 import { ActivitiesService } from '../../core/activities.service';
 import { AuthService } from '../../core/auth.service';
 import { Clock } from '../../core/clock.service';
-import { ContactsService, wonDate } from '../../core/contacts.service';
+import { ContactsService } from '../../core/contacts.service';
 import { agoLabel, fullLabel, moneyLabel } from '../../core/dates';
 import { LiveQuery, firestoreErrorMessage } from '../../core/firestore-utils';
 import { FollowUpsService } from '../../core/followups.service';
 import { intlLocale, t } from '../../core/i18n/i18n';
 import { MembersService } from '../../core/members.service';
-import { Activity, Contact, ContactDraft, Lead, activityLabel, stageMeta, tierLabel } from '../../core/models';
+import { Activity, Contact, ContactDraft, Lead, activityLabel, stageMeta, tierLabel, wonDate } from '../../core/models';
 import { ToastService } from '../../core/toast.service';
 import { UiService } from '../../core/ui.service';
 import { ChannelIcon } from '../../shared/channel-icon';

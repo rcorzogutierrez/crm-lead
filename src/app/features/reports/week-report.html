@@ -1,0 +1,191 @@
+<header class="flex flex-wrap items-end justify-between gap-4">
+  <div class="min-w-0">
+    <h1 class="date-face text-[2rem] leading-tight font-bold first-letter:uppercase sm:text-[2.5rem]">{{ title() }}</h1>
+    <p class="mt-1 text-ink-2">{{ t('report.week.sub') }}</p>
+  </div>
+  <div class="flex flex-wrap items-center gap-2">
+    <ng-content select="[toggle]" />
+    <div class="flex items-center gap-1">
+      <button type="button" class="btn-secondary btn-icon" (click)="go(-1)" [attr.aria-label]="t('report.prevWeek')" [title]="t('report.prevWeek')">
+        <svg lucideChevronLeft [size]="18"></svg>
+      </button>
+      @if (!isCurrent()) {
+        <button type="button" class="btn-secondary" (click)="thisWeek()">{{ t('report.thisWeek') }}</button>
+      }
+      <button type="button" class="btn-secondary btn-icon" (click)="go(1)" [disabled]="isCurrent()" [attr.aria-label]="t('report.nextWeek')" [title]="t('report.nextWeek')">
+        <svg lucideChevronRight [size]="18"></svg>
+      </button>
+    </div>
+  </div>
+</header>
+
+@if (error(); as err) {
+  <p class="mt-6 rounded-lg bg-ribbon-soft px-4 py-3 text-sm font-medium text-ribbon" role="alert">{{ err }}</p>
+}
+
+<article class="sheet mt-6 overflow-hidden" [attr.aria-busy]="loading()">
+  @if (loading()) {
+    <div class="space-y-3 p-6" aria-hidden="true">
+      <div class="h-6 w-3/4 animate-pulse rounded bg-sheet-2"></div>
+      @for (i of [1, 2, 3, 4]; track i) {
+        <div class="h-24 animate-pulse rounded bg-sheet-2"></div>
+      }
+    </div>
+  } @else {
+    @let r = report();
+    <p class="px-4 py-5 text-[1.0625rem] leading-7 sm:py-6 sm:pr-7 sm:pl-[12.75rem] sm:text-[1.1875rem] sm:leading-[1.875rem]" aria-live="polite">
+      {{ summary() }}
+      @if (isCurrent()) {
+        @if (r.overdue.length) {
+          <mark class="rounded-sm bg-ribbon-soft px-1 font-bold text-ribbon">{{ t(r.overdue.length === 1 ? 'report.sum.overdue1' : 'report.sum.overdueN', { n: r.overdue.length }) }}</mark>
+        } @else {
+          {{ t('report.sum.overdue0') }}
+        }
+      }
+    </p>
+
+    <!-- Lo que entró -->
+    <app-report-row [figure]="'' + r.created.length" [caption]="t(r.created.length === 1 ? 'report.newLead1' : 'report.newLeadN')" [heading]="t('report.in')">
+      @if (sources().length) {
+        <ul class="grid max-w-xl grid-cols-[6.5rem_minmax(0,1fr)_2rem] items-center gap-x-3 gap-y-1.5 text-sm">
+          @for (s of sources(); track s.label) {
+            <li class="contents">
+              <span class="truncate">{{ s.label }}</span>
+              <span class="h-3.5 rounded-r-[4px] rounded-l-[2px] bg-ink-3/70" [style.width.%]="s.pct" aria-hidden="true"></span>
+              <span class="text-right font-semibold tabular">{{ s.count }}</span>
+            </li>
+          }
+        </ul>
+      } @else {
+        <p class="text-sm text-ink-2">{{ t('report.in.empty') }}</p>
+      }
+    </app-report-row>
+
+    <!-- Lo que se ganó -->
+    <app-report-row [figure]="money(r.wonTotal)" [caption]="t(r.won.length === 1 ? 'report.sale1' : 'report.saleN', { n: r.won.length })" [heading]="t('report.won')">
+      @if (r.won.length) {
+        <ul>
+          @for (l of r.won; track l.id) {
+            <li class="grid grid-cols-[4.25rem_minmax(0,1fr)_auto] items-baseline gap-3 border-b border-rule py-2 text-sm last:border-b-0">
+              <span class="text-ink-2 tabular">{{ wonDay(l) }}</span>
+              <span class="min-w-0">
+                <a [routerLink]="['/leads', l.id]" class="font-semibold text-ink hover:text-pen">{{ l.name }}</a>
+                <span class="text-ink-2"> · {{ dealMeta(l, true) }}</span>
+              </span>
+              <span class="font-bold tabular">{{ money(l.value) }}</span>
+            </li>
+          }
+        </ul>
+      } @else {
+        <p class="text-sm text-ink-2">{{ t('report.won.empty') }}</p>
+      }
+    </app-report-row>
+
+    <!-- Lo que se perdió -->
+    <app-report-row [figure]="'' + r.lost.length" [caption]="t(r.lost.length === 1 ? 'report.lost1' : 'report.lostN')" [heading]="t('report.lost')">
+      @if (r.lost.length) {
+        <ul>
+          @for (l of r.lost; track l.id) {
+            <li class="grid grid-cols-[4.25rem_minmax(0,1fr)] items-baseline gap-x-3 border-b border-rule py-2 text-sm last:border-b-0 sm:grid-cols-[4.25rem_minmax(0,1fr)_minmax(0,14rem)]">
+              <span class="text-ink-2 tabular">{{ lostDay(l) }}</span>
+              <span class="min-w-0">
+                <a [routerLink]="['/leads', l.id]" class="font-semibold text-ink hover:text-pen">{{ l.name }}</a>
+                <span class="text-ink-2"> · {{ dealMeta(l, false) }}</span>
+              </span>
+              <span class="col-start-2 text-ink-2 sm:col-start-auto sm:text-right">{{ l.lostReason || t('report.lost.noReason') }}</span>
+            </li>
+          }
+        </ul>
+      } @else {
+        <p class="text-sm text-ink-2">{{ t('report.lost.empty') }}</p>
+      }
+    </app-report-row>
+
+    @if (isCurrent()) {
+      <!-- Lo que se está cayendo: vencidos y sin próxima acción -->
+      <app-report-row
+        [figure]="r.overdue.length + ' + ' + r.orphans.length"
+        [caption]="t('report.falling.caption')"
+        [heading]="t('report.falling')"
+        [alert]="r.overdue.length + r.orphans.length > 0"
+      >
+        @if (r.overdue.length || r.orphans.length) {
+          <ul>
+            @for (f of r.overdue.slice(0, limit); track f.id) {
+              <li class="grid items-baseline gap-x-3 gap-y-1 border-b border-rule py-2 text-sm last:border-b-0 sm:grid-cols-[7.5rem_minmax(0,1fr)]">
+                <span><app-due-chip [date]="f.dueAt" /></span>
+                <span class="min-w-0">
+                  <a [routerLink]="['/leads', f.leadId]" class="font-semibold text-ink hover:text-pen">{{ f.leadName }}</a>
+                  <span class="text-ink-2"> · {{ followUpMeta(f.note, f.channel, f.assigneeId) }}</span>
+                </span>
+              </li>
+            }
+            @for (l of r.orphans.slice(0, limit); track l.id) {
+              <li class="grid items-baseline gap-x-3 gap-y-1 border-b border-rule py-2 text-sm last:border-b-0 sm:grid-cols-[7.5rem_minmax(0,1fr)]">
+                <span><app-due-chip [date]="null" /></span>
+                <span class="min-w-0">
+                  <a [routerLink]="['/leads', l.id]" class="font-semibold text-ink hover:text-pen">{{ l.name }}</a>
+                  <span class="text-ink-2"> · {{ orphanMeta(l) }}</span>
+                </span>
+              </li>
+            }
+          </ul>
+          <p class="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-sm font-semibold">
+            @if (r.overdue.length > limit) {
+              <a routerLink="/today">{{ t('report.falling.allOverdue', { n: r.overdue.length }) }}</a>
+            }
+            @if (r.orphans.length > limit) {
+              <a routerLink="/leads" [queryParams]="{ filter: 'no-action' }">{{ t('report.falling.allOrphans', { n: r.orphans.length }) }}</a>
+            }
+          </p>
+        } @else {
+          <p class="text-sm text-ok">{{ t('report.falling.empty') }}</p>
+        }
+      </app-report-row>
+
+      <!-- Negocios quietos -->
+      <app-report-row [figure]="'' + r.stalled.length" [caption]="t('report.stalled.caption')" [heading]="t('report.stalled')">
+        <p class="mb-1 text-sm text-ink-2">{{ t('report.stalled.body', { n: stalledDays }) }}</p>
+        @if (r.stalled.length) {
+          <ul>
+            @for (s of r.stalled.slice(0, limit); track s.lead.id) {
+              <li class="grid grid-cols-[4.25rem_minmax(0,1fr)] items-baseline gap-3 border-b border-rule py-2 text-sm last:border-b-0">
+                <span class="text-ink-2 tabular">{{ t('report.days', { n: s.days }) }}</span>
+                <span class="min-w-0">
+                  <a [routerLink]="['/leads', s.lead.id]" class="font-semibold text-ink hover:text-pen">{{ s.lead.name }}</a>
+                  <span class="text-ink-2"> · {{ stalledMeta(s.lead) }}</span>
+                </span>
+              </li>
+            }
+          </ul>
+          @if (r.stalled.length > limit) {
+            <p class="mt-2 text-sm text-ink-2">{{ t('report.more', { n: r.stalled.length - limit }) }}</p>
+          }
+        } @else {
+          <p class="text-sm text-ok">{{ t('report.stalled.empty') }}</p>
+        }
+      </app-report-row>
+
+      <!-- Lo que viene -->
+      <app-report-row [figure]="'' + upcomingTotal()" [caption]="t('report.next.caption')" [heading]="t('report.next')">
+        <ol class="grid max-w-xl grid-cols-7 gap-2 sm:gap-3">
+          @for (d of upcoming(); track d.label) {
+            <li class="flex flex-col items-stretch gap-1 text-center">
+              <span class="flex h-24 flex-col justify-end" aria-hidden="true">
+                <span class="mb-1 text-[0.8125rem] font-bold tabular">{{ d.count }}</span>
+                <span class="rounded-t-[4px] rounded-b-[2px]" [class]="$first ? 'bg-pen' : 'bg-pen/55'" [style.height.%]="d.pct * 0.72"></span>
+              </span>
+              <span class="text-xs text-ink-2 tabular first-letter:uppercase" [class.font-bold]="$first" [class.text-ink]="$first">{{ d.label }}</span>
+              <span class="sr-only">{{ t('report.next.sr', { n: d.count }) }}</span>
+            </li>
+          }
+        </ol>
+      </app-report-row>
+    } @else {
+      <p class="border-t border-rule px-4 py-4 text-sm text-ink-2 sm:pl-[12.75rem]">
+        {{ t('report.pastWeek') }}
+        <button type="button" class="font-semibold text-pen underline-offset-3 hover:underline" (click)="thisWeek()">{{ t('report.thisWeek') }}</button>
+      </p>
+    }
+  }
+</article>
