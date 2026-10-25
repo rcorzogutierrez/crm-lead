@@ -13,6 +13,7 @@ import {
   getDoc,
   getDocs,
   query,
+  serverTimestamp,
   setDoc,
   updateDoc,
   where,
@@ -460,5 +461,87 @@ describe('Precio de un lead', () => {
     );
     // Otros campos sí.
     await assertSucceeds(updateDoc(doc(db(LUIS), 'leads/luis-won'), { notes: 'pagado' }));
+  });
+});
+
+describe('Resumen de compras del contacto', () => {
+  // c1 con una venta ganada y un negocio abierto de Luis y otro de Pedro.
+  const stats = { statsV: 1, wonCount: 1, wonTotal: 2060, firstWonAt: null, openBy: { [LUIS]: 1, [PEDRO]: 1 } };
+  beforeEach(async () => {
+    await seed({ 'contacts/c1': { ...contact(LUIS), ...stats } });
+  });
+
+  it('un vendedor lo mueve como lo mueve un lead suyo', async () => {
+    const ref = doc(db(LUIS), 'contacts/c1');
+    // Gana su negocio: abierto −1, ventas +1.
+    await assertSucceeds(updateDoc(ref, { [`openBy.${LUIS}`]: 0, wonCount: 2, wonTotal: 4120 }));
+    // Borra una venta suya: ventas −1.
+    await assertSucceeds(updateDoc(ref, { wonCount: 1, wonTotal: 2060 }));
+    // Primera venta: fija la fecha con la hora del servidor.
+    await assertSucceeds(updateDoc(ref, { wonCount: 2, wonTotal: 4120, firstWonAt: serverTimestamp() }));
+  });
+
+  it('un vendedor no reescribe el resumen a mano', async () => {
+    const ref = doc(db(LUIS), 'contacts/c1');
+    await assertFails(updateDoc(ref, { wonCount: 0, wonTotal: 0, openBy: {} }));
+    await assertFails(updateDoc(ref, { wonCount: 5 }));
+    await assertFails(updateDoc(ref, { wonTotal: 999999 }));
+    await assertFails(updateDoc(ref, { [`openBy.${PEDRO}`]: 0 }));
+    await assertFails(updateDoc(ref, { [`openBy.${LUIS}`]: 9 }));
+    await assertFails(updateDoc(ref, { statsV: 2 }));
+    await assertFails(updateDoc(ref, { wonCount: 'muchas' }));
+    await assertFails(updateDoc(ref, { firstWonAt: Timestamp.fromDate(new Date('2020-01-01')) }));
+  });
+
+  it('un admin lo recalcula entero', async () => {
+    await assertSucceeds(
+      updateDoc(doc(db(ANA), 'contacts/c1'), { statsV: 1, wonCount: 3, wonTotal: 6180, openBy: {} }),
+    );
+  });
+
+  it('un contacto nuevo nace con el resumen de su primer lead', async () => {
+    const fresh = { ...contact(LUIS), statsV: 1, wonCount: 0, wonTotal: 0, firstWonAt: null };
+    await assertSucceeds(setDoc(doc(db(LUIS), 'contacts/c3'), { ...fresh, openBy: { [LUIS]: 1 } }));
+    await assertFails(setDoc(doc(db(LUIS), 'contacts/c4'), { ...fresh, openBy: { [PEDRO]: 1 } }));
+    await assertFails(setDoc(doc(db(LUIS), 'contacts/c5'), { ...fresh, wonCount: 7, wonTotal: 9000, openBy: {} }));
+  });
+});
+
+describe('Validación al editar', () => {
+  it('un vendedor no mueve su lead a otro contacto; el admin sí', async () => {
+    await assertFails(updateDoc(doc(db(LUIS), 'leads/luis-1'), { contactId: 'c2' }));
+    await assertSucceeds(updateDoc(doc(db(ANA), 'leads/luis-1'), { contactId: 'c2' }));
+  });
+
+  it('no se vende un servicio archivado', async () => {
+    await seed({ 'services/viejo': { name: 'Viejo', description: '', price: 1000, unit: 'u', active: false } });
+    await assertFails(setDoc(doc(db(LUIS), 'leads/n'), lead(LUIS, { serviceId: 'viejo' })));
+    await assertFails(updateDoc(doc(db(LUIS), 'leads/luis-1'), { serviceId: 'viejo' }));
+    // Un lead que ya lo tenía lo conserva aunque se archive.
+    await seed({ 'leads/luis-v': lead(LUIS, { serviceId: 'viejo' }) });
+    await assertSucceeds(updateDoc(doc(db(LUIS), 'leads/luis-v'), { quantity: 3, value: 3090 }));
+  });
+
+  it('un follow-up editado sigue teniendo fecha, canal y tamaños válidos', async () => {
+    const ref = doc(db(LUIS), 'followups/f-luis');
+    await assertSucceeds(updateDoc(ref, { dueAt: Timestamp.fromDate(new Date('2026-12-01T10:00:00Z')) }));
+    await assertSucceeds(updateDoc(ref, { status: 'done', outcome: 'Hablamos' }));
+    await assertFails(updateDoc(ref, { dueAt: 'mañana' }));
+    await assertFails(updateDoc(ref, { channel: 'paloma' }));
+    await assertFails(updateDoc(ref, { note: 'x'.repeat(1001) }));
+    await assertFails(updateDoc(ref, { outcome: 'x'.repeat(5001) }));
+  });
+
+  it('el historial solo admite tipos conocidos y textos acotados', async () => {
+    await assertFails(setDoc(doc(db(LUIS), 'leads/luis-1/activities/a2'), { type: 'hack', body: 'x', createdBy: LUIS }));
+    await assertFails(updateDoc(doc(db(LUIS), 'leads/luis-1/activities/a1'), { body: 'x'.repeat(5001) }));
+    await assertSucceeds(updateDoc(doc(db(LUIS), 'leads/luis-1/activities/a1'), { body: 'corregido' }));
+  });
+
+  it('el nombre y la foto propios tienen tipo y tamaño', async () => {
+    const ref = doc(db(LUIS), `members/${LUIS}`);
+    await assertSucceeds(updateDoc(ref, { displayName: 'Luis G.' }));
+    await assertFails(updateDoc(ref, { displayName: 'x'.repeat(201) }));
+    await assertFails(updateDoc(ref, { photoURL: 42 }));
   });
 });

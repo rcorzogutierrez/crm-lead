@@ -92,7 +92,9 @@ service cloud.firestore {
       allow update: if (isAdmin() && uid != request.auth.uid && changedOnly(['role', 'active'])
                         && request.resource.data.role in ['admin', 'member']
                         && request.resource.data.active is bool)
-                    || (isMember() && uid == request.auth.uid && changedOnly(['displayName', 'photoURL']));
+                    || (isMember() && uid == request.auth.uid && changedOnly(['displayName', 'photoURL'])
+                        && isString(request.resource.data.displayName, 200)
+                        && (request.resource.data.photoURL == null || isString(request.resource.data.photoURL, 2000)));
       allow delete: if false;
     }
 
@@ -172,10 +174,42 @@ service cloud.firestore {
             && request.resource.data.get('archivedAt', null) == null);
     }
 
+    // Resumen de compras (statsV, wonCount, wonTotal, firstWonAt, openBy): lo escribe la app
+    // en el mismo batch que el lead. Un vendedor solo puede moverlo lo que mueve un lead suyo:
+    // una venta más o menos y su propio contador de negocios abiertos. La versión (statsV),
+    // que dice si el resumen es fiable, solo la pone un admin o un contacto nuevo.
+    function validStats(d) {
+      return d.get('wonCount', 0) is number
+        && d.get('wonTotal', 0) is number
+        && d.get('openBy', {}) is map
+        && (d.get('firstWonAt', null) == null || d.firstWonAt is timestamp);
+    }
+    function statsOnCreate(d) {
+      return isAdmin() || (
+        d.get('statsV', 1) == 1
+        && d.get('wonCount', 0) in [0, 1]
+        && (d.get('wonCount', 0) == 1 || d.get('wonTotal', 0) == 0)
+        && d.get('openBy', {}).keys().hasOnly([request.auth.uid])
+        && d.get('openBy', {}).get(request.auth.uid, 0) in [0, 1]
+        && (d.get('firstWonAt', null) == null || d.firstWonAt == request.time));
+    }
+    function statsOnUpdate(d, old) {
+      return isAdmin() || (
+        d.get('statsV', null) == old.get('statsV', null)
+        && math.abs(d.get('wonCount', 0) - old.get('wonCount', 0)) <= 1
+        && (d.get('wonTotal', 0) == old.get('wonTotal', 0) || d.get('wonCount', 0) != old.get('wonCount', 0))
+        && d.get('openBy', {}).diff(old.get('openBy', {})).affectedKeys().hasOnly([request.auth.uid])
+        && math.abs(d.get('openBy', {}).get(request.auth.uid, 0) - old.get('openBy', {}).get(request.auth.uid, 0)) <= 1
+        && (d.get('firstWonAt', null) == old.get('firstWonAt', null)
+            || (old.get('firstWonAt', null) == null && d.firstWonAt == request.time)));
+    }
+
     match /contacts/{contactId} {
       allow read: if isMember();
       allow create: if isMember()
         && validContact(request.resource.data)
+        && validStats(request.resource.data)
+        && statsOnCreate(request.resource.data)
         && request.resource.data.createdBy == request.auth.uid;
       // El resumen de compras (wonCount, wonTotal, firstWonAt, openBy) lo mantiene la app
       // en el mismo batch que el lead. El responsable del contacto solo lo cambia un admin.
@@ -183,6 +217,8 @@ service cloud.firestore {
         && validContact(request.resource.data)
         && request.resource.data.createdBy == resource.data.createdBy
         && (isAdmin() || request.resource.data.assigneeId == resource.data.assigneeId)
+        && validStats(request.resource.data)
+        && statsOnUpdate(request.resource.data, resource.data)
         && archiveOk();
       // Solo un admin borra, y nunca a un cliente con ventas ganadas (ese se archiva).
       allow delete: if isAdmin() && resource.data.get('wonCount', 0) == 0;
@@ -196,6 +232,7 @@ service cloud.firestore {
         && isString(d.phone, 50)
         && isString(d.notes, 5000)
         && isString(d.get('detail', ''), 1000)
+        && isString(d.get('lostReason', ''), 5000)
         && d.stage in ['new', 'contacted', 'qualified', 'proposal', 'negotiation', 'won', 'lost']
         && d.source in ['web', 'whatsapp', 'phone', 'referral', 'social', 'event', 'email', 'other']
         && d.value is number && d.value >= 0
@@ -221,6 +258,7 @@ service cloud.firestore {
         ? d.value == 0
         : priceMath(d)
           && get(servicePath(d.serviceId)).data.price == d.unitPrice
+          && get(servicePath(d.serviceId)).data.active == true
           && d.tierPct == tierRate(d.tier);
     }
     function pricingKeys() {
@@ -236,7 +274,10 @@ service cloud.firestore {
                 ? !hasService(old) && d.value == old.value
                 : priceMath(d)
                   && (d.unitPrice == old.get('unitPrice', -1) && d.serviceId == old.get('serviceId', null)
-                      || get(servicePath(d.serviceId)).data.price == d.unitPrice)
+                      || get(servicePath(d.serviceId)).data.price == d.unitPrice
+                         // Cambiar a otro servicio: solo a uno que siga en el catálogo.
+                         && (d.serviceId == old.get('serviceId', null)
+                             || get(servicePath(d.serviceId)).data.active == true))
                   && (d.tierPct == old.get('tierPct', -1) && d.tier == old.get('tier', null)
                       || d.tierPct == tierRate(d.tier))));
     }
@@ -250,9 +291,10 @@ service cloud.firestore {
         && validLead(request.resource.data)
         && pricingOnCreate(request.resource.data)
         && request.resource.data.createdBy == request.auth.uid;
-      // Solo un admin cambia el responsable (reasignar).
+      // Solo un admin cambia el responsable (reasignar) o el contacto del lead.
       allow update: if isMember()
-        && (isAdmin() || (isMine(resource.data) && isMine(request.resource.data)))
+        && (isAdmin() || (isMine(resource.data) && isMine(request.resource.data)
+            && request.resource.data.get('contactId', null) == resource.data.get('contactId', null)))
         && validLead(request.resource.data)
         && pricingOnUpdate(request.resource.data, resource.data)
         && request.resource.data.createdBy == resource.data.createdBy;
@@ -266,10 +308,13 @@ service cloud.firestore {
         allow create: if isMember()
           && canSeeLeadAfter(leadId)
           && request.resource.data.createdBy == request.auth.uid
+          && request.resource.data.type in activityTypes()
           && isString(request.resource.data.body, 5000);
         allow update: if isMember() && canSeeLead(leadId)
           && resource.data.createdBy == request.auth.uid
-          && request.resource.data.createdBy == resource.data.createdBy;
+          && request.resource.data.createdBy == resource.data.createdBy
+          && request.resource.data.type in activityTypes()
+          && isString(request.resource.data.body, 5000);
         // Borrado: el autor, o quien borra el lead completo (admin o creador del lead).
         allow delete: if isMember() && canSeeLead(leadId) && (
           resource.data.createdBy == request.auth.uid
@@ -277,6 +322,13 @@ service cloud.firestore {
           || get(leadPath(leadId)).data.createdBy == request.auth.uid
         );
       }
+    }
+
+    function activityTypes() {
+      return ['call', 'whatsapp', 'email', 'meeting', 'note', 'stage', 'created', 'followup', 'pricing'];
+    }
+    function followUpChannels() {
+      return ['call', 'whatsapp', 'email', 'meeting', 'task'];
     }
 
     match /followups/{followUpId} {
@@ -289,11 +341,16 @@ service cloud.firestore {
         && request.resource.data.createdBy == request.auth.uid
         && request.resource.data.status == 'pending'
         && request.resource.data.dueAt is timestamp
-        && request.resource.data.channel in ['call', 'whatsapp', 'email', 'meeting', 'task']
+        && request.resource.data.channel in followUpChannels()
         && isString(request.resource.data.note, 1000);
+      // Al editar se revisa lo mismo que al crear (fecha, canal, tamaños).
       allow update: if isMember()
         && (isAdmin() || (isMine(resource.data) && isMine(request.resource.data)))
         && request.resource.data.status in ['pending', 'done', 'cancelled']
+        && request.resource.data.dueAt is timestamp
+        && request.resource.data.channel in followUpChannels()
+        && isString(request.resource.data.note, 1000)
+        && isString(request.resource.data.get('outcome', ''), 5000)
         && request.resource.data.leadId == resource.data.leadId
         && request.resource.data.createdBy == resource.data.createdBy;
       allow delete: if isAdmin() || (isMember() && isMine(resource.data));
