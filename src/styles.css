@@ -370,33 +370,14 @@ dialog.drawer[open]::backdrop {
 .login-words > span.is-off {
   transform: translateY(-70%);
 }
-/* Google: anillo índigo, se eleva al pasar y un destello lo cruza cada pocos segundos */
+/* Google: anillo índigo y se eleva al pasar. Sin destello en bucle: el movimiento del login es la agenda del fondo */
 .login-google {
-  position: relative;
-  overflow: hidden;
   box-shadow:
     0 0 0 6px oklch(0.5 0.2 275 / 0.28),
     0 20px 40px -12px oklch(0.1 0.03 265 / 0.55);
   transition:
     transform 200ms var(--ease-out-quart),
     box-shadow 200ms var(--ease-out-quart);
-}
-.login-google::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(105deg, transparent 35%, oklch(0.5 0.2 275 / 0.22) 50%, transparent 65%);
-  transform: translateX(-120%);
-  animation: login-shine 4.5s 1.4s ease-in-out infinite;
-}
-@keyframes login-shine {
-  0% {
-    transform: translateX(-120%);
-  }
-  35%,
-  100% {
-    transform: translateX(120%);
-  }
 }
 /* Solo con ratón: en táctil el :hover se queda pegado tras el toque */
 @media (hover: hover) and (pointer: fine) {
@@ -414,8 +395,7 @@ dialog.drawer[open]::backdrop {
   color: oklch(0.78 0.12 278);
 }
 @media (prefers-reduced-motion: reduce) {
-  .login-glow,
-  .login-google::after {
+  .login-glow {
     animation: none;
   }
   .login-glow {
