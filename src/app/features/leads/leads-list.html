@@ -106,15 +106,16 @@
         <tbody class="divide-y divide-rule">
           @for (lead of filtered(); track lead.id) {
             <tr class="cursor-pointer transition-colors duration-100 hover:bg-pen-soft/50" (click)="open(lead)">
-              <td class="px-4 py-2.5">
+              <!-- w-full + max-w-0: la columna toma el espacio libre y el servicio se recorta sin empujar las demás -->
+              <td class="w-full max-w-0 px-4 py-2.5">
                 <a [routerLink]="['/leads', lead.id]" class="font-semibold text-ink hover:text-pen" (click)="$event.stopPropagation()">{{ lead.name }}</a>
-                <p class="truncate text-xs text-ink-3">{{ lead.serviceName || lead.company || lead.phone || lead.email || '—' }}</p>
+                <p class="truncate text-xs text-ink-3" [title]="lead.serviceName || lead.company">{{ lead.serviceName || lead.company || lead.phone || lead.email || '—' }}</p>
               </td>
               <td class="px-3 py-2.5"><app-stage-badge [stage]="lead.stage" /></td>
               <td class="px-3 py-2.5"><app-due-chip [date]="lead.nextFollowUpAt" [closed]="closed(lead.stage)" /></td>
-              <td class="px-3 py-2.5 text-ink-2 tabular">{{ contact(lead) }}</td>
-              <td class="px-3 py-2.5 text-right font-semibold tabular">{{ lead.value ? money(lead.value) : '—' }}</td>
-              <td class="px-3 py-2.5 text-ink-2 max-xl:hidden">{{ sourceName(lead.source) }}</td>
+              <td class="px-3 py-2.5 whitespace-nowrap text-ink-2 tabular">{{ contact(lead) }}</td>
+              <td class="px-3 py-2.5 text-right font-semibold whitespace-nowrap tabular">{{ lead.value ? money(lead.value) : '—' }}</td>
+              <td class="px-3 py-2.5 whitespace-nowrap text-ink-2 max-xl:hidden">{{ sourceName(lead.source) }}</td>
               <td class="px-4 py-2.5 text-right">
                 <app-avatar [name]="members.name(lead.assigneeId)" [photo]="members.byId().get(lead.assigneeId)?.photoURL ?? null" size="sm" />
               </td>

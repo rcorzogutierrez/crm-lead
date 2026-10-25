@@ -43,11 +43,13 @@ Estrategia: Restrained. Base neutra gris azulada; el índigo solo para acciones 
 - Confirmaciones en línea (archivar, eliminar, quitar acceso): el foco pasa a la confirmación y vuelve al botón al cancelar. Solo lo irreversible (eliminar) confirma con `.btn-danger`; archivar es reversible y usa `.btn-secondary`.
 - Móvil: las tablas anchas (Servicios, servicios comprados) se vuelven listas apiladas; los filtros segmentados van en una fila que se desliza; los controles de una fila bajan a su propio renglón antes de cortar un nombre. La cuenta se abre desde el avatar (botón de 44px con menú), no cierra sesión al tocarlo.
 
+- Táctil: los campos van a 16px (si no, iOS amplía la página al enfocarlos); `viewport-fit=cover` con `env(safe-area-inset-*)` en la barra inferior, la barra superior y el pie del panel de captura.
+- Datos largos: en tablas, la primera columna lleva `w-full max-w-0` para que el subtítulo se recorte sin empujar las demás; importes y fechas nunca se recortan (`whitespace-nowrap`). Las rejillas de una columna en móvil usan `grid-cols-1` (minmax(0,1fr)), no la pista implícita.
 - Inactividad: el último minuto, un aviso con el aspecto del toast (tinta, reloj en resaltador) con cuenta atrás y "Seguir conectado"; tras el cierre, el login cambia su insignia por una nota translúcida con el motivo.
 
 ## Movimiento
 
-150–250ms, `cubic-bezier(0.25, 1, 0.5, 1)`. Solo estado: entrada del panel, toasts, transición de vista corta (140ms). Respeta `prefers-reduced-motion`.
+150–250ms, `cubic-bezier(0.25, 1, 0.5, 1)`. Solo estado: entrada del panel, toasts, transición de vista corta (140ms). Respeta `prefers-reduced-motion`. Sin rebotes. Los toasts entran con transición y `@starting-style` (no keyframes), para que varios seguidos se reacomoden. Los `:hover` con movimiento van dentro de `@media (hover: hover) and (pointer: fine)`. Animar solo `transform`/`translate`/`opacity`, nunca `left`/`top`/`width`.
 
 Excepción autorizada: el fondo del login, "la agenda corre" (`features/auth/login-agenda.ts`, Canvas 2D). La página de agenda sube despacio con renglones, margen y horas; las citas suben con ella y se marcan con el resaltador al cruzar la cinta roja de "ahora". Cada cambio de palabra del titular trae una cita nueva. Textos de las citas y horas traducidos; con movimiento reducido es una imagen fija.
 

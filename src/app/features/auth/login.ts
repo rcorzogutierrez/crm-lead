@@ -124,9 +124,10 @@ export class Login {
   /** El brillo índigo sigue al puntero con retardo suave (la transición está en CSS). */
   protected follow(event: PointerEvent): void {
     if (event.pointerType !== 'mouse') return;
-    const el = event.currentTarget as HTMLElement;
-    el.style.setProperty('--gx', `${event.clientX}px`);
-    el.style.setProperty('--gy', `${event.clientY}px`);
+    // Las variables van en el propio brillo, no en el tablero: así no se recalculan los estilos de toda la página.
+    const glow = (event.currentTarget as HTMLElement).querySelector<HTMLElement>('.login-glow');
+    glow?.style.setProperty('--gx', `${event.clientX}px`);
+    glow?.style.setProperty('--gy', `${event.clientY}px`);
   }
 
   protected async signIn(): Promise<void> {

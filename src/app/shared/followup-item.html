@@ -51,7 +51,8 @@
       [title]="t('fu.snooze')"
     >
       <svg lucideCalendarClock [size]="16"></svg>
-      {{ t('fu.snooze') }}
+      <!-- En pantallas de 320 px no caben icono, posponer y hecho: queda solo el icono (el nombre sigue para lectores) -->
+      <span class="max-[359px]:sr-only">{{ t('fu.snooze') }}</span>
     </button>
     <button
       type="button"

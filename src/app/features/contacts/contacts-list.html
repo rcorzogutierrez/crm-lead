@@ -88,21 +88,22 @@
         <tbody class="divide-y divide-rule">
           @for (row of rows(); track row.c.id) {
             <tr class="cursor-pointer transition-colors duration-100 hover:bg-pen-soft/50" (click)="open(row.c)">
-              <td class="px-4 py-2.5">
+              <!-- w-full + max-w-0: la columna toma el espacio libre y la empresa se recorta sin empujar las demás -->
+              <td class="w-full max-w-0 px-4 py-2.5">
                 <a [routerLink]="['/contacts', row.c.id]" class="font-semibold text-ink hover:text-pen" (click)="$event.stopPropagation()">{{ row.c.name }}</a>
-                <p class="truncate text-xs text-ink-3">{{ row.c.company || row.c.phone || row.c.email || '—' }}</p>
+                <p class="truncate text-xs text-ink-3" [title]="row.c.company || row.c.email">{{ row.c.company || row.c.phone || row.c.email || '—' }}</p>
               </td>
               <td class="px-3 py-2.5">
                 @if (row.c.archived) {
                   <span class="inline-flex h-6 items-center rounded-md border border-rule-strong px-2 text-xs font-semibold text-ink-2">{{ t('contacts.archivedTag') }}</span>
                 } @else if (row.s.wonCount) {
-                  <span class="inline-flex h-6 items-center rounded-md bg-ok-soft px-2 text-xs font-semibold text-ok">{{ t('contacts.customerSince', { date: since(row.s) }) }}</span>
+                  <span class="inline-flex h-6 items-center rounded-md bg-ok-soft px-2 text-xs font-semibold whitespace-nowrap text-ok">{{ t('contacts.customerSince', { date: since(row.s) }) }}</span>
                 } @else {
                   <span class="inline-flex h-6 items-center rounded-md bg-sheet-2 px-2 text-xs font-semibold text-ink-2">{{ t('contacts.prospect') }}</span>
                 }
               </td>
               <td class="px-3 py-2.5 text-right tabular">{{ row.s.openCount }}</td>
-              <td class="px-3 py-2.5 text-right font-semibold tabular">{{ row.s.totalWon ? money(row.s.totalWon) : '—' }}</td>
+              <td class="px-3 py-2.5 text-right font-semibold whitespace-nowrap tabular">{{ row.s.totalWon ? money(row.s.totalWon) : '—' }}</td>
               <td class="px-3 py-2.5"><app-due-chip [date]="row.s.nextAt" [closed]="!row.s.open.length" /></td>
               <td class="px-3 py-2.5 text-right">
                 <app-avatar [name]="members.name(row.c.assigneeId)" [photo]="members.byId().get(row.c.assigneeId)?.photoURL ?? null" size="sm" />
