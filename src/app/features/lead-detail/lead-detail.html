@@ -47,11 +47,15 @@
               [class]="
                 s.id === lead.stage
                   ? (s.id === 'lost' ? 'bg-stage-lost text-white' : s.id === 'won' ? 'bg-stage-won text-white' : 'bg-ink text-white')
-                  : i < stageIndex() && lead.stage !== 'lost'
-                    ? 'bg-pen-soft text-pen-strong hover:bg-pen/15'
-                    : 'border border-rule-strong bg-sheet text-ink-2 hover:border-ink-3 hover:text-ink'
+                  : locked()
+                    ? 'cursor-not-allowed border border-rule bg-sheet-2 text-ink-3'
+                    : i < stageIndex() && lead.stage !== 'lost'
+                      ? 'bg-pen-soft text-pen-strong hover:bg-pen/15'
+                      : 'border border-rule-strong bg-sheet text-ink-2 hover:border-ink-3 hover:text-ink'
               "
               [attr.aria-current]="s.id === lead.stage ? 'step' : null"
+              [disabled]="locked() && s.id !== lead.stage"
+              [attr.aria-describedby]="locked() ? 'won-locked' : null"
               (click)="setStage(s.id)"
             >
               {{ s.label }}
@@ -60,6 +64,13 @@
         }
       </ol>
     </nav>
+
+    @if (locked()) {
+      <p id="won-locked" class="mt-2 flex items-center gap-1.5 text-sm text-ink-2">
+        <svg lucideLock [size]="14" aria-hidden="true" class="shrink-0 text-ink-3"></svg>
+        {{ t('detail.wonLocked') }}
+      </p>
+    }
 
     @if (askLostReason()) {
       <form class="mt-3 flex flex-wrap items-end gap-2 rounded-lg border border-rule bg-sheet p-3" (submit)="confirmLost($event)">
