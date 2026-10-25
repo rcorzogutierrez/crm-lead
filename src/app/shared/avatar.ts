@@ -1,11 +1,11 @@
-import { Component, computed, input } from '@angular/core';
+import { Component, computed, input, linkedSignal } from '@angular/core';
 
-/** Iniciales del miembro (o foto de Google si existe). */
+/** Iniciales del miembro (o foto de Google si existe y carga). */
 @Component({
   selector: 'app-avatar',
   template: `
-    @if (photo()) {
-      <img [src]="photo()" alt="" class="size-full rounded-full object-cover" referrerpolicy="no-referrer" />
+    @if (photo() && !failed()) {
+      <img [src]="photo()" alt="" class="size-full rounded-full object-cover" referrerpolicy="no-referrer" (error)="failed.set(true)" />
     } @else {
       {{ initials() }}
     }
@@ -23,6 +23,9 @@ export class Avatar {
   readonly name = input('');
   readonly photo = input<string | null>(null);
   readonly size = input<'sm' | 'md'>('md');
+
+  /** La foto de Google puede caducar o bloquearse: entonces se muestran las iniciales. Se reintenta si cambia la URL. */
+  protected readonly failed = linkedSignal({ source: this.photo, computation: () => false });
 
   protected readonly initials = computed(() => {
     const parts = this.name().trim().split(/\s+/).filter(Boolean);

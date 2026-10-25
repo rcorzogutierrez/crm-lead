@@ -31,7 +31,7 @@
     </div>
   }
 
-  <div class="mt-8 grid gap-8 lg:grid-cols-[minmax(0,1fr)_21rem]">
+  <div class="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_21rem]">
     <div class="min-w-0 space-y-6">
       <!-- Arrastrado de días anteriores -->
       @if (overdue().length) {
@@ -94,7 +94,7 @@
       </section>
     </div>
 
-    <aside class="space-y-6" [attr.aria-label]="t('today.upcoming')">
+    <aside class="min-w-0 space-y-6" [attr.aria-label]="t('today.upcoming')">
       <section aria-labelledby="orphans-title">
         <div class="flex items-baseline justify-between">
           <h2 id="orphans-title" class="text-sm font-bold">{{ t('today.orphans') }}</h2>
@@ -159,7 +159,7 @@
 
       <section aria-labelledby="pulse-title" class="border-t border-rule-strong pt-4">
         <h2 id="pulse-title" class="sr-only">{{ t('today.pulse') }}</h2>
-        <dl class="grid grid-cols-3 gap-3 text-sm">
+        <dl class="grid grid-cols-[repeat(2,minmax(0,1fr))_auto] gap-3 text-sm">
           <div>
             <dt class="text-xs text-ink-3">{{ t('today.active') }}</dt>
             <dd class="text-lg font-bold tabular">{{ openCount() }}</dd>

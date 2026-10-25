@@ -25,7 +25,7 @@
     <p class="mx-4 mt-4 rounded-lg bg-ribbon-soft px-4 py-3 text-sm font-medium text-ribbon sm:mx-6 lg:mx-10" role="alert">{{ err }}</p>
   }
 
-  <div class="mt-6 flex min-h-0 flex-1 snap-x snap-proximity scroll-px-4 gap-3 overflow-x-auto px-4 sm:scroll-px-6 lg:scroll-px-10 pb-24 sm:px-6 lg:px-10 lg:pb-8">
+  <div class="mt-6 flex min-h-0 flex-1 snap-x snap-proximity scroll-px-4 gap-3 overflow-x-auto overscroll-x-contain px-4 sm:scroll-px-6 lg:scroll-px-10 pb-24 sm:px-6 lg:px-10 lg:pb-8">
     @for (col of columns(); track col.id) {
       <section
         class="flex w-[16rem] shrink-0 snap-start flex-col rounded-page border bg-sheet-2/70 transition-colors duration-150"

@@ -134,7 +134,7 @@
                 @if (pService()?.unit) {
                   <div>
                     <label class="field-label" for="p-qty">{{ t('field.quantity', { unit: pService()!.unit }) }}</label>
-                    <input id="p-qty" class="input tabular" type="number" min="1" step="1" [value]="pQuantity()" (input)="pQuantity.set(+$any($event.target).value || 1)" />
+                    <input id="p-qty" class="input tabular" type="number" inputmode="numeric" min="1" step="1" [value]="pQuantity()" (input)="pQuantity.set(+$any($event.target).value || 1)" />
                   </div>
                 }
               </div>
