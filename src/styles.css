@@ -273,14 +273,19 @@ dialog.drawer[open]::backdrop {
     scale: 1.1;
   }
 }
-/* Renglones de agenda, desvanecidos hacia los bordes */
-.login-lines {
+/* Fondo de agenda que corre (login-agenda.ts): se atenúa detrás del texto y hacia los bordes */
+.login-agenda {
   position: absolute;
   inset: 0;
   z-index: -1;
-  background-image: linear-gradient(oklch(1 0 0 / 0.045) 1px, transparent 1px);
-  background-size: 100% 36px;
-  mask-image: radial-gradient(ellipse at 50% 42%, black 30%, transparent 75%);
+  pointer-events: none;
+  mask-image: radial-gradient(ellipse 44% 30% at 50% 44%, rgb(0 0 0 / 0.4), black 70%);
+}
+@media (max-width: 639px) {
+  /* En el móvil el texto ocupa casi todo el ancho: las citas casi desaparecen detrás de él */
+  .login-agenda {
+    mask-image: radial-gradient(ellipse 75% 36% at 50% 42%, rgb(0 0 0 / 0.2), black 90%);
+  }
 }
 .login-in {
   animation: login-in 720ms var(--ease-out-quart) both;

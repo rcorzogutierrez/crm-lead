@@ -49,6 +49,8 @@ Estrategia: Restrained. Base neutra gris azulada; el índigo solo para acciones 
 
 150–250ms, `cubic-bezier(0.25, 1, 0.5, 1)`. Solo estado: entrada del panel, toasts, transición de vista corta (140ms). Respeta `prefers-reduced-motion`.
 
+Excepción autorizada: el fondo del login, "la agenda corre" (`features/auth/login-agenda.ts`, Canvas 2D). La página de agenda sube despacio con renglones, margen y horas; las citas suben con ella y se marcan con el resaltador al cruzar la cinta roja de "ahora". Cada cambio de palabra del titular trae una cita nueva. Textos de las citas y horas traducidos; con movimiento reducido es una imagen fija.
+
 ## Superficies del navegador
 
 Selección en resaltador, caret y `accent-color` en pluma, scrollbar fina en `rule-strong`, foco 2px pluma.

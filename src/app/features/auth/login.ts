@@ -6,19 +6,21 @@ import { IDLE_MINUTES, IdleService } from '../../core/idle.service';
 import { I18nKey, t } from '../../core/i18n/i18n';
 import { LangSwitch } from '../../shared/lang-switch';
 import { Logo } from '../../shared/logo';
+import { LoginAgenda } from './login-agenda';
 
 /**
- * Entrar ("Pizarra"): fondo pizarra con renglones y un brillo índigo que sigue al cursor,
- * titular con la palabra final rotando (llamada → seguimiento → propuesta), acceso con Google
+ * Entrar ("Pizarra"): fondo de agenda que corre (`LoginAgenda`) y un brillo índigo que sigue al cursor,
+ * titular con la palabra final rotando (llamada → seguimiento → propuesta; cada cambio trae una cita
+ * nueva al fondo), acceso con Google
  * con un destello periódico y garantías que entran escalonadas.
  */
 @Component({
   selector: 'app-login',
-  imports: [Logo, LangSwitch, LucideCheck, LucideClock],
+  imports: [Logo, LangSwitch, LoginAgenda, LucideCheck, LucideClock],
   template: `
     <div class="login-board relative isolate flex min-h-dvh flex-col overflow-hidden text-rail-ink" (pointermove)="follow($event)">
       <span class="login-glow" aria-hidden="true"></span>
-      <span class="login-lines" aria-hidden="true"></span>
+      <app-login-agenda [beat]="word()" />
 
       <header class="login-in flex items-center justify-between gap-3 px-5 py-5 sm:px-8" style="--d: 0ms">
         <div class="flex items-center gap-2.5">
