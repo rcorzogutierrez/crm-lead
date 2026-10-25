@@ -37,6 +37,7 @@
           @case ('leads') { <svg lucideUsers [size]="18" [strokeWidth]="1.75"></svg> }
           @case ('services') { <svg lucidePackage [size]="18" [strokeWidth]="1.75"></svg> }
           @case ('pipeline') { <svg lucideColumns3 [size]="18" [strokeWidth]="1.75"></svg> }
+          @case ('reports') { <svg lucideChartColumn [size]="18" [strokeWidth]="1.75"></svg> }
           @case ('team') { <svg lucideUserRoundCog [size]="18" [strokeWidth]="1.75"></svg> }
         }
         {{ t(item.label) }}
@@ -146,6 +147,7 @@
               @switch (item.icon) {
                 @case ('leads') { <svg lucideUsers [size]="18" [strokeWidth]="1.75"></svg> }
                 @case ('services') { <svg lucidePackage [size]="18" [strokeWidth]="1.75"></svg> }
+                @case ('reports') { <svg lucideChartColumn [size]="18" [strokeWidth]="1.75"></svg> }
                 @default { <svg lucideUserRoundCog [size]="18" [strokeWidth]="1.75"></svg> }
               }
               {{ t(item.label) }}

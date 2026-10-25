@@ -18,7 +18,7 @@ import { toDate } from './firestore-utils';
 import { FollowUpsService } from './followups.service';
 import { t } from './i18n/i18n';
 import { LeadsService } from './leads.service';
-import { Contact, ContactDraft, ContactStats, Lead, isClosed } from './models';
+import { Contact, ContactDraft, ContactStats, Lead, isClosed, wonDate } from './models';
 import { teamQuery } from './team-query';
 
 function mapContact(id: string, d: DocumentData): Contact {
@@ -101,11 +101,6 @@ export function samePhone(a: string, b: string): boolean {
   const y = phoneDigits(b);
   if (x.length < 7 || y.length < 7) return false;
   return x === y || x.endsWith(y) || y.endsWith(x);
-}
-
-/** Fecha en que se ganó un lead (los anteriores a `wonAt` usan su última actualización). */
-export function wonDate(l: Lead): Date | null {
-  return l.wonAt ?? l.updatedAt ?? l.createdAt;
 }
 
 /** Contactos del equipo (prospectos y clientes) y el resumen de sus leads. */
@@ -307,6 +302,7 @@ export class ContactsService {
         stage: 'lost',
         lostReason: reason,
         wonAt: null,
+        lostAt: serverTimestamp(),
         nextFollowUpAt: null,
         updatedAt: serverTimestamp(),
       });

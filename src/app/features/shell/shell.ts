@@ -3,6 +3,7 @@ import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/rou
 import {
   LucideBookUser,
   LucideCalendarDays,
+  LucideChartColumn,
   LucideClock,
   LucideColumns3,
   LucideEllipsis,
@@ -25,7 +26,7 @@ import { CaptureDrawer } from './capture-drawer';
 interface NavItem {
   path: string;
   label: I18nKey;
-  icon: 'today' | 'contacts' | 'leads' | 'pipeline' | 'services' | 'team';
+  icon: 'today' | 'contacts' | 'leads' | 'pipeline' | 'reports' | 'services' | 'team';
 }
 
 /** Marco de la app: riel pizarra (escritorio) o barra inferior (móvil). */
@@ -41,6 +42,7 @@ interface NavItem {
     LangSwitch,
     LucideBookUser,
     LucideCalendarDays,
+    LucideChartColumn,
     LucideClock,
     LucideColumns3,
     LucideEllipsis,
@@ -93,6 +95,7 @@ export class Shell {
     { path: '/contacts', label: 'nav.contacts', icon: 'contacts' },
     { path: '/leads', label: 'nav.leads', icon: 'leads' },
     { path: '/pipeline', label: 'nav.pipeline', icon: 'pipeline' },
+    { path: '/reports', label: 'nav.reports', icon: 'reports' },
     { path: '/services', label: 'nav.services', icon: 'services' },
     { path: '/team', label: 'nav.team', icon: 'team' },
   ];

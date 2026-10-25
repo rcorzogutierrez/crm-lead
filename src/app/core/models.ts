@@ -157,6 +157,13 @@ export interface Lead {
   /** Precio oficial nuevo que se decidió no aplicar (para no volver a avisar). */
   priceAck: number | null;
   wonAt: Date | null;
+  /** Cuándo pasó a Perdido (null en los anteriores a este campo y en los no perdidos). */
+  lostAt: Date | null;
+}
+
+/** Fecha en que se ganó un lead (los anteriores a `wonAt` usan su última actualización). */
+export function wonDate(l: Lead): Date | null {
+  return l.wonAt ?? l.updatedAt ?? l.createdAt;
 }
 
 /** Datos de precio de un lead con servicio. */
@@ -178,6 +185,8 @@ export interface FollowUp {
   note: string;
   status: 'pending' | 'done' | 'cancelled';
   createdBy: string;
+  /** Cuándo se marcó hecho (solo en los `done`). */
+  completedAt: Date | null;
 }
 
 export interface Activity {

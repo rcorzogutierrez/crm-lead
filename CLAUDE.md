@@ -6,7 +6,7 @@ follow-up programado, no del registro.
 
 - Idioma del código de dominio (comentarios): **español**. La interfaz es **bilingüe español/inglés** (español por defecto).
 - **i18n en tiempo de ejecución** (`src/app/core/i18n/`), sin librerías y sin recargar: `t('clave', { param })` lee la signal `lang`, así que plantillas y `computed` se actualizan solas. Ningún texto visible va escrito directo en plantillas o servicios: se añade la clave en `es.ts` **y** en `en.ts` (el tipo de `en.ts` obliga a traducirlas todas). Las etiquetas de `STAGES`/`SOURCES`/`CHANNELS` son getters traducidos; fechas y montos usan `intlLocale()`; los `title` de las rutas son claves (`I18nTitleStrategy`). Selector: `shared/lang-switch.ts` (riel, barra móvil, login); la elección se guarda en `localStorage`. No se usa `@angular/localize` porque compila un bundle por idioma y no permite cambiar en caliente.
-- **URLs en inglés** (`/today`, `/leads`, `/contacts`, `/pipeline`, `/services`, `/team`, `/login`, `/pending`), igual que los parámetros de filtro (`?search=`, `?stage=open`, `?filter=no-action`…). Las rutas y parámetros antiguos en español redirigen desde `core/legacy-urls.ts`; una ruta nueva va en inglés.
+- **URLs en inglés** (`/today`, `/leads`, `/contacts`, `/pipeline`, `/reports`, `/services`, `/team`, `/login`, `/pending`), igual que los parámetros de filtro (`?search=`, `?stage=open`, `?filter=no-action`…). Las rutas y parámetros antiguos en español redirigen desde `core/legacy-urls.ts`; una ruta nueva va en inglés.
 - Skills oficiales de Angular y Firebase en `.claude/skills/` (ver `.claude/skills/README.md`); donde difieran, mandan las convenciones de este archivo.
 - Contexto de producto: `PRODUCT.md`. Sistema visual: `DESIGN.md`. Contrato de dirección de diseño: `.impeccable/surfaces/src-app.md`.
 
@@ -60,6 +60,7 @@ src/app/
     leads/         lista con búsqueda/filtros en la URL
     lead-detail/   ficha: etapas, próxima acción, historial, datos editables
     pipeline/      tablero por etapas (drag & drop, Alt+←/→)
+    reports/       informe semanal del equipo (admin) y "Mis números" (cada vendedor)
     team/          miembros, roles, invitaciones
 ```
 
@@ -72,17 +73,18 @@ src/app/
 | `sessions/{uid}` | última entrada/salida | `signInAt`, `signOutAt`, `signOutReason: manual\|idle` — cada uno escribe solo el suyo con `serverTimestamp()`; solo el admin lee (se muestra en *Equipo*) |
 | `invites/{emailEnMinúsculas}` | invitación | `email`, `role`, `invitedBy` — se consume al entrar |
 | `contacts/{id}` | persona/empresa | `name`, `company`, `email` (minúsculas), `phone`, `assigneeId`, `notes`, `createdBy` + resumen `statsV`, `wonCount`, `wonTotal`, `firstWonAt`, `openBy` (uid → nº abiertos), `archived`, `archivedAt` — "cliente" si `wonCount > 0` |
-| `leads/{id}` | lead = oportunidad (un servicio para un contacto) | `contactId`, copia del contacto (`name`, `company`, `email`, `phone`), `serviceId`, `serviceName`, `detail`, `quantity`, `unitPrice`, `tier`, `tierPct`, `value`, `priceAck`, `source`, `stage`, `wonAt`, `assigneeId`, `notes`, `lostReason`, `nextFollowUpAt`, `lastContactAt`, `createdBy`, timestamps |
+| `leads/{id}` | lead = oportunidad (un servicio para un contacto) | `contactId`, copia del contacto (`name`, `company`, `email`, `phone`), `serviceId`, `serviceName`, `detail`, `quantity`, `unitPrice`, `tier`, `tierPct`, `value`, `priceAck`, `source`, `stage`, `wonAt`, `lostAt`, `assigneeId`, `notes`, `lostReason`, `nextFollowUpAt`, `lastContactAt`, `createdBy`, timestamps |
 | `services/{id}` | catálogo | `name`, `description`, `price` (oficial, por unidad), `unit`, `active` — solo admin escribe; se archivan, no se borran |
 | `meta/pricing` | único | `bronze`, `silver`, `gold` (% sobre el precio oficial; por defecto 3/5/7) — solo admin |
 | `leads/{id}/activities/{id}` | historial | `type` (call, whatsapp, email, meeting, note, stage, created, followup), `body`, `from`/`to`, `createdBy`, `createdAt` |
-| `followups/{id}` | próxima acción | `leadId`, `leadName`, `company`, `assigneeId`, `dueAt`, `channel`, `note`, `status: pending\|done\|cancelled` |
+| `followups/{id}` | próxima acción | `leadId`, `leadName`, `company`, `assigneeId`, `dueAt`, `channel`, `note`, `status: pending\|done\|cancelled`, `completedAt`/`outcome` al hacerlo |
 
 Reglas de dominio:
 - Etapas en orden: `new → contacted → qualified → proposal → negotiation → won | lost`. `won`/`lost` son cerradas y no necesitan follow-up.
 - `leads.nextFollowUpAt` es una **copia desnormalizada** del follow-up pendiente más próximo. Toda escritura de follow-ups (programar, completar, reprogramar, descartar) debe recalcularla en el **mismo batch** (`FollowUpsService`).
 - Completar un follow-up = marcarlo `done` + crear actividad + actualizar `lastContactAt` + (opcional) programar el siguiente, todo en un batch.
-- Cambiar etapa siempre deja una actividad `stage` (`LeadsService.moveToStage`); ganar guarda `wonAt`.
+- Cambiar etapa siempre deja una actividad `stage` (`LeadsService.moveToStage`); ganar guarda `wonAt` y perder `lostAt` (los perdidos anteriores usan `updatedAt`).
+- Reportes (`/reports`, cálculos puros en `core/reports.ts`): el admin ve el informe de la semana (`?week=AAAA-MM-DD`; vencidos, quietos y próximos solo en la semana actual) y puede pasar a sus números (`?view=mine`); un vendedor solo ve "Mis números" (`?period=week|month|quarter`). Los follow-ups hechos se piden puntualmente con `FollowUpsService.doneBetween` (índice `assigneeId, status, dueAt`).
 - Precio: `value = unitPrice × quantity × (100 + tierPct) / 100` (`salePrice`). El vendedor no escribe el precio: elige servicio, cantidad y categoría (bronce por defecto). Las reglas validan que `unitPrice` y `tierPct` sean los vigentes (o los ya pactados) y que un lead ganado no cambie de precio.
 - Cambio de precio oficial: los leads guardan su `unitPrice`; los abiertos muestran aviso (actualizar o mantener → `priceAck`). Los ganados nunca cambian.
 - Editar un contacto copia nombre/empresa/email/teléfono a sus leads y follow-ups pendientes (`ContactsService.update`). Los leads antiguos sin `contactId` se vinculan con el botón del admin en *Clientes* (`migrateLegacy`).

@@ -55,6 +55,11 @@ export const routes: Routes = [
         loadComponent: () => import('./features/pipeline/pipeline').then((m) => m.Pipeline),
       },
       {
+        path: 'reports',
+        title: 'nav.reports',
+        loadComponent: () => import('./features/reports/reports').then((m) => m.Reports),
+      },
+      {
         path: 'services',
         title: 'nav.services',
         loadComponent: () => import('./features/services/services-page').then((m) => m.ServicesPage),
