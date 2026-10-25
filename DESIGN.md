@@ -43,6 +43,8 @@ Estrategia: Restrained. Base neutra gris azulada; el índigo solo para acciones 
 - Confirmaciones en línea (archivar, eliminar, quitar acceso): el foco pasa a la confirmación y vuelve al botón al cancelar. Solo lo irreversible (eliminar) confirma con `.btn-danger`; archivar es reversible y usa `.btn-secondary`.
 - Móvil: las tablas anchas (Servicios, servicios comprados) se vuelven listas apiladas; los filtros segmentados van en una fila que se desliza; los controles de una fila bajan a su propio renglón antes de cortar un nombre. La cuenta se abre desde el avatar (botón de 44px con menú), no cierra sesión al tocarlo.
 
+- Inactividad: el último minuto, un aviso con el aspecto del toast (tinta, reloj en resaltador) con cuenta atrás y "Seguir conectado"; tras el cierre, el login cambia su insignia por una nota translúcida con el motivo.
+
 ## Movimiento
 
 150–250ms, `cubic-bezier(0.25, 1, 0.5, 1)`. Solo estado: entrada del panel, toasts, transición de vista corta (140ms). Respeta `prefers-reduced-motion`.

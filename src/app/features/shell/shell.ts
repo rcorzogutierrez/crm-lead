@@ -1,8 +1,9 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, DestroyRef, computed, effect, inject, signal } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import {
   LucideBookUser,
   LucideCalendarDays,
+  LucideClock,
   LucideColumns3,
   LucideEllipsis,
   LucidePackage,
@@ -13,6 +14,7 @@ import {
 } from '@lucide/angular';
 import { AuthService } from '../../core/auth.service';
 import { FollowUpsService } from '../../core/followups.service';
+import { IdleService } from '../../core/idle.service';
 import { UiService } from '../../core/ui.service';
 import { I18nKey, t } from '../../core/i18n/i18n';
 import { Avatar } from '../../shared/avatar';
@@ -39,6 +41,7 @@ interface NavItem {
     LangSwitch,
     LucideBookUser,
     LucideCalendarDays,
+    LucideClock,
     LucideColumns3,
     LucideEllipsis,
     LucidePackage,
@@ -56,6 +59,7 @@ interface NavItem {
 export class Shell {
   protected readonly auth = inject(AuthService);
   protected readonly ui = inject(UiService);
+  protected readonly idle = inject(IdleService);
   private readonly followUps = inject(FollowUpsService);
   private readonly router = inject(Router);
 
@@ -67,6 +71,22 @@ export class Shell {
   protected readonly hasOverdue = computed(() => this.followUps.overdue().some(this.mine));
 
   protected readonly t = t;
+
+  /** Cuenta atrás del aviso de inactividad, como m:ss. */
+  protected readonly idleLeft = computed(() => {
+    const s = this.idle.remaining() ?? 0;
+    return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+  });
+
+  constructor() {
+    inject(DestroyRef).onDestroy(this.idle.watch());
+    // Sesión cerrada desde otra pestaña (o por inactividad en ella): esta también vuelve a entrar.
+    effect(() => {
+      if (this.auth.status() !== 'signedOut') return;
+      this.idle.signedOut();
+      void this.router.navigateByUrl('/login');
+    });
+  }
 
   protected readonly nav: readonly NavItem[] = [
     { path: '/today', label: 'nav.today', icon: 'today' },
