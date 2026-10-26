@@ -1,23 +1,35 @@
 <header class="flex flex-wrap items-end justify-between gap-4">
   <div class="min-w-0">
     <h1 class="date-face text-[2rem] leading-tight font-bold first-letter:uppercase sm:text-[2.5rem]">{{ title() }}</h1>
-    <p class="mt-1 text-ink-2">{{ t('report.week.sub') }}</p>
+    <p class="mt-1 text-ink-2">{{ t(custom() ? 'report.range.sub' : 'report.week.sub') }}</p>
   </div>
   <div class="flex flex-wrap items-center gap-2">
     <ng-content select="[toggle]" />
-    <div class="flex items-center gap-1">
-      <button type="button" class="btn-secondary btn-icon" (click)="go(-1)" [attr.aria-label]="t('report.prevWeek')" [title]="t('report.prevWeek')">
-        <svg lucideChevronLeft [size]="18"></svg>
+    @if (custom()) {
+      <button type="button" class="btn-secondary" (click)="thisWeek()">{{ t('report.backToWeeks') }}</button>
+    } @else {
+      <div class="flex items-center gap-1">
+        <button type="button" class="btn-secondary btn-icon" (click)="go(-1)" [attr.aria-label]="t('report.prevWeek')" [title]="t('report.prevWeek')">
+          <svg lucideChevronLeft [size]="18"></svg>
+        </button>
+        @if (!isCurrent()) {
+          <button type="button" class="btn-secondary" (click)="thisWeek()">{{ t('report.thisWeek') }}</button>
+        }
+        <button type="button" class="btn-secondary btn-icon" (click)="go(1)" [disabled]="isCurrent()" [attr.aria-label]="t('report.nextWeek')" [title]="t('report.nextWeek')">
+          <svg lucideChevronRight [size]="18"></svg>
+        </button>
+      </div>
+      <button type="button" class="btn-secondary" (click)="pickDates()">
+        <svg lucideCalendarRange [size]="16"></svg>
+        {{ t('report.pickDates') }}
       </button>
-      @if (!isCurrent()) {
-        <button type="button" class="btn-secondary" (click)="thisWeek()">{{ t('report.thisWeek') }}</button>
-      }
-      <button type="button" class="btn-secondary btn-icon" (click)="go(1)" [disabled]="isCurrent()" [attr.aria-label]="t('report.nextWeek')" [title]="t('report.nextWeek')">
-        <svg lucideChevronRight [size]="18"></svg>
-      </button>
-    </div>
+    }
   </div>
 </header>
+
+@if (custom()) {
+  <app-range-picker class="mt-5 block" [from]="fromParam()" [to]="toParam()" [max]="today()" (changed)="setRange($event)" />
+}
 
 @if (error(); as err) {
   <p class="mt-6 rounded-lg bg-ribbon-soft px-4 py-3 text-sm font-medium text-ribbon" role="alert">{{ err }}</p>
@@ -35,7 +47,7 @@
     @let r = report();
     <p class="px-4 py-5 text-[1.0625rem] leading-7 sm:py-6 sm:pr-7 sm:pl-[12.75rem] sm:text-[1.1875rem] sm:leading-[1.875rem]" aria-live="polite">
       {{ summary() }}
-      @if (isCurrent()) {
+      @if (showNow()) {
         @if (r.overdue.length) {
           <mark class="rounded-sm bg-ribbon-soft px-1 font-bold text-ribbon">{{ t(r.overdue.length === 1 ? 'report.sum.overdue1' : 'report.sum.overdueN', { n: r.overdue.length }) }}</mark>
         } @else {
@@ -65,7 +77,7 @@
     <app-report-row [figure]="money(r.wonTotal)" [caption]="t(r.won.length === 1 ? 'report.sale1' : 'report.saleN', { n: r.won.length })" [heading]="t('report.won')">
       @if (r.won.length) {
         <ul>
-          @for (l of r.won; track l.id) {
+          @for (l of r.won.slice(0, listLimit); track l.id) {
             <li class="grid grid-cols-[4.25rem_minmax(0,1fr)_auto] items-baseline gap-3 border-b border-rule py-2 text-sm last:border-b-0">
               <span class="text-ink-2 tabular">{{ wonDay(l) }}</span>
               <span class="min-w-0">
@@ -76,6 +88,9 @@
             </li>
           }
         </ul>
+        @if (r.won.length > listLimit) {
+          <p class="mt-2 text-sm text-ink-2">{{ t('report.more', { n: r.won.length - listLimit }) }}</p>
+        }
       } @else {
         <p class="text-sm text-ink-2">{{ t('report.won.empty') }}</p>
       }
@@ -85,7 +100,7 @@
     <app-report-row [figure]="'' + r.lost.length" [caption]="t(r.lost.length === 1 ? 'report.lost1' : 'report.lostN')" [heading]="t('report.lost')">
       @if (r.lost.length) {
         <ul>
-          @for (l of r.lost; track l.id) {
+          @for (l of r.lost.slice(0, listLimit); track l.id) {
             <li class="grid grid-cols-[4.25rem_minmax(0,1fr)] items-baseline gap-x-3 border-b border-rule py-2 text-sm last:border-b-0 sm:grid-cols-[4.25rem_minmax(0,1fr)_minmax(0,14rem)]">
               <span class="text-ink-2 tabular">{{ lostDay(l) }}</span>
               <span class="min-w-0">
@@ -96,12 +111,15 @@
             </li>
           }
         </ul>
+        @if (r.lost.length > listLimit) {
+          <p class="mt-2 text-sm text-ink-2">{{ t('report.more', { n: r.lost.length - listLimit }) }}</p>
+        }
       } @else {
         <p class="text-sm text-ink-2">{{ t('report.lost.empty') }}</p>
       }
     </app-report-row>
 
-    @if (isCurrent()) {
+    @if (showNow()) {
       <!-- Lo que se está cayendo: vencidos y sin próxima acción -->
       <app-report-row
         [figure]="r.overdue.length + ' + ' + r.orphans.length"

@@ -10,7 +10,10 @@ import { FollowUpsService } from '../../core/followups.service';
 import { I18nKey, intlLocale, t } from '../../core/i18n/i18n';
 import { LeadsService } from '../../core/leads.service';
 import { PriceTier, stageMeta, tierLabel } from '../../core/models';
-import { Period, followUpScore, myNumbers, periodRange, previousRange } from '../../core/reports';
+import { Period, customRange, dayParam, followUpScore, myNumbers, parseDay, periodRange, precedingRange, previousRange, rangeDays } from '../../core/reports';
+import { RangePicker } from './range-picker';
+
+type Choice = Period | 'custom';
 
 const PERIODS: readonly { id: Period; label: I18nKey; current: I18nKey; previous: I18nKey }[] = [
   { id: 'week', label: 'report.period.week', current: 'report.period.thisWeek', previous: 'report.period.prevWeek' },
@@ -28,7 +31,7 @@ const TIER_TONE: Record<PriceTier, string> = {
 /** Mis números: lo que ve cada vendedor de sí mismo (también el admin, sobre sus propios leads). */
 @Component({
   selector: 'app-my-numbers',
-  imports: [RouterLink, LucideChevronRight],
+  imports: [RouterLink, RangePicker, LucideChevronRight],
   templateUrl: './my-numbers.html',
 })
 export class MyNumbersView {
@@ -45,16 +48,36 @@ export class MyNumbersView {
   protected readonly tierTone = TIER_TONE;
 
   private readonly params = toSignal(this.route.queryParamMap, { requireSync: true });
-  protected readonly period = computed<Period>(() => {
-    const p = this.params().get('period');
-    return p === 'week' || p === 'quarter' ? p : 'month';
+  /** Rango elegido a mano (`?period=custom&from=&to=`); sin fechas válidas, del día 1 del mes a hoy. */
+  protected readonly custom = computed(() => {
+    if (this.params().get('period') !== 'custom') return null;
+    const now = this.clock.now();
+    const from = parseDay(this.params().get('from')) ?? new Date(now.getFullYear(), now.getMonth(), 1);
+    const to = parseDay(this.params().get('to')) ?? now;
+    return customRange(from, to);
   });
-  private readonly meta = computed(() => PERIODS.find((p) => p.id === this.period())!);
-  protected readonly range = computed(() => periodRange(this.period(), this.clock.now()));
-  private readonly prev = computed(() => previousRange(this.period(), this.range()));
+  protected readonly period = computed<Choice>(() => {
+    const p = this.params().get('period');
+    return p === 'week' || p === 'quarter' || p === 'custom' ? p : 'month';
+  });
+  private readonly meta = computed(() => PERIODS.find((p) => p.id === this.period()));
+  protected readonly range = computed(() => {
+    const p = this.period();
+    return p === 'custom' ? this.custom()! : periodRange(p, this.clock.now());
+  });
+  /** Un rango a mano se compara con los mismos días justo antes. */
+  private readonly prev = computed(() => {
+    const p = this.period();
+    return p === 'custom' ? precedingRange(this.range()) : previousRange(p, this.range());
+  });
+  protected readonly fromParam = computed(() => dayParam(this.range().start));
+  protected readonly toParam = computed(() => dayParam(addDays(this.range().end, -1)));
+  protected readonly today = computed(() => dayParam(this.clock.now()));
 
   protected readonly rangeLabel = computed(() => {
-    const f = new Intl.DateTimeFormat(intlLocale(), { day: 'numeric', month: 'long' });
+    const { start, end } = this.range();
+    const otherYear = start.getFullYear() !== this.clock.now().getFullYear() || addDays(end, -1).getFullYear() !== start.getFullYear();
+    const f = new Intl.DateTimeFormat(intlLocale(), { day: 'numeric', month: 'long', ...(otherYear ? { year: 'numeric' } : {}) });
     return f.formatRange(this.range().start, addDays(this.range().end, -1));
   });
 
@@ -78,8 +101,14 @@ export class MyNumbersView {
     return { ...s, total, pct: total ? Math.round((s.onTime / total) * 100) : 0 };
   });
 
-  protected readonly currentLabel = computed(() => t(this.meta().current));
-  protected readonly previousLabel = computed(() => t(this.meta().previous));
+  protected readonly currentLabel = computed(() => {
+    const m = this.meta();
+    return m ? t(m.current) : t('report.period.thisRange');
+  });
+  protected readonly previousLabel = computed(() => {
+    const m = this.meta();
+    return m ? t(m.previous) : t('report.period.prevRange', { n: rangeDays(this.range()) });
+  });
 
   /** Barras de "lo que vendí": este periodo frente al anterior, a la misma escala. */
   protected readonly compare = computed(() => {
@@ -97,12 +126,17 @@ export class MyNumbersView {
   protected readonly tiers = computed(() => this.n().tiers.map((x) => ({ ...x, label: tierLabel(x.tier) })));
   protected readonly tierTotal = computed(() => this.n().tiers.reduce((a, x) => a + x.count, 0));
 
-  protected setPeriod(period: Period): void {
-    void this.router.navigate([], {
-      relativeTo: this.route,
-      queryParams: { period: period === 'month' ? null : period },
-      queryParamsHandling: 'merge',
-      replaceUrl: true,
-    });
+  protected setPeriod(period: Choice): void {
+    // Personalizado empieza con las fechas del periodo que se estaba viendo.
+    const custom = period === 'custom' ? { from: this.fromParam(), to: this.toParam() } : { from: null, to: null };
+    this.navigate({ period: period === 'month' ? null : period, ...custom });
+  }
+
+  protected setRange(r: { from: string; to: string }): void {
+    this.navigate({ period: 'custom', from: r.from, to: r.to });
+  }
+
+  private navigate(queryParams: Record<string, string | null>): void {
+    void this.router.navigate([], { relativeTo: this.route, queryParams, queryParamsHandling: 'merge', replaceUrl: true });
   }
 }

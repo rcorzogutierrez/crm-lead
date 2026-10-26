@@ -1,7 +1,7 @@
 import { Component, computed, inject } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { LucideChevronLeft, LucideChevronRight } from '@lucide/angular';
+import { LucideCalendarRange, LucideChevronLeft, LucideChevronRight } from '@lucide/angular';
 import { Clock } from '../../core/clock.service';
 import { addDays, moneyLabel } from '../../core/dates';
 import { FollowUpsService } from '../../core/followups.service';
@@ -9,17 +9,23 @@ import { intlLocale, t } from '../../core/i18n/i18n';
 import { LeadsService } from '../../core/leads.service';
 import { MembersService } from '../../core/members.service';
 import { Lead, channelLabel, sourceLabel, stageMeta, tierLabel, wonDate } from '../../core/models';
-import { STALLED_DAYS, lostDate, weekRange, weekReport } from '../../core/reports';
+import { STALLED_DAYS, customRange, dayParam, inRange, lostDate, parseDay, weekRange, weekReport } from '../../core/reports';
 import { DueChip } from '../../shared/due-chip';
+import { RangePicker } from './range-picker';
 import { ReportRow } from './report-row';
 
 /** Cuántas filas se muestran por sección antes de mandar a la lista completa. */
 const LIMIT = 8;
+/** Ganados y perdidos: un rango largo puede traer muchos; se resume el resto. */
+const LIST_LIMIT = 15;
 
-/** Informe de la semana (admin): qué entró, qué se ganó y perdió, qué se está cayendo y qué viene. */
+/**
+ * Informe del equipo (admin): qué entró, qué se ganó y perdió, qué se está cayendo y qué viene.
+ * Por semanas (`?week=`) o en un rango elegido a mano (`?from=&to=`).
+ */
 @Component({
   selector: 'app-week-report',
-  imports: [RouterLink, DueChip, ReportRow, LucideChevronLeft, LucideChevronRight],
+  imports: [RouterLink, DueChip, ReportRow, RangePicker, LucideCalendarRange, LucideChevronLeft, LucideChevronRight],
   templateUrl: './week-report.html',
 })
 export class WeekReportView {
@@ -33,25 +39,44 @@ export class WeekReportView {
   protected readonly t = t;
   protected readonly money = moneyLabel;
   protected readonly limit = LIMIT;
+  protected readonly listLimit = LIST_LIMIT;
   protected readonly stalledDays = STALLED_DAYS;
 
   private readonly params = toSignal(this.route.queryParamMap, { requireSync: true });
   private readonly current = computed(() => weekRange(this.clock.now()));
+  /** Rango elegido a mano (`?from=&to=`, días incluidos); null = vista por semanas. */
+  protected readonly custom = computed(() => {
+    const from = parseDay(this.params().get('from'));
+    const to = parseDay(this.params().get('to'));
+    return from && to ? customRange(from, to) : null;
+  });
   /** `?week=AAAA-MM-DD`: cualquier día de la semana; una semana futura muestra la actual. */
   protected readonly range = computed(() => {
+    const custom = this.custom();
+    if (custom) return custom;
     const day = parseDay(this.params().get('week'));
     const r = day ? weekRange(day) : this.current();
     return r.start > this.current().start ? this.current() : r;
   });
   protected readonly isCurrent = computed(() => this.range().start.getTime() === this.current().start.getTime());
+  /** Vencidos, quietos y lo que viene son el estado de hoy: solo se muestran si el rango incluye hoy. */
+  protected readonly showNow = computed(() => inRange(this.clock.now(), this.range()));
+  protected readonly fromParam = computed(() => dayParam(this.range().start));
+  protected readonly toParam = computed(() => dayParam(addDays(this.range().end, -1)));
+  protected readonly today = computed(() => dayParam(this.clock.now()));
 
   protected readonly loading = computed(() => this.leads.loading() || this.followUps.loading());
   protected readonly error = computed(() => this.leads.error() || this.followUps.error());
   protected readonly report = computed(() => weekReport(this.leads.leads(), this.followUps.pending(), this.range(), this.clock.now()));
 
   protected readonly title = computed(() => {
-    const f = new Intl.DateTimeFormat(intlLocale(), { day: 'numeric', month: 'long' });
-    return t('report.weekOf', { range: f.formatRange(this.range().start, addDays(this.range().end, -1)) });
+    const { start, end } = this.range();
+    const last = addDays(end, -1);
+    // El año solo si el rango no es del año en curso.
+    const otherYear = start.getFullYear() !== this.clock.now().getFullYear() || last.getFullYear() !== start.getFullYear();
+    const f = new Intl.DateTimeFormat(intlLocale(), { day: 'numeric', month: 'long', ...(otherYear ? { year: 'numeric' } : {}) });
+    const range = f.formatRange(start, last);
+    return this.custom() ? range : t('report.weekOf', { range });
   });
 
   /** Resumen en una frase: entró, se ganó, se perdió. */
@@ -115,26 +140,28 @@ export class WeekReportView {
 
   protected go(weeks: number): void {
     const start = addDays(this.range().start, weeks * 7);
-    this.setWeek(start >= this.current().start ? null : ymd(start));
+    this.setWeek(start >= this.current().start ? null : dayParam(start));
   }
 
   protected thisWeek(): void {
-    this.setWeek(null);
+    this.setParams({ week: null, from: null, to: null });
+  }
+
+  /** Pasa a elegir fechas, empezando por la semana que se está viendo. */
+  protected pickDates(): void {
+    this.setParams({ week: null, from: this.fromParam(), to: this.toParam() });
+  }
+
+  protected setRange(r: { from: string; to: string }): void {
+    this.setParams({ week: null, from: r.from, to: r.to });
   }
 
   private setWeek(week: string | null): void {
-    void this.router.navigate([], { relativeTo: this.route, queryParams: { week }, queryParamsHandling: 'merge', replaceUrl: true });
+    this.setParams({ week, from: null, to: null });
+  }
+
+  private setParams(queryParams: Record<string, string | null>): void {
+    void this.router.navigate([], { relativeTo: this.route, queryParams, queryParamsHandling: 'merge', replaceUrl: true });
   }
 }
 
-function parseDay(value: string | null): Date | null {
-  const m = value?.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if (!m) return null;
-  const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
-  return Number.isNaN(d.getTime()) ? null : d;
-}
-
-function ymd(d: Date): string {
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-}
