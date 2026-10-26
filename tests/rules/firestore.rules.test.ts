@@ -402,6 +402,14 @@ describe('Precio de un lead', () => {
     );
   });
 
+  it('el valor puede llevar centavos (180 × 1 + 3 % = 185.40)', async () => {
+    await seed({ 'services/tour': { name: 'Tour', description: '', price: 180, unit: 'persona', active: true } });
+    const tour = { serviceId: 'tour', serviceName: 'Tour', unitPrice: 180, quantity: 1 };
+    await assertSucceeds(setDoc(doc(db(LUIS), 'leads/n'), lead(LUIS, { ...tour, value: 185.4 })));
+    await assertSucceeds(setDoc(doc(db(LUIS), 'leads/n3'), lead(LUIS, { ...tour, quantity: 3, value: 556.2 })));
+    await assertFails(setDoc(doc(db(LUIS), 'leads/n2'), lead(LUIS, { ...tour, value: 185 })));
+  });
+
   it('no se puede vender por debajo del precio oficial', async () => {
     await assertFails(
       setDoc(doc(db(LUIS), 'leads/n'), lead(LUIS, { unitPrice: 900, value: 1854 })),
