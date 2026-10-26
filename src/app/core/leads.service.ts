@@ -316,6 +316,9 @@ export class LeadsService {
     const batch = writeBatch(this.db);
     acts.forEach((d) => batch.delete(d.ref));
     fus.forEach((d) => batch.delete(d.ref));
+    // Cada factura anulada se lleva sus pagos (deshechos: una con pagos vigentes no se anula).
+    const payments = await Promise.all(voided.map((d) => getDocs(collection(d.ref, 'payments'))));
+    payments.forEach((snap) => snap.docs.forEach((d) => batch.delete(d.ref)));
     voided.forEach((d) => batch.delete(d.ref));
     await batch.commit();
     const counts: CascadeCounts = {

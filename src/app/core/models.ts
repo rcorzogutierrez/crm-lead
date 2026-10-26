@@ -16,7 +16,7 @@ export type LeadSource =
 
 export type ContactChannel = 'call' | 'whatsapp' | 'email' | 'meeting' | 'task';
 
-export type ActivityType = ContactChannel | 'note' | 'stage' | 'created' | 'followup' | 'pricing' | 'invoice';
+export type ActivityType = ContactChannel | 'note' | 'stage' | 'created' | 'followup' | 'pricing' | 'invoice' | 'payment';
 
 /** Motivo de pérdida, de una lista corta para que los reportes puedan agruparlo. */
 export type LostCode = 'price' | 'competitor' | 'noResponse' | 'timing' | 'notFit' | 'other';
@@ -298,6 +298,7 @@ const ACTIVITY_LABEL: Record<ActivityType, I18nKey> = {
   followup: 'act.followup',
   pricing: 'act.pricing',
   invoice: 'act.invoice',
+  payment: 'act.payment',
 };
 
 /** Nombre de un tipo de actividad en el idioma actual. */

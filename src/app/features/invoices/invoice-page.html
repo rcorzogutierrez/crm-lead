@@ -6,7 +6,7 @@
         <svg lucideArrowLeft [size]="16"></svg>
         {{ t('invoice.backToDeal') }}
       </a>
-      <div class="flex flex-wrap gap-2">
+      <div class="flex flex-wrap items-center gap-2">
         @if (auth.isAdmin() && inv.status === 'issued' && !voiding()) {
           <button type="button" class="btn-ghost btn-sm text-ribbon hover:bg-ribbon-soft hover:text-ribbon" [attr.aria-expanded]="false" (click)="voiding.set(true)">
             <svg lucideBan [size]="14"></svg>
@@ -26,7 +26,15 @@
       </div>
     </div>
 
-    @if (voiding()) {
+    @if (voiding() && inv.paid > 0) {
+      <div class="sheet mt-3 border-ribbon/40 p-4 print:hidden" role="note">
+        <p class="text-sm font-semibold">{{ t('pay.voidBlocked') }}</p>
+        <p class="mt-1 text-xs text-ink-2">{{ t('pay.voidBlockedBody', { amount: cents(inv.paid) }) }}</p>
+        <div class="mt-3 flex justify-end">
+          <button type="button" class="btn-ghost btn-sm" (click)="voiding.set(false)">{{ t('common.close') }}</button>
+        </div>
+      </div>
+    } @else if (voiding()) {
       <form class="sheet mt-3 border-ribbon/40 p-4 print:hidden" novalidate (submit)="confirmVoid($event)" [attr.aria-label]="t('invoice.void')">
         <p class="text-sm font-semibold">{{ t('invoice.voidConfirm', { n: number() }) }}</p>
         <p class="mt-1 text-xs text-ink-2">{{ t('invoice.voidHint') }}</p>
@@ -58,6 +66,10 @@
         <div class="mb-6 rounded-lg border-2 border-ribbon px-4 py-3 text-ribbon" role="note">
           <p class="text-sm font-bold tracking-wide uppercase">{{ t('invoice.voidStamp') }}</p>
           <p class="mt-0.5 text-sm">{{ inv.voidReason }}@if (inv.voidedAt) { · {{ date(inv.voidedAt) }}}</p>
+        </div>
+      } @else if (state() === 'paid') {
+        <div class="mb-6 inline-block rounded-lg border-2 border-ok px-4 py-2 text-ok" role="note">
+          <p class="text-sm font-bold tracking-wide uppercase">{{ t('pay.state.paid') }}</p>
         </div>
       }
 
@@ -145,6 +157,16 @@
           <dt class="font-bold">{{ t('invoice.totalUsd') }}</dt>
           <dd class="text-base font-bold">{{ cents(inv.total) }}</dd>
         </div>
+        @if (inv.paid > 0 && inv.status === 'issued') {
+          <div class="flex justify-between gap-6 pt-1">
+            <dt class="text-ink-2">{{ t('pay.received') }}</dt>
+            <dd>−{{ cents(inv.paid) }}</dd>
+          </div>
+          <div class="flex items-baseline justify-between gap-6 border-t border-rule-strong pt-1">
+            <dt class="font-semibold">{{ t('pay.balance') }}</dt>
+            <dd class="font-bold">{{ cents(balance()) }}</dd>
+          </div>
+        }
       </dl>
 
       @if (inv.notes) {
@@ -156,6 +178,14 @@
 
       <p class="mt-10 border-t border-rule pt-3 text-xs text-ink-3">{{ t('invoice.footer', { name: inv.issuedByName }) }}</p>
     </article>
+
+    <!-- Cobro: solo en pantalla (lo pagado y el saldo ya salen en los totales impresos) -->
+    @if (inv.status === 'issued' || inv.paid > 0) {
+      <section class="sheet mt-4 p-4 sm:p-6 print:hidden" aria-labelledby="inv-payments">
+        <h2 id="inv-payments" class="mb-3 text-sm font-bold">{{ t('pay.section') }}</h2>
+        <app-invoice-payments [invoice]="inv" />
+      </section>
+    }
   } @else if (loading()) {
     <div class="space-y-3" aria-hidden="true">
       <div class="h-8 w-48 animate-pulse rounded bg-sheet-2"></div>

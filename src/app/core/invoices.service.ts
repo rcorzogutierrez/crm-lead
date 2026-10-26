@@ -13,6 +13,7 @@ import {
   query,
   serverTimestamp,
   setDoc,
+  where,
   writeBatch,
 } from 'firebase/firestore';
 import { AuthService } from './auth.service';
@@ -22,8 +23,10 @@ import { DeletionsService } from './deletions.service';
 import { FIRESTORE } from './firebase';
 import { toDate } from './firestore-utils';
 import { t } from './i18n/i18n';
-import { InvoiceLine, InvoiceTotals, invoiceLabel, invoiceLines, invoiceTotals } from './invoice-math';
+import { InvoiceLine, InvoiceTotals, PaymentMethod, invoiceBalance, invoiceLabel, invoiceLines, invoiceTotals, round2 } from './invoice-math';
 import { Lead } from './models';
+import { teamQuery } from './team-query';
+import { centsLabel } from './dates';
 
 export interface InvoiceParty {
   name: string;
@@ -68,6 +71,34 @@ export interface Invoice extends InvoiceTotals {
   issuedByName: string;
   voidReason: string;
   voidedAt: Date | null;
+  /** Suma de los pagos vigentes (se sube o baja en el mismo lote que cada pago). */
+  paid: number;
+}
+
+/**
+ * Pago recibido (`invoices/{número}/payments/{id}`). No se borra ni se edita: un admin lo
+ * deshace (queda tachado con el motivo) y lo pagado de la factura baja en el mismo lote.
+ */
+export interface Payment {
+  id: string;
+  amount: number;
+  method: PaymentMethod;
+  paidAt: Date | null;
+  /** Referencia o nota (nº de cheque, últimos dígitos, confirmación de Zelle…). */
+  note: string;
+  createdBy: string;
+  createdByName: string;
+  createdAt: Date | null;
+  undone: boolean;
+  undoReason: string;
+  undoneAt: Date | null;
+}
+
+export interface PaymentInput {
+  amount: number;
+  method: PaymentMethod;
+  paidAt: Date;
+  note: string;
 }
 
 export interface IssueInput {
@@ -122,6 +153,23 @@ function mapInvoice(id: string, d: DocumentData): Invoice {
     issuedByName: str(d['issuedByName']),
     voidReason: str(d['voidReason']),
     voidedAt: toDate(d['voidedAt']),
+    paid: Number(d['paid'] ?? 0),
+  };
+}
+
+function mapPayment(id: string, d: DocumentData): Payment {
+  return {
+    id,
+    amount: Number(d['amount'] ?? 0),
+    method: d['method'] ?? 'other',
+    paidAt: toDate(d['paidAt']),
+    note: str(d['note']),
+    createdBy: str(d['createdBy']),
+    createdByName: str(d['createdByName']),
+    createdAt: toDate(d['createdAt']),
+    undone: d['undone'] === true,
+    undoReason: str(d['undoReason']),
+    undoneAt: toDate(d['undoneAt']),
   };
 }
 
@@ -165,11 +213,43 @@ export class InvoicesService {
     });
   }
 
+  /**
+   * Facturas vigentes (no anuladas), para el saldo por cobrar. Un vendedor solo las suyas
+   * (igualdades sobre dos campos: no necesita índice compuesto).
+   */
+  private readonly live = teamQuery(
+    () =>
+      this.auth.isAdmin()
+        ? query(collection(this.db, 'invoices'), where('status', '==', 'issued'))
+        : query(
+            collection(this.db, 'invoices'),
+            where('assigneeId', '==', this.auth.uid()),
+            where('status', '==', 'issued'),
+          ),
+    mapInvoice,
+  );
+  readonly issued = this.live.data;
+  readonly issuedLoading = this.live.loading;
+  readonly issuedError = this.live.error;
+
   /** Escucha una factura; devuelve la función para dejar de escuchar. */
   watch(id: string, next: (inv: Invoice | null) => void, fail: (err: unknown) => void): () => void {
     return onSnapshot(
       doc(this.db, 'invoices', id),
       (snap) => next(snap.exists() ? mapInvoice(snap.id, snap.data()) : null),
+      fail,
+    );
+  }
+
+  /** Escucha los pagos de una factura, del más reciente al más antiguo. */
+  watchPayments(
+    id: string,
+    next: (list: Payment[]) => void,
+    fail: (err: unknown) => void,
+  ): () => void {
+    return onSnapshot(
+      query(collection(this.db, 'invoices', id, 'payments'), orderBy('paidAt', 'desc')),
+      (snap) => next(snap.docs.map((d) => mapPayment(d.id, d.data()))),
       fail,
     );
   }
@@ -233,8 +313,72 @@ export class InvoicesService {
     return batch;
   }
 
+  /**
+   * Registra un pago: el pago, lo pagado de la factura y una línea en el historial de la venta,
+   * en el mismo lote. Nunca más que el saldo (las reglas lo exigen).
+   */
+  async addPayment(inv: Invoice, input: PaymentInput): Promise<void> {
+    const amount = round2(input.amount);
+    if (!(amount > 0) || amount > invoiceBalance(inv) + 0.005) throw new Error(t('pay.tooMuch'));
+    const user = this.auth.user();
+    const batch = writeBatch(this.db);
+    const ref = doc(collection(this.db, 'invoices', inv.id, 'payments'));
+    batch.set(ref, {
+      amount,
+      method: input.method,
+      paidAt: Timestamp.fromDate(input.paidAt),
+      note: input.note.trim(),
+      createdBy: this.auth.uid(),
+      createdByName: user?.displayName ?? user?.email ?? '',
+      createdAt: serverTimestamp(),
+    });
+    batch.update(doc(this.db, 'invoices', inv.id), {
+      paid: round2(inv.paid + amount),
+      lastPaymentId: ref.id,
+    });
+    const left = invoiceBalance({ total: inv.total, paid: inv.paid + amount });
+    batch.set(doc(collection(this.db, 'leads', inv.leadId, 'activities')), {
+      type: 'payment',
+      body: t(left < 0.005 ? 'pay.activityPaid' : 'pay.activity', {
+        amount: centsLabel(amount),
+        n: invoiceLabel(inv),
+        left: centsLabel(left),
+      }),
+      createdBy: this.auth.uid(),
+      createdAt: serverTimestamp(),
+    });
+    await batch.commit();
+  }
+
+  /** Solo admin: deshace un pago (queda en el historial, tachado) y el saldo vuelve a subir. */
+  async undoPayment(inv: Invoice, p: Payment, reason: string): Promise<void> {
+    const batch = writeBatch(this.db);
+    batch.update(doc(this.db, 'invoices', inv.id, 'payments', p.id), {
+      undone: true,
+      undoReason: reason.trim(),
+      undoneAt: serverTimestamp(),
+      undoneBy: this.auth.uid(),
+    });
+    batch.update(doc(this.db, 'invoices', inv.id), {
+      paid: Math.max(0, round2(inv.paid - p.amount)),
+      lastPaymentId: p.id,
+    });
+    batch.set(doc(collection(this.db, 'leads', inv.leadId, 'activities')), {
+      type: 'payment',
+      body: t('pay.activityUndone', {
+        amount: centsLabel(p.amount),
+        n: invoiceLabel(inv),
+        reason: reason.trim(),
+      }),
+      createdBy: this.auth.uid(),
+      createdAt: serverTimestamp(),
+    });
+    await batch.commit();
+  }
+
   /** Solo admin: anula la factura y libera la venta para volver a facturarla. */
   async void(inv: Invoice, reason: string): Promise<void> {
+    if (inv.paid > 0) throw new Error(t('pay.voidBlocked'));
     const batch = writeBatch(this.db);
     batch.update(doc(this.db, 'invoices', inv.id), {
       status: 'void',
@@ -256,9 +400,11 @@ export class InvoicesService {
    * Solo admin: borra una factura ya anulada (las vigentes se anulan antes) y lo anota en el
    * registro de borrados. Su número queda libre si se baja el contador.
    */
-  remove(inv: Invoice): Promise<void> {
-    if (inv.status !== 'void') return Promise.reject(new Error(t('invoice.deleteOnlyVoid')));
+  async remove(inv: Invoice): Promise<void> {
+    if (inv.status !== 'void') throw new Error(t('invoice.deleteOnlyVoid'));
     const batch = writeBatch(this.db);
+    // Los pagos (todos deshechos, si no la factura no estaría anulada) se van con ella.
+    await this.deletePayments(batch, inv.id);
     batch.delete(doc(this.db, 'invoices', inv.id));
     this.deletions.record(batch, {
       kind: 'invoice',
@@ -267,7 +413,14 @@ export class InvoicesService {
       detail: inv.voidReason,
       snapshot: inv,
     });
-    return batch.commit();
+    await batch.commit();
+  }
+
+  /** Añade al lote el borrado de los pagos de una factura (al borrarla, en cascada o no). */
+  async deletePayments(batch: WriteBatch, invoiceId: string): Promise<number> {
+    const snap = await getDocs(collection(this.db, 'invoices', invoiceId, 'payments'));
+    snap.docs.forEach((d) => batch.delete(d.ref));
+    return snap.size;
   }
 
   /** Solo admin: número de la última factura que existe (0 si no hay ninguna). */

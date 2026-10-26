@@ -10,6 +10,7 @@ import { invoiceLabel } from '../core/invoice-math';
 import { Invoice, InvoicesService } from '../core/invoices.service';
 import { Lead } from '../core/models';
 import { ToastService } from '../core/toast.service';
+import { InvoicePayments } from './invoice-payments';
 
 /**
  * Factura de una venta ganada, en la ficha del negocio. Si no tiene, el responsable (o un
@@ -18,7 +19,7 @@ import { ToastService } from '../core/toast.service';
 @Component({
   selector: 'app-deal-invoice',
   host: { class: 'block' },
-  imports: [RouterLink, LucideFileText],
+  imports: [RouterLink, LucideFileText, InvoicePayments],
   template: `
     <section aria-labelledby="inv-title">
       <h2 id="inv-title" class="text-sm font-bold">{{ t('invoice.section') }}</h2>
@@ -30,11 +31,12 @@ import { ToastService } from '../core/toast.service';
               <div class="min-w-0 flex-1">
                 <p class="font-semibold tabular">{{ label(inv) }}</p>
                 <p class="text-[0.8125rem] text-ink-2 tabular">
-                  {{ t('invoice.issuedOn', { date: date(inv.issuedAt) }) }} · {{ t('invoice.total') }} {{ cents(inv.total) }}
+                  {{ t('invoice.issuedOn', { date: date(inv.issuedAt) }) }}
                 </p>
               </div>
               <a class="btn-secondary btn-sm" [routerLink]="['/invoices', inv.id]">{{ t('invoice.open') }}</a>
             </div>
+            <app-invoice-payments class="mt-4 border-t border-rule pt-3" [invoice]="inv" />
           } @else if (loadError()) {
             <p class="text-sm text-ribbon" role="alert">{{ loadError() }}</p>
           } @else {

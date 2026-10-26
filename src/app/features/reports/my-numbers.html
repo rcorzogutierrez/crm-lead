@@ -174,5 +174,27 @@
         <p class="text-sm text-ink-2">{{ t('report.mine.noTiers') }}</p>
       }
     </section>
+
+    <!-- Por cobrar: mis facturas con saldo -->
+    @let rc = receivable();
+    @if (rc.rows.length) {
+      <section
+        class="sheet flex flex-col gap-3 p-5 md:col-span-2"
+        aria-labelledby="mine-receivable"
+      >
+        <div class="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 id="mine-receivable" class="text-base font-bold">{{ t('report.receivable') }}</h2>
+          <span class="text-sm tabular">
+            <b>{{ cents(rc.total) }}</b>
+            @if (rc.overdueCount) {
+              <span class="font-semibold text-ribbon">
+                · {{ t('report.receivable.late', { amount: cents(rc.overdue) }) }}</span
+              >
+            }
+          </span>
+        </div>
+        <app-receivable-list [rows]="rc.rows" />
+      </section>
+    }
   </div>
 }

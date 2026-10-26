@@ -4,7 +4,7 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { LucideChevronRight } from '@lucide/angular';
 import { AuthService } from '../../core/auth.service';
 import { Clock } from '../../core/clock.service';
-import { addDays, moneyLabel } from '../../core/dates';
+import { addDays, centsLabel, moneyLabel } from '../../core/dates';
 import { firestoreErrorMessage } from '../../core/firestore-utils';
 import { FollowUpsService } from '../../core/followups.service';
 import { I18nKey, intlLocale, t } from '../../core/i18n/i18n';
@@ -12,6 +12,9 @@ import { LeadsService } from '../../core/leads.service';
 import { PriceTier, stageMeta, tierLabel } from '../../core/models';
 import { Period, customRange, dayParam, followUpScore, myNumbers, parseDay, periodRange, precedingRange, previousRange, rangeDays } from '../../core/reports';
 import { RangePicker } from './range-picker';
+import { ReceivableList } from './receivable-list';
+import { InvoicesService } from '../../core/invoices.service';
+import { receivables } from '../../core/invoice-math';
 
 type Choice = Period | 'custom';
 
@@ -31,7 +34,7 @@ const TIER_TONE: Record<PriceTier, string> = {
 /** Mis números: lo que ve cada vendedor de sí mismo (también el admin, sobre sus propios leads). */
 @Component({
   selector: 'app-my-numbers',
-  imports: [RouterLink, RangePicker, LucideChevronRight],
+  imports: [RouterLink, RangePicker, ReceivableList, LucideChevronRight],
   templateUrl: './my-numbers.html',
 })
 export class MyNumbersView {
@@ -41,9 +44,11 @@ export class MyNumbersView {
   private readonly auth = inject(AuthService);
   private readonly leads = inject(LeadsService);
   private readonly followUps = inject(FollowUpsService);
+  private readonly invoices = inject(InvoicesService);
 
   protected readonly t = t;
   protected readonly money = moneyLabel;
+  protected readonly cents = centsLabel;
   protected readonly periods = PERIODS;
   protected readonly tierTone = TIER_TONE;
 
@@ -85,6 +90,10 @@ export class MyNumbersView {
   protected readonly error = this.leads.error;
   private readonly mine = computed(() => this.leads.leads().filter((l) => l.assigneeId === this.auth.uid()));
   protected readonly n = computed(() => myNumbers(this.mine(), this.range(), this.prev()));
+  /** Mis facturas con saldo (el admin escucha todas: aquí solo las suyas). Estado de hoy. */
+  protected readonly receivable = computed(() =>
+    receivables(this.invoices.issued().filter((i) => i.assigneeId === this.auth.uid()), this.clock.now()),
+  );
   protected readonly overdue = computed(() => this.followUps.overdue().filter((f) => f.assigneeId === this.auth.uid()).length);
 
   /** Follow-ups hechos con fecha en el periodo: se piden a Firestore (la app solo escucha los pendientes). */
