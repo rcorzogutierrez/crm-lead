@@ -13,6 +13,9 @@ import { Lead, channelLabel, sourceLabel, lostReasonLabel, stageMeta, tierLabel,
 import { STALLED_DAYS, customRange, dayParam, inRange, lostDate, parseDay, weekRange, weekReport } from '../../core/reports';
 import { DueChip } from '../../shared/due-chip';
 import { RangePicker } from './range-picker';
+import { ReceivableList } from './receivable-list';
+import { InvoicesService } from '../../core/invoices.service';
+import { receivables } from '../../core/invoice-math';
 import { ReportRow } from './report-row';
 
 /** Cuántas filas se muestran por sección antes de mandar a la lista completa. */
@@ -26,7 +29,7 @@ const LIST_LIMIT = 15;
  */
 @Component({
   selector: 'app-week-report',
-  imports: [RouterLink, DueChip, ReportRow, RangePicker, LucideCalendarRange, LucideChevronLeft, LucideChevronRight],
+  imports: [RouterLink, DueChip, ReportRow, RangePicker, ReceivableList, LucideCalendarRange, LucideChevronLeft, LucideChevronRight],
   templateUrl: './week-report.html',
 })
 export class WeekReportView {
@@ -35,6 +38,7 @@ export class WeekReportView {
   private readonly clock = inject(Clock);
   private readonly leads = inject(LeadsService);
   private readonly followUps = inject(FollowUpsService);
+  private readonly invoices = inject(InvoicesService);
   protected readonly members = inject(MembersService);
 
   protected readonly t = t;
@@ -67,8 +71,10 @@ export class WeekReportView {
   protected readonly toParam = computed(() => dayParam(addDays(this.range().end, -1)));
   protected readonly today = computed(() => dayParam(this.clock.now()));
 
-  protected readonly loading = computed(() => this.leads.loading() || this.followUps.loading());
-  protected readonly error = computed(() => this.leads.error() || this.followUps.error());
+  protected readonly loading = computed(() => this.leads.loading() || this.followUps.loading() || this.invoices.issuedLoading());
+  protected readonly error = computed(() => this.leads.error() || this.followUps.error() || this.invoices.issuedError());
+  /** Saldo por cobrar de todo el equipo (estado de hoy, como vencidos y quietos). */
+  protected readonly receivable = computed(() => receivables(this.invoices.issued(), this.clock.now()));
   protected readonly report = computed(() => weekReport(this.leads.leads(), this.followUps.pending(), this.range(), this.clock.now()));
 
   protected readonly title = computed(() => {

@@ -841,4 +841,96 @@ describe('Facturas', () => {
     // Anulada, la venta se vuelve a facturar con el número siguiente.
     await assertSucceeds(issue(LUIS, 2));
   });
+
+  // Factura 1 de luis: total 2204.2.
+  function pay(
+    uid: string,
+    amount: number,
+    paid: number,
+    id = `p${Math.round(paid * 100)}`,
+    extra: Record<string, unknown> = {},
+  ) {
+    const fs = db(uid);
+    const batch = writeBatch(fs);
+    batch.set(doc(fs, 'invoices/1/payments', id), {
+      amount,
+      method: 'zelle',
+      paidAt: Timestamp.now(),
+      note: '',
+      createdBy: uid,
+      createdByName: uid,
+      createdAt: serverTimestamp(),
+      ...extra,
+    });
+    batch.update(doc(fs, 'invoices/1'), { paid, lastPaymentId: id });
+    return batch.commit();
+  }
+  function undo(uid: string, id: string, paid: number, reason = 'Monto equivocado') {
+    const fs = db(uid);
+    const batch = writeBatch(fs);
+    batch.update(doc(fs, 'invoices/1/payments', id), {
+      undone: true,
+      undoReason: reason,
+      undoneAt: serverTimestamp(),
+      undoneBy: uid,
+    });
+    batch.update(doc(fs, 'invoices/1'), { paid, lastPaymentId: id });
+    return batch.commit();
+  }
+
+  it('el responsable registra abonos hasta el total; lo pagado sube con cada pago', async () => {
+    await assertSucceeds(issue(LUIS, 1));
+    await assertSucceeds(pay(LUIS, 1000, 1000));
+    await assertSucceeds(getDocs(collection(db(LUIS), 'invoices/1/payments')));
+    await assertFails(getDocs(collection(db(PEDRO), 'invoices/1/payments')));
+    // Más que el saldo, o lo pagado de la factura sin cuadrar con el pago.
+    await assertFails(pay(LUIS, 1300, 2300));
+    await assertFails(pay(LUIS, 100, 1500));
+    await assertFails(pay(LUIS, 0, 1000));
+    await assertFails(pay(LUIS, 100, 1100, 'px', { method: 'bitcoin' }));
+    // Lo pagado no se toca sin un pago en el mismo lote.
+    await assertFails(
+      updateDoc(doc(db(LUIS), 'invoices/1'), { paid: 2204.2, lastPaymentId: 'p100000' }),
+    );
+    await assertFails(updateDoc(doc(db(LUIS), 'invoices/1'), { paid: 2204.2 }));
+    // Otro vendedor no paga una factura ajena; el admin sí. Completa el total.
+    await assertFails(pay(PEDRO, 100, 1100));
+    await assertSucceeds(pay(ANA, 1204.2, 2204.2));
+    await assertFails(pay(ANA, 1, 2205.2));
+  });
+
+  it('un pago no se edita ni se borra; solo un admin lo deshace y el saldo vuelve', async () => {
+    await assertSucceeds(issue(LUIS, 1));
+    await assertSucceeds(pay(LUIS, 500, 500, 'a'));
+    await assertFails(updateDoc(doc(db(LUIS), 'invoices/1/payments/a'), { amount: 50 }));
+    await assertFails(deleteDoc(doc(db(ANA), 'invoices/1/payments/a')));
+    await assertFails(undo(LUIS, 'a', 0));
+    await assertFails(undo(ANA, 'a', 100));
+    await assertFails(undo(ANA, 'a', 0, ''));
+    await assertSucceeds(undo(ANA, 'a', 0));
+    // No se deshace dos veces.
+    await assertFails(undo(ANA, 'a', 0));
+  });
+
+  it('una factura con pagos vigentes no se anula; deshechos, sí', async () => {
+    await assertSucceeds(issue(LUIS, 1));
+    await assertSucceeds(pay(LUIS, 500, 500, 'a'));
+    const voidIt = () => {
+      const fs = db(ANA);
+      const batch = writeBatch(fs);
+      batch.update(doc(fs, 'invoices/1'), {
+        status: 'void',
+        voidReason: 'Error',
+        voidedAt: serverTimestamp(),
+        voidedBy: ANA,
+      });
+      batch.update(doc(fs, 'leads/luis-won'), { invoiceId: null });
+      return batch.commit();
+    };
+    await assertFails(voidIt());
+    await assertSucceeds(undo(ANA, 'a', 0));
+    await assertSucceeds(voidIt());
+    // Anulada, no admite pagos.
+    await assertFails(pay(ANA, 100, 100, 'b'));
+  });
 });

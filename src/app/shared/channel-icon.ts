@@ -1,6 +1,7 @@
 import { Component, computed, input } from '@angular/core';
 import {
   LucideArrowRightLeft,
+  LucideBanknote,
   LucideCalendarCheck,
   LucideDynamicIcon,
   LucideFileText,
@@ -27,6 +28,7 @@ const ICONS = {
   followup: LucideCalendarCheck,
   pricing: LucideTag,
   invoice: LucideFileText,
+  payment: LucideBanknote,
 } as const;
 
 @Component({

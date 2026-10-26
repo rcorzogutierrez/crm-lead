@@ -184,6 +184,30 @@
         }
       </app-report-row>
 
+      <!-- Lo que falta cobrar: facturas vigentes con saldo -->
+      @let rc = receivable();
+      <app-report-row
+        [figure]="money(rc.total)"
+        [caption]="
+          t(rc.rows.length === 1 ? 'report.receivable.caption1' : 'report.receivable.captionN', {
+            n: rc.rows.length,
+          })
+        "
+        [heading]="t('report.receivable')"
+        [alert]="rc.overdueCount > 0"
+      >
+        @if (rc.rows.length) {
+          @if (rc.overdueCount) {
+            <p class="mb-1 text-sm font-semibold text-ribbon">
+              {{ t('report.receivable.late', { amount: money(rc.overdue) }) }}
+            </p>
+          }
+          <app-receivable-list [rows]="rc.rows" [limit]="limit" [showOwner]="true" />
+        } @else {
+          <p class="text-sm text-ok">{{ t('report.receivable.empty') }}</p>
+        }
+      </app-report-row>
+
       <!-- Lo que viene -->
       <app-report-row [figure]="'' + upcomingTotal()" [caption]="t('report.next.caption')" [heading]="t('report.next')">
         <ol class="grid max-w-xl grid-cols-7 gap-2 sm:gap-3">

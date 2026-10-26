@@ -478,7 +478,7 @@ service cloud.firestore {
     }
 
     function activityTypes() {
-      return ['call', 'whatsapp', 'email', 'meeting', 'note', 'stage', 'created', 'followup', 'pricing', 'invoice'];
+      return ['call', 'whatsapp', 'email', 'meeting', 'note', 'stage', 'created', 'followup', 'pricing', 'invoice', 'payment'];
     }
     function followUpChannels() {
       return ['call', 'whatsapp', 'email', 'meeting', 'task'];
@@ -551,10 +551,19 @@ service cloud.firestore {
         && request.resource.data.taxRate == get(companyPath()).data.taxRate
         && invoiceTotals(request.resource.data)
         && invoiceLeadOk(request.resource.data, invoiceId);
-      // Solo un admin anula (con motivo) o la pasa al nuevo responsable de la venta.
-      allow update: if isAdmin() && (
+      // Solo un admin anula (con motivo, y sin pagos vigentes) o la pasa al nuevo responsable
+      // de la venta. Lo pagado lo mueve un pago en el mismo lote (ver payments).
+      allow update: if (isMember() && (isMine(resource.data) || adminRole())
+          && changedOnly(['paid', 'lastPaymentId'])
+          && resource.data.status == 'issued'
+          && request.resource.data.paid is number
+          && request.resource.data.paid >= 0
+          && request.resource.data.paid <= resource.data.total + 0.005
+          && paymentMoved(invoiceId, request.resource.data.lastPaymentId))
+        || isAdmin() && (
         (changedOnly(['status', 'voidReason', 'voidedAt', 'voidedBy'])
           && resource.data.status == 'issued'
+          && resource.data.get('paid', 0) < 0.005
           && request.resource.data.status == 'void'
           && request.resource.data.voidedBy == request.auth.uid
           && request.resource.data.voidedAt == request.time
@@ -563,6 +572,54 @@ service cloud.firestore {
         || changedOnly(['assigneeId']));
       allow delete: if false;
     }
+    // ---- Pagos de una factura ----
+    // Abonos hasta completar el total. Registra el responsable de la factura o un admin; solo
+    // un admin deshace uno (queda tachado). Cada cambio mueve lo pagado de la factura en el
+    // mismo lote, y la factura exige que ese pago cambie con ella.
+    function paymentPath(invoiceId, paymentId) {
+      return /databases/$(database)/documents/invoices/$(invoiceId)/payments/$(paymentId);
+    }
+    // El pago se crea o se deshace en este mismo lote.
+    function paymentMoved(invoiceId, paymentId) {
+      let p = paymentPath(invoiceId, paymentId);
+      return paymentId is string && (
+        (!exists(p) && existsAfter(p))
+        || (exists(p) && get(p).data.get('undone', false) == false && getAfter(p).data.get('undone', false) == true));
+    }
+    function paymentMethods() {
+      return ['cash', 'card', 'transfer', 'zelle', 'check', 'other'];
+    }
+    match /invoices/{invoiceId}/payments/{paymentId} {
+      allow read: if isAdmin() || (isMember() && get(invoicePath(invoiceId)).data.assigneeId == request.auth.uid);
+      allow create: if isMember()
+        && request.resource.data.keys().hasOnly(['amount', 'method', 'paidAt', 'note', 'createdBy', 'createdByName', 'createdAt'])
+        && paymentCreateOk(get(invoicePath(invoiceId)).data, getAfter(invoicePath(invoiceId)).data, request.resource.data);
+      allow update: if isAdmin()
+        && changedOnly(['undone', 'undoReason', 'undoneAt', 'undoneBy'])
+        && resource.data.get('undone', false) == false
+        && request.resource.data.undone == true
+        && request.resource.data.undoneBy == request.auth.uid
+        && request.resource.data.undoneAt == request.time
+        && isString(request.resource.data.undoReason, 500)
+        && request.resource.data.undoReason.size() > 0
+        && math.abs(getAfter(invoicePath(invoiceId)).data.paid
+             - (get(invoicePath(invoiceId)).data.get('paid', 0) - resource.data.amount)) < 0.005;
+      allow delete: if false;
+    }
+    function paymentCreateOk(inv, after, d) {
+      return (adminRole() || inv.assigneeId == request.auth.uid)
+        && inv.status == 'issued'
+        && d.amount is number && d.amount > 0
+        && d.amount <= inv.total - inv.get('paid', 0) + 0.005
+        && math.abs(after.paid - (inv.get('paid', 0) + d.amount)) < 0.005
+        && d.method in paymentMethods()
+        && d.paidAt is timestamp && d.paidAt <= request.time + duration.value(2, 'd')
+        && isString(d.note, 500)
+        && d.createdBy == request.auth.uid
+        && isString(d.createdByName, 200)
+        && d.createdAt == request.time;
+    }
+
     // La venta es del que factura (o la factura un admin), está ganada, no tenía factura y queda
     // apuntando a esta; el subtotal es su valor.
     function invoiceLeadOk(d, id) {

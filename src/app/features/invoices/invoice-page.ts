@@ -2,14 +2,16 @@ import { Component, computed, effect, inject, input, signal } from '@angular/cor
 import { RouterLink } from '@angular/router';
 import { LucideArrowLeft, LucideBan, LucidePrinter } from '@lucide/angular';
 import { AuthService } from '../../core/auth.service';
+import { Clock } from '../../core/clock.service';
 import { CompanyService } from '../../core/company.service';
 import { centsLabel, dateLabel } from '../../core/dates';
 import { firestoreErrorMessage } from '../../core/firestore-utils';
 import { t } from '../../core/i18n/i18n';
-import { invoiceLabel } from '../../core/invoice-math';
+import { invoiceBalance, invoiceLabel, payState } from '../../core/invoice-math';
 import { Invoice, InvoicesService } from '../../core/invoices.service';
 import { ToastService } from '../../core/toast.service';
 import { EmptyState } from '../../shared/empty-state';
+import { InvoicePayments } from '../../shared/invoice-payments';
 
 /**
  * Factura lista para imprimir o guardar en PDF (el diálogo de impresión del navegador).
@@ -17,7 +19,7 @@ import { EmptyState } from '../../shared/empty-state';
  */
 @Component({
   selector: 'app-invoice-page',
-  imports: [RouterLink, EmptyState, LucideArrowLeft, LucidePrinter, LucideBan],
+  imports: [RouterLink, EmptyState, InvoicePayments, LucideArrowLeft, LucidePrinter, LucideBan],
   templateUrl: './invoice-page.html',
 })
 export class InvoicePage {
@@ -25,6 +27,7 @@ export class InvoicePage {
   protected readonly companies = inject(CompanyService);
   private readonly invoices = inject(InvoicesService);
   private readonly toast = inject(ToastService);
+  private readonly clock = inject(Clock);
 
   readonly id = input.required<string>();
 
@@ -47,6 +50,14 @@ export class InvoicePage {
   protected readonly issuerName = computed(() => {
     const i = this.invoice()?.issuer;
     return i ? i.tradeName || i.legalName : '';
+  });
+  protected readonly state = computed(() => {
+    const inv = this.invoice();
+    return inv ? payState(inv, this.clock.now()) : 'issued';
+  });
+  protected readonly balance = computed(() => {
+    const inv = this.invoice();
+    return inv ? invoiceBalance(inv) : 0;
   });
   /** La base imponible solo se muestra si no es todo el subtotal. */
   protected readonly partialTax = computed(() => {
