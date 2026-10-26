@@ -23,6 +23,18 @@ export interface EditLine {
   quantity: number;
 }
 
+/** Tope de cantidad por línea (evita un error de tecleo con ceros de más). */
+export const MAX_QUANTITY = 100_000;
+
+/**
+ * Cantidad válida de lo tecleado: mayor que cero, con hasta dos decimales (2,5 metros,
+ * 1,5 horas); null si no sirve. Las reglas aceptan cualquier número positivo.
+ */
+export function parseQuantity(raw: unknown): number | null {
+  const n = Math.round(Number(typeof raw === 'string' ? raw.replace(',', '.') : raw) * 100) / 100;
+  return Number.isFinite(n) && n > 0 && n <= MAX_QUANTITY ? n : null;
+}
+
 /** Máximo de servicios por negocio: las reglas validan uno por uno y tienen un tope de cálculo. */
 export const MAX_LINES = 4;
 
@@ -69,7 +81,7 @@ export function pricedLines(edit: readonly EditLine[], catalog: ReadonlyMap<stri
   for (const e of edit) {
     const svc = catalog.get(e.serviceId);
     if (!svc) continue;
-    const quantity = svc.unit ? Math.max(1, Math.floor(Number(e.quantity) || 1)) : 1;
+    const quantity = svc.unit ? (parseQuantity(e.quantity) ?? 1) : 1;
     const prev = before[out.length];
     const kept = prev?.serviceId === svc.id ? prev : undefined;
     out.push({

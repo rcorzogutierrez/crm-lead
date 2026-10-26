@@ -5,7 +5,7 @@ import { RouterLink } from '@angular/router';
 import { LucideBadgeCheck, LucideCalendarClock, LucidePlus, LucideUserRound, LucideX } from '@lucide/angular';
 import { CatalogService } from '../../core/catalog.service';
 import { ContactsService } from '../../core/contacts.service';
-import { moneyLabel } from '../../core/dates';
+import { moneyLabel, qtyLabel, unitPriceLabel } from '../../core/dates';
 import { AuthService } from '../../core/auth.service';
 import { firestoreErrorMessage } from '../../core/firestore-utils';
 import { FollowUpsService } from '../../core/followups.service';
@@ -113,6 +113,8 @@ export class CaptureDrawer {
   protected readonly priced = computed(() => pricedLines(this.lines(), this.catalog.byId()));
   protected readonly official = computed(() => linesOfficial(this.priced()));
   protected readonly money = moneyLabel;
+  protected readonly unitPrice = unitPriceLabel;
+  protected readonly qty = qtyLabel;
   protected readonly value = computed(() => linesValue(this.priced(), this.catalog.rate(this.tier())));
 
   /** Cómo quedó: "open" = le interesa (sigue con próxima acción), "won" = ya compró. */

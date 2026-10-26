@@ -83,6 +83,14 @@
         <dd class="h-2.5 rounded-r-[4px] rounded-l-[2px] bg-margin" [style.width.%]="compare().previous" aria-hidden="true"></dd>
         <dd class="text-right text-ink-2 tabular">{{ money(num.prevTotal) }}</dd>
       </dl>
+      @if (soldByKind().length) {
+        <p class="flex flex-wrap gap-x-4 gap-y-1 text-[0.8125rem] text-ink-2 tabular">
+          <span>{{ t('report.byKind') }}</span>
+          @for (x of soldByKind(); track x.kind) {
+            <span>{{ x.label }} <b class="text-ink">{{ money(x.total) }}</b></span>
+          }
+        </p>
+      }
       <p class="text-sm">
         @if (num.change !== null) {
           <b class="tabular" [class]="num.change >= 0 ? 'text-ok' : 'text-ribbon'">{{ num.change >= 0 ? '+' : '−' }}{{ num.change < 0 ? -num.change : num.change }} %</b>

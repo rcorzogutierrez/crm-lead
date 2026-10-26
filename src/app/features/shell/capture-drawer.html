@@ -182,7 +182,7 @@
                   @if (priced().length > 1) {
                     {{ t('capture.officialMulti', { total: money(official()), n: priced().length }) }}
                   } @else if (catalog.byId().get(priced()[0].serviceId)?.unit) {
-                    {{ t('capture.officialQty', { qty: priced()[0].quantity, price: money(priced()[0].unitPrice), total: money(official()) }) }}
+                    {{ t('capture.officialQty', { qty: qty(priced()[0].quantity), price: unitPrice(priced()[0].unitPrice), total: money(official()) }) }}
                   } @else {
                     {{ t('capture.official', { total: money(official()) }) }}
                   }

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { DealLine, dealLines, linesPricing, linesValue, pricedLines, staleLines } from './deal-lines';
 import { ServiceItem } from './models';
 
-const svc = (id: string, price: number, unit = 'persona'): ServiceItem => ({ id, name: id, description: '', price, unit, active: true, taxable: true });
+const svc = (id: string, price: number, unit = 'persona'): ServiceItem => ({ id, kind: 'service', name: id, description: '', price, unit, active: true, taxable: true });
 const catalog = new Map([
   ['paquete', svc('paquete', 1200)],
   ['tour', svc('tour', 180)],

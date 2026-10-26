@@ -1,5 +1,5 @@
 import { FollowUp, Lead } from './models';
-import { customRange, dayParam, followUpScore, myNumbers, parseDay, periodRange, precedingRange, previousRange, weekRange, weekReport } from './reports';
+import { customRange, dayParam, followUpScore, myNumbers, salesByKind, parseDay, periodRange, precedingRange, previousRange, weekRange, weekReport } from './reports';
 
 function lead(p: Partial<Lead>): Lead {
   return {
@@ -156,5 +156,34 @@ describe('mis números', () => {
         { dueAt: due, completedAt: new Date(2026, 9, 21, 8) },
       ]),
     ).toEqual({ onTime: 2, late: 1 });
+  });
+});
+
+describe('ventas por tipo', () => {
+  const kinds: Record<string, 'service' | 'product' | 'material'> = { tour: 'service', router: 'product', cable: 'material' };
+  const kindOf = (id: string) => kinds[id];
+
+  it('reparte cada línea con el % de su categoría; lo que no está en el catálogo cuenta como servicio', () => {
+    const won = [
+      // Router 2 × 100 + 3 % = 206 · cable 2,5 × 3,50 + 3 % = 9,01
+      lead({
+        serviceId: 'router',
+        quantity: 2,
+        unitPrice: 100,
+        extras: [{ serviceId: 'cable', serviceName: 'Cable', quantity: 2.5, unitPrice: 3.5, ack: null }],
+      }),
+      lead({ serviceId: 'viejo', unitPrice: 50 }),
+      lead({ serviceId: null, value: 80 }),
+    ];
+    expect(salesByKind(won, kindOf)).toEqual([
+      { kind: 'service', total: 131.5 },
+      { kind: 'product', total: 206 },
+      { kind: 'material', total: 9.01 },
+    ]);
+  });
+
+  it('solo devuelve los tipos con ventas', () => {
+    expect(salesByKind([lead({ serviceId: 'tour', unitPrice: 100 })], kindOf)).toEqual([{ kind: 'service', total: 103 }]);
+    expect(salesByKind([], kindOf)).toEqual([]);
   });
 });

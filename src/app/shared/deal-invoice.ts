@@ -3,7 +3,7 @@ import { Router, RouterLink } from '@angular/router';
 import { LucideFileText } from '@lucide/angular';
 import { AuthService } from '../core/auth.service';
 import { CompanyService } from '../core/company.service';
-import { centsLabel, dateLabel } from '../core/dates';
+import { centsLabel, dateLabel, qtyLabel } from '../core/dates';
 import { firestoreErrorMessage } from '../core/firestore-utils';
 import { t } from '../core/i18n/i18n';
 import { invoiceLabel } from '../core/invoice-math';
@@ -72,7 +72,7 @@ import { InvoicePayments } from './invoice-payments';
                 @for (l of p.lines; track $index) {
                   <tr>
                     <td class="py-2 pr-3">
-                      {{ l.name }}@if (l.quantity > 1) { <span class="text-ink-2 tabular"> × {{ l.quantity }}</span> }
+                      {{ l.name }}@if (l.quantity !== 1) { <span class="text-ink-2 tabular"> × {{ qty(l.quantity) }}</span> }
                       @if (!l.taxable) { <span class="block text-xs text-ink-3">{{ t('invoice.noTax') }}</span> }
                     </td>
                     <td class="py-2 text-right tabular">{{ cents(l.amount) }}</td>
@@ -136,6 +136,7 @@ export class DealInvoice {
 
   protected readonly t = t;
   protected readonly cents = centsLabel;
+  protected readonly qty = qtyLabel;
   protected readonly date = dateLabel;
   protected readonly label = invoiceLabel;
 

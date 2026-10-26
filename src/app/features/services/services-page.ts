@@ -2,32 +2,40 @@ import { Component, Injector, afterNextRender, computed, inject, linkedSignal, s
 import { dealLines } from '../../core/deal-lines';
 import { NgTemplateOutlet } from '@angular/common';
 import { FormField, form, min, required, submit } from '@angular/forms/signals';
-import { LucideLock, LucidePlus, LucideSearch } from '@lucide/angular';
+import { LucideHandshake, LucideLayers, LucideLock, LucidePackage, LucidePlus, LucideSearch } from '@lucide/angular';
 import { AuthService } from '../../core/auth.service';
 import { normalizeText } from '../../core/contacts.service';
 import { CatalogService } from '../../core/catalog.service';
-import { moneyLabel } from '../../core/dates';
+import { unitPriceLabel } from '../../core/dates';
 import { firestoreErrorMessage } from '../../core/firestore-utils';
+import type { I18nKey } from '../../core/i18n/es';
 import { t } from '../../core/i18n/i18n';
 import { LeadsService } from '../../core/leads.service';
 import { mediaQuery } from '../../core/media';
-import { ServiceItem, ServiceItemDraft, TIERS, TierRates, isClosed } from '../../core/models';
+import { ITEM_KINDS, ItemKind, ServiceItem, ServiceItemDraft, TIERS, TierRates, isClosed, kindLabel } from '../../core/models';
 import { ToastService } from '../../core/toast.service';
 import { EmptyState } from '../../shared/empty-state';
 import { SETTINGS_TABS, SectionTabs } from '../../shared/section-tabs';
 
 
-function emptyDraft(): ServiceItemDraft {
-  return { name: '', description: '', price: 0, unit: '', active: true, taxable: true };
+function emptyDraft(kind: ItemKind = 'service'): ServiceItemDraft {
+  return { kind, name: '', description: '', price: 0, unit: '', active: true, taxable: true };
 }
 
+/** Clave del texto de ejemplo y de las unidades sugeridas de cada tipo. */
+const UNIT_KEYS: Record<ItemKind, { placeholder: I18nKey; units: I18nKey }> = {
+  service: { placeholder: 'svc.unitPlaceholder', units: 'svc.units.service' },
+  product: { placeholder: 'svc.unitPlaceholder.product', units: 'svc.units.product' },
+  material: { placeholder: 'svc.unitPlaceholder.material', units: 'svc.units.material' },
+};
+
 /**
- * Catálogo de servicios con su precio oficial y los porcentajes de cada categoría.
+ * Catálogo (servicios, productos y materiales; sin control de stock) con su precio oficial y los porcentajes de cada categoría.
  * Lo ve todo el equipo; solo un admin crea, edita o archiva.
  */
 @Component({
   selector: 'app-services-page',
-  imports: [FormField, NgTemplateOutlet, EmptyState, SectionTabs, LucidePlus, LucideSearch, LucideLock],
+  imports: [FormField, NgTemplateOutlet, EmptyState, SectionTabs, LucidePlus, LucideSearch, LucideLock, LucideHandshake, LucidePackage, LucideLayers],
   templateUrl: './services-page.html',
 })
 export class ServicesPage {
@@ -39,13 +47,15 @@ export class ServicesPage {
 
   protected readonly t = t;
   protected readonly settingsTabs = SETTINGS_TABS;
-  protected readonly money = moneyLabel;
   protected readonly tiers = TIERS;
+  protected readonly kinds = ITEM_KINDS;
+  protected readonly kindLabel = kindLabel;
 
   /** Móvil: lista apilada en lugar de la tabla de siete columnas (mismo corte `md` que Clientes). */
   protected readonly narrow = mediaQuery('(max-width: 767.98px)');
 
   protected readonly search = signal('');
+  protected readonly kind = signal<ItemKind | 'all'>('all');
   /** null = cerrado; '' = servicio nuevo; id = editando ese servicio. */
   protected readonly editing = signal<string | null>(null);
 
@@ -82,7 +92,8 @@ export class ServicesPage {
     const q = normalizeText(this.search().trim());
     return this.catalog
       .services()
-      .filter((s) => !q || normalizeText(`${s.name} ${s.description}`).includes(q))
+      .filter((s) => this.kind() === 'all' || s.kind === this.kind())
+      .filter((s) => !q || normalizeText(`${s.name} ${s.description} ${s.unit}`).includes(q))
       .sort((a, b) => Number(b.active) - Number(a.active))
       .map((s) => ({ ...s, ...(this.stats().get(s.id) ?? { open: 0, won: 0 }) }));
   });
@@ -91,6 +102,21 @@ export class ServicesPage {
     const all = this.catalog.services();
     return { active: all.filter((s) => s.active).length, archived: all.filter((s) => !s.active).length };
   });
+
+  /** Cuántos hay de cada tipo (para el filtro). */
+  protected readonly kindCounts = computed(() => {
+    const out: Record<ItemKind, number> = { service: 0, product: 0, material: 0 };
+    for (const s of this.catalog.services()) out[s.kind]++;
+    return out;
+  });
+
+  /** Unidades sugeridas para el tipo que se está editando. */
+  protected readonly unitOptions = computed(() => t(UNIT_KEYS[this.model().kind].units).split(','));
+  protected readonly unitPlaceholder = computed(() => t(UNIT_KEYS[this.model().kind].placeholder));
+
+  protected setKind(kind: ItemKind): void {
+    this.model.update((m) => ({ ...m, kind }));
+  }
 
   /** Servicio archivado que el admin está por borrar (confirmación en línea). */
   protected readonly deletingId = signal<string | null>(null);
@@ -124,13 +150,15 @@ export class ServicesPage {
   }
 
   protected startNew(): void {
-    this.model.set(emptyDraft());
+    // Con un tipo filtrado, lo nuevo es de ese tipo.
+    const k = this.kind();
+    this.model.set(emptyDraft(k === 'all' ? 'service' : k));
     this.f().reset();
     this.editing.set('');
   }
 
   protected startEdit(s: ServiceItem): void {
-    this.model.set({ name: s.name, description: s.description, price: s.price, unit: s.unit, active: s.active, taxable: s.taxable });
+    this.model.set({ kind: s.kind, name: s.name, description: s.description, price: s.price, unit: s.unit, active: s.active, taxable: s.taxable });
     this.f().reset();
     this.editing.set(s.id);
   }
@@ -200,6 +228,6 @@ export class ServicesPage {
   }
 
   protected priceLabel(s: ServiceItem): string {
-    return s.unit ? `${moneyLabel(s.price)} / ${s.unit}` : moneyLabel(s.price);
+    return s.unit ? `${unitPriceLabel(s.price)} / ${s.unit}` : unitPriceLabel(s.price);
   }
 }

@@ -127,7 +127,7 @@
                     @if (pPriced().length > 1) {
                       {{ t('pricing.officialMulti', { total: money(pOfficial()), n: pPriced().length }) }}
                     } @else {
-                      {{ t('pricing.officialLine', { price: money(pPriced()[0].unitPrice), unit: unitLabel(pPriced()[0].serviceId) }) }}
+                      {{ t('pricing.officialLine', { price: unitPrice(pPriced()[0].unitPrice), unit: unitLabel(pPriced()[0].serviceId) }) }}
                     }
                   </p>
                 </div>
@@ -149,7 +149,7 @@
                   <dt class="text-xs text-ink-3">{{ lines().length > 1 ? t('lines.label') : t('field.service') }}</dt>
                   <dd class="font-semibold">
                     @for (x of lines(); track $index) {
-                      <span class="block">{{ x.serviceName }}@if (x.quantity > 1) { <span class="font-normal text-ink-2 tabular">× {{ x.quantity }}</span> }</span>
+                      <span class="block">{{ x.serviceName }}@if (x.quantity !== 1) { <span class="ms-1 font-normal text-ink-2 tabular">× {{ qty(x.quantity) }}</span> }</span>
                     } @empty {
                       —
                     }

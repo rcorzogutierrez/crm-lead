@@ -22,6 +22,7 @@ import { teamQuery } from './team-query';
 function mapService(id: string, d: DocumentData): ServiceItem {
   return {
     id,
+    kind: d['kind'] === 'product' || d['kind'] === 'material' ? d['kind'] : 'service',
     name: d['name'] ?? '',
     description: d['description'] ?? '',
     price: Number(d['price'] ?? 0),
@@ -32,7 +33,7 @@ function mapService(id: string, d: DocumentData): ServiceItem {
 }
 
 /**
- * Catálogo de servicios y porcentajes de cada categoría de venta.
+ * Catálogo (servicios, productos y materiales) y porcentajes de cada categoría de venta.
  * Todo el equipo lo lee; solo un admin lo cambia (lo garantizan las reglas).
  */
 @Service()

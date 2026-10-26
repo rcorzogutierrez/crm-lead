@@ -1,5 +1,6 @@
 import { addDays, dayDiff, startOfDay } from './dates';
-import { FollowUp, Lead, LeadSource, OPEN_STAGES, PriceTier, Stage, TIERS, isClosed, wonDate } from './models';
+import { dealLines } from './deal-lines';
+import { FollowUp, ITEM_KINDS, ItemKind, Lead, LeadSource, OPEN_STAGES, PriceTier, Stage, TIERS, isClosed, salePrice, wonDate } from './models';
 
 /**
  * Cálculos de los reportes. Funciones puras sobre los leads y follow-ups que la app ya
@@ -209,7 +210,28 @@ export function followUpScore(done: Pick<FollowUp, 'dueAt' | 'completedAt'>[]): 
   return { onTime, late: done.length - onTime };
 }
 
-function wonIn(leads: Lead[], range: Range): Lead[] {
+export interface KindTotal {
+  kind: ItemKind;
+  total: number;
+}
+
+/**
+ * Lo vendido repartido por tipo (servicios, productos, materiales), línea a línea con el % de
+ * su categoría. El tipo sale del catálogo actual; lo que ya no está en él, o un negocio sin
+ * concepto, cuenta como servicio. Solo los tipos con ventas, en el orden de siempre.
+ */
+export function salesByKind(won: Lead[], kindOf: (serviceId: string) => ItemKind | undefined): KindTotal[] {
+  const totals: Record<ItemKind, number> = { service: 0, product: 0, material: 0 };
+  for (const l of won) {
+    const lines = dealLines(l);
+    if (!lines.length) totals.service += l.value || 0;
+    for (const x of lines) totals[kindOf(x.serviceId) ?? 'service'] += salePrice(x.unitPrice, x.quantity, l.tierPct);
+  }
+  return ITEM_KINDS.filter((k) => totals[k.id] > 0).map((k) => ({ kind: k.id, total: Math.round(totals[k.id] * 100) / 100 }));
+}
+
+/** Ventas ganadas dentro del rango. */
+export function wonIn(leads: Lead[], range: Range): Lead[] {
   return leads.filter((l) => l.stage === 'won' && inRange(wonDate(l), range));
 }
 

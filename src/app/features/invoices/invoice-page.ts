@@ -4,7 +4,7 @@ import { LucideArrowLeft, LucideBan, LucidePrinter, LucideTrash2 } from '@lucide
 import { AuthService } from '../../core/auth.service';
 import { Clock } from '../../core/clock.service';
 import { CompanyService } from '../../core/company.service';
-import { centsLabel, dateLabel } from '../../core/dates';
+import { centsLabel, dateLabel, qtyLabel } from '../../core/dates';
 import { firestoreErrorMessage } from '../../core/firestore-utils';
 import { t } from '../../core/i18n/i18n';
 import { invoiceBalance, invoiceLabel, payState } from '../../core/invoice-math';
@@ -35,6 +35,7 @@ export class InvoicePage {
 
   protected readonly t = t;
   protected readonly cents = centsLabel;
+  protected readonly qty = qtyLabel;
   protected readonly date = dateLabel;
 
   protected readonly invoice = signal<Invoice | null>(null);

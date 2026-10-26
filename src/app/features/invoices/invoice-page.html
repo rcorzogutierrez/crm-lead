@@ -132,7 +132,7 @@
                   {{ l.name }}
                   @if (!l.taxable) { <span class="block text-xs text-ink-2">{{ t('invoice.noTax') }}</span> }
                 </td>
-                <td class="px-3 py-2.5 text-right tabular">{{ l.quantity }}@if (l.unit) { <span class="hidden text-ink-2 sm:inline print:inline"> {{ l.unit }}</span> }</td>
+                <td class="px-3 py-2.5 text-right tabular">{{ qty(l.quantity) }}@if (l.unit) { <span class="hidden text-ink-2 sm:inline print:inline"> {{ l.unit }}</span> }</td>
                 <td class="hidden px-3 py-2.5 text-right tabular sm:table-cell print:table-cell">{{ cents(l.unitPrice) }}</td>
                 <td class="py-2.5 pl-3 text-right tabular">{{ cents(l.amount) }}</td>
               </tr>
