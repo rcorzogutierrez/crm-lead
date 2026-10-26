@@ -26,11 +26,11 @@
               <p class="field-label" id="co-logo-label">{{ t('company.logo') }}</p>
               <div class="flex flex-wrap items-center gap-3">
                 <div
-                  class="grid h-20 w-60 max-w-full place-items-center rounded-lg border bg-sheet p-2"
+                  class="flex h-20 w-60 max-w-full items-center justify-center overflow-hidden rounded-lg border bg-sheet p-2"
                   [class]="model().logo ? 'border-rule' : 'border-dashed border-rule-strong'"
                 >
                   @if (model().logo) {
-                    <img [src]="model().logo" alt="" class="max-h-full max-w-full object-contain" />
+                    <img [src]="model().logo" alt="" class="h-full w-full object-contain" />
                   } @else {
                     <span class="text-xs text-ink-3">{{ t('company.noLogo') }}</span>
                   }
