@@ -107,7 +107,7 @@
                 <a [routerLink]="['/leads', l.id]" class="font-semibold text-ink hover:text-pen">{{ l.name }}</a>
                 <span class="text-ink-2"> · {{ dealMeta(l, false) }}</span>
               </span>
-              <span class="col-start-2 text-ink-2 sm:col-start-auto sm:text-right">{{ l.lostReason || t('report.lost.noReason') }}</span>
+              <span class="col-start-2 text-ink-2 sm:col-start-auto sm:text-right">{{ lostLabel(l) || t('report.lost.noReason') }}</span>
             </li>
           }
         </ul>

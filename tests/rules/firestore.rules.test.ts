@@ -532,6 +532,15 @@ describe('Validación al editar', () => {
     await assertFails(updateDoc(ref, { outcome: 'x'.repeat(5001) }));
   });
 
+  it('cerrar un negocio: el vendedor lo pierde con un motivo de la lista y cancela sus follow-ups', async () => {
+    const fs = db(LUIS);
+    const batch = writeBatch(fs);
+    batch.update(doc(fs, 'leads/luis-1'), { stage: 'lost', lostCode: 'price', lostReason: 'Muy caro', nextFollowUpAt: null });
+    batch.update(doc(fs, 'followups/f-luis'), { status: 'cancelled' });
+    await assertSucceeds(batch.commit());
+    await assertFails(updateDoc(doc(db(LUIS), 'leads/luis-1'), { lostCode: 'aburrido' }));
+  });
+
   it('el historial solo admite tipos conocidos y textos acotados', async () => {
     await assertFails(setDoc(doc(db(LUIS), 'leads/luis-1/activities/a2'), { type: 'hack', body: 'x', createdBy: LUIS }));
     await assertFails(updateDoc(doc(db(LUIS), 'leads/luis-1/activities/a1'), { body: 'x'.repeat(5001) }));

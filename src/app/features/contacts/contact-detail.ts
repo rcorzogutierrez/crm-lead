@@ -22,7 +22,7 @@ import { LiveQuery, firestoreErrorMessage } from '../../core/firestore-utils';
 import { FollowUpsService } from '../../core/followups.service';
 import { intlLocale, t } from '../../core/i18n/i18n';
 import { MembersService } from '../../core/members.service';
-import { Activity, Contact, ContactDraft, Lead, activityLabel, stageMeta, tierLabel, wonDate } from '../../core/models';
+import { Activity, Contact, ContactDraft, Lead, activityLabel, lostReasonLabel, stageMeta, tierLabel, wonDate } from '../../core/models';
 import { ToastService } from '../../core/toast.service';
 import { UiService } from '../../core/ui.service';
 import { ChannelIcon } from '../../shared/channel-icon';
@@ -75,6 +75,7 @@ export class ContactDetail {
   private readonly injector = inject(Injector);
 
   protected readonly t = t;
+  protected readonly lostLabel = lostReasonLabel;
   protected readonly money = moneyLabel;
   protected readonly tierName = tierLabel;
 

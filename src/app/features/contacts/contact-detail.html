@@ -184,7 +184,7 @@
                 @for (l of summary().lost; track l.id) {
                   <li class="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 text-sm">
                     <a [routerLink]="['/leads', l.id]" class="font-semibold hover:text-pen hover:underline">{{ dealTitle(l) }}</a>
-                    <span class="text-ink-2">{{ l.lostReason || '—' }}</span>
+                    <span class="text-ink-2">{{ lostLabel(l) || '—' }}</span>
                   </li>
                 }
               </ul>

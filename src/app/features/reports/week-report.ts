@@ -8,7 +8,7 @@ import { FollowUpsService } from '../../core/followups.service';
 import { intlLocale, t } from '../../core/i18n/i18n';
 import { LeadsService } from '../../core/leads.service';
 import { MembersService } from '../../core/members.service';
-import { Lead, channelLabel, sourceLabel, stageMeta, tierLabel, wonDate } from '../../core/models';
+import { Lead, channelLabel, sourceLabel, lostReasonLabel, stageMeta, tierLabel, wonDate } from '../../core/models';
 import { STALLED_DAYS, customRange, dayParam, inRange, lostDate, parseDay, weekRange, weekReport } from '../../core/reports';
 import { DueChip } from '../../shared/due-chip';
 import { RangePicker } from './range-picker';
@@ -37,6 +37,7 @@ export class WeekReportView {
   protected readonly members = inject(MembersService);
 
   protected readonly t = t;
+  protected readonly lostLabel = lostReasonLabel;
   protected readonly money = moneyLabel;
   protected readonly limit = LIMIT;
   protected readonly listLimit = LIST_LIMIT;
