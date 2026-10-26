@@ -16,6 +16,7 @@ import { LeadsService } from '../core/leads.service';
 import { MembersService } from '../core/members.service';
 import { ContactChannel, FollowUp, channelLabel } from '../core/models';
 import { ToastService } from '../core/toast.service';
+import { UiService } from '../core/ui.service';
 import { Avatar } from './avatar';
 import { ChannelIcon } from './channel-icon';
 import { ChannelPicker } from './channel-picker';
@@ -40,6 +41,7 @@ export class FollowUpItem {
   private readonly leads = inject(LeadsService);
   protected readonly members = inject(MembersService);
   private readonly toast = inject(ToastService);
+  private readonly ui = inject(UiService);
 
   readonly fu = input.required<FollowUp>();
   /** Muestra la fecha (fuera de la página de hoy) en vez de solo la hora. */
@@ -57,6 +59,11 @@ export class FollowUpItem {
   protected readonly nextNote = signal('');
 
   protected readonly lead = computed(() => this.leads.byId().get(this.fu().leadId));
+  /**
+   * Seguimiento de una venta ya ganada (la postventa): lo natural al terminarlo no es otro
+   * follow-up sobre la venta cerrada sino, si quiere algo más, un negocio nuevo con el contacto.
+   */
+  protected readonly afterSale = computed(() => this.lead()?.stage === 'won' && !!this.lead()?.contactId);
   protected readonly tel = computed(() => telHref(this.lead()?.phone ?? ''));
   protected readonly wa = computed(() => whatsappHref(this.lead()?.phone ?? ''));
   protected readonly state = computed(() => dueState(this.fu().dueAt, this.clock.now()));
@@ -74,12 +81,13 @@ export class FollowUpItem {
       this.nextChannel.set(this.fu().channel);
       this.nextAt.set(presetDate('in3', this.clock.now()));
       this.nextNote.set('');
-      this.scheduleNext.set(true);
+      this.scheduleNext.set(!this.afterSale());
     }
   }
 
-  protected async complete(event: Event): Promise<void> {
+  protected async complete(event: Event, openDeal = false): Promise<void> {
     event.preventDefault();
+    const contactId = this.lead()?.contactId ?? null;
     this.busy.set(true);
     try {
       await this.followUps.complete(this.fu(), {
@@ -92,6 +100,7 @@ export class FollowUpItem {
         this.scheduleNext() ? t('fu.doneNext', { name: this.fu().leadName }) : t('fu.done'),
       );
       this.mode.set('idle');
+      if (openDeal && contactId) this.ui.openCapture(contactId);
     } catch (err) {
       this.toast.error(firestoreErrorMessage(err));
     } finally {

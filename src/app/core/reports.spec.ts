@@ -14,6 +14,7 @@ function lead(p: Partial<Lead>): Lead {
     assigneeId: 'u1',
     notes: '',
     lostReason: '',
+    lostCode: null,
     nextFollowUpAt: null,
     lastContactAt: null,
     createdBy: 'u1',

@@ -17,7 +17,7 @@ import { moneyLabel } from '../../core/dates';
 import { ActivitiesService } from '../../core/activities.service';
 import { AuthService } from '../../core/auth.service';
 import { Clock } from '../../core/clock.service';
-import { agoLabel, fullLabel } from '../../core/dates';
+import { agoLabel, dueLabel, fullLabel } from '../../core/dates';
 import { LiveQuery, firestoreErrorMessage } from '../../core/firestore-utils';
 import { FollowUpsService } from '../../core/followups.service';
 import { I18nKey, intlLocale, t } from '../../core/i18n/i18n';
@@ -26,6 +26,7 @@ import { MembersService } from '../../core/members.service';
 import {
   Activity,
   ActivityType,
+  ContactChannel,
   activityLabel,
   LeadDraft,
   PriceTier,
@@ -33,18 +34,22 @@ import {
   STAGES,
   Stage,
   sourceLabel,
+  channelLabel,
   isClosed,
+  lostReasonLabel,
   salePrice,
   stageMeta,
   tierLabel,
 } from '../../core/models';
 import { ToastService } from '../../core/toast.service';
+import { UiService } from '../../core/ui.service';
 import { ChannelIcon } from '../../shared/channel-icon';
 import { mailHref, telHref, whatsappHref } from '../../shared/contact-links';
 import { EmptyState } from '../../shared/empty-state';
 import { FollowUpItem } from '../../shared/followup-item';
 import { ScheduleForm } from '../../shared/schedule-form';
 import { TierPicker } from '../../shared/tier-picker';
+import { CloseDeal } from '../../shared/close-deal';
 
 const LOG_TYPES: { id: ActivityType; label: I18nKey }[] = [
   { id: 'note', label: 'act.note' },
@@ -66,6 +71,7 @@ const LOG_TYPES: { id: ActivityType; label: I18nKey }[] = [
     FollowUpItem,
     ScheduleForm,
     TierPicker,
+    CloseDeal,
     LucideArrowLeft,
     LucideTriangleAlert,
     LucideUserRound,
@@ -91,11 +97,13 @@ export class LeadDetail {
   protected readonly catalog = inject(CatalogService);
   protected readonly contacts = inject(ContactsService);
   private readonly toast = inject(ToastService);
+  protected readonly ui = inject(UiService);
 
   protected readonly t = t;
   protected readonly stages = STAGES;
   protected readonly sources = SOURCES;
   protected readonly logTypes = LOG_TYPES;
+  protected readonly lostLabel = lostReasonLabel;
 
   protected readonly lead = computed(() => this.leadsService.byId().get(this.id()));
   protected readonly loading = this.leadsService.loading;
@@ -174,8 +182,8 @@ export class LeadDetail {
   });
   protected readonly pSaving = signal(false);
 
-  /** Tras ganar: ofrecer el seguimiento de postventa. */
-  protected readonly offerPostSale = signal(false);
+  /** Cierre en curso (ganado o perdido): se abre en línea debajo de las etapas. */
+  protected readonly closing = signal<'won' | 'lost' | null>(null);
 
   protected readonly tel = computed(() => telHref(this.lead()?.phone ?? ''));
   protected readonly wa = computed(() => whatsappHref(this.lead()?.phone ?? ''));
@@ -189,13 +197,27 @@ export class LeadDetail {
   protected readonly logType = signal<ActivityType>('note');
   protected readonly logBody = signal('');
   protected readonly logging = signal(false);
+  /**
+   * Follow-up que vence hoy o ya venció: registrar un contacto lo da por hecho
+   * (si no, seguiría saliendo como vencido en Hoy aunque ya se habló con el cliente).
+   */
+  protected readonly duePending = computed(() => {
+    const end = new Date(this.clock.now());
+    end.setHours(23, 59, 59, 999);
+    return this.pending().find((f) => f.dueAt <= end) ?? null;
+  });
+  protected readonly completesDue = computed(() => !!this.duePending() && this.logType() !== 'note');
+  protected readonly dueText = computed(() => {
+    const fu = this.duePending();
+    if (!fu) return '';
+    const what = fu.note.trim() || channelLabel(fu.channel);
+    return `${what} (${dueLabel(fu.dueAt, this.clock.now()).toLowerCase()})`;
+  });
+  /** El vendedor puede desmarcarlo si la llamada no era la del follow-up. */
+  protected readonly completeDue = signal(true);
 
   // Programar otra acción
   protected readonly addingNext = signal(false);
-
-  // Etapa perdida
-  protected readonly askLostReason = signal(false);
-  protected readonly lostReason = signal('');
 
   // Borrado
   protected readonly confirmDelete = signal(false);
@@ -252,36 +274,21 @@ export class LeadDetail {
   protected async setStage(stage: Stage): Promise<void> {
     const lead = this.lead();
     if (!lead || lead.stage === stage) return;
-    if (stage === 'lost') {
-      this.askLostReason.set(true);
+    // Ganar o perder pasa por el mismo paso de cierre que en el pipeline.
+    if (isClosed(stage)) {
+      this.closing.set(stage as 'won' | 'lost');
       return;
     }
+    this.closing.set(null);
     try {
       const from = lead.stage;
       await this.leadsService.moveToStage(lead, stage);
-      if (stage === 'won') {
-        this.toast.show(t('detail.won', { name: lead.serviceName || lead.name }));
-        this.offerPostSale.set(true);
-      } else {
-        this.toast.show(t('detail.movedTo', { name: lead.serviceName || lead.name, stage: stageMeta(stage).label }), {
-          action: {
-            label: t('common.undo'),
-            run: () => this.toast.follow(this.leadsService.moveToStage({ ...lead, stage }, from), t('common.undone')),
-          },
-        });
-      }
-    } catch (err) {
-      this.toast.error(firestoreErrorMessage(err));
-    }
-  }
-
-  protected async schedulePostSale(): Promise<void> {
-    const lead = this.lead();
-    if (!lead) return;
-    try {
-      await this.followUps.schedulePostSale(lead);
-      this.offerPostSale.set(false);
-      this.toast.show(t('postsale.done'));
+      this.toast.show(t('detail.movedTo', { name: lead.serviceName || lead.name, stage: stageMeta(stage).label }), {
+        action: {
+          label: t('common.undo'),
+          run: () => this.toast.follow(this.leadsService.moveToStage({ ...lead, stage }, from), t('common.undone')),
+        },
+      });
     } catch (err) {
       this.toast.error(firestoreErrorMessage(err));
     }
@@ -369,29 +376,22 @@ export class LeadDetail {
     }
   }
 
-  protected async confirmLost(event: Event): Promise<void> {
-    event.preventDefault();
-    const lead = this.lead();
-    if (!lead) return;
-    try {
-      await this.leadsService.moveToStage(lead, 'lost', this.lostReason().trim());
-      this.askLostReason.set(false);
-      this.lostReason.set('');
-      this.toast.show(t('detail.lostMsg', { name: lead.serviceName || lead.name }));
-    } catch (err) {
-      this.toast.error(firestoreErrorMessage(err));
-    }
-  }
-
   protected async log(event: Event): Promise<void> {
     event.preventDefault();
     const body = this.logBody().trim();
     if (!body) return;
     this.logging.set(true);
     try {
-      await this.activitiesService.log(this.id(), this.logType(), body);
+      const due = this.duePending();
+      if (due && this.completesDue() && this.completeDue()) {
+        await this.followUps.complete(due, { outcome: body, channel: this.logType() as ContactChannel });
+        this.toast.show(t('detail.loggedDone'));
+      } else {
+        await this.activitiesService.log(this.id(), this.logType(), body);
+        this.toast.show(t('detail.logged'));
+      }
       this.logBody.set('');
-      this.toast.show(t('detail.logged'));
+      this.completeDue.set(true);
     } catch (err) {
       this.toast.error(firestoreErrorMessage(err));
     } finally {

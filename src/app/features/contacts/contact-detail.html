@@ -23,7 +23,7 @@
             <span class="inline-flex h-6 items-center rounded-md bg-sheet-2 px-2 text-[0.8125rem] font-semibold">{{ t('contacts.prospect') }}</span>
           }
           <span class="max-sm:hidden" aria-hidden="true">·</span>
-          <span>{{ t('field.assignee') }}: {{ members.name(c.assigneeId) }}</span>
+          <span>{{ t('contact.owner') }}: {{ members.name(c.assigneeId) }}</span>
         </p>
       </div>
       <div class="flex flex-wrap gap-2">
@@ -184,7 +184,7 @@
                 @for (l of summary().lost; track l.id) {
                   <li class="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 text-sm">
                     <a [routerLink]="['/leads', l.id]" class="font-semibold hover:text-pen hover:underline">{{ dealTitle(l) }}</a>
-                    <span class="text-ink-2">{{ l.lostReason || '—' }}</span>
+                    <span class="text-ink-2">{{ lostLabel(l) || '—' }}</span>
                   </li>
                 }
               </ul>
@@ -228,12 +228,13 @@
               </div>
               @if (auth.isAdmin()) {
                 <div>
-                  <label class="field-label" for="k-assignee">{{ t('field.assignee') }}</label>
+                  <label class="field-label" for="k-assignee">{{ t('contact.owner') }}</label>
                   <select id="k-assignee" class="input" [formField]="f.assigneeId">
                     @for (m of members.active(); track m.uid) {
                       <option [value]="m.uid">{{ m.displayName }}</option>
                     }
                   </select>
+                  <p class="mt-1 text-xs text-ink-3">{{ t('contact.ownerHint') }}</p>
                 </div>
               }
               <div>

@@ -17,6 +17,9 @@ export type ContactChannel = 'call' | 'whatsapp' | 'email' | 'meeting' | 'task';
 
 export type ActivityType = ContactChannel | 'note' | 'stage' | 'created' | 'followup' | 'pricing';
 
+/** Motivo de pérdida, de una lista corta para que los reportes puedan agruparlo. */
+export type LostCode = 'price' | 'competitor' | 'noResponse' | 'timing' | 'notFit' | 'other';
+
 /** Categoría de venta: porcentaje sobre el precio oficial del servicio. */
 export type PriceTier = 'bronze' | 'silver' | 'gold';
 
@@ -135,7 +138,10 @@ export interface Lead {
   value: number;
   assigneeId: string;
   notes: string;
+  /** Detalle libre del motivo de pérdida (antes era el único campo). */
   lostReason: string;
+  /** Motivo de pérdida de la lista; null en los anteriores a la lista y en los no perdidos. */
+  lostCode: LostCode | null;
   /** Fecha del próximo follow-up pendiente (desnormalizada desde `followups`). */
   nextFollowUpAt: Date | null;
   lastContactAt: Date | null;
@@ -252,6 +258,21 @@ export const CHANNELS: readonly { id: ContactChannel; readonly label: string; re
 
 export function channelLabel(channel: ContactChannel): string {
   return CHANNELS.find((c) => c.id === channel)?.label ?? t('channel.task');
+}
+
+export const LOST_REASONS: readonly { id: LostCode; readonly label: string }[] = [
+  { id: 'price', get label() { return t('lost.price'); } },
+  { id: 'competitor', get label() { return t('lost.competitor'); } },
+  { id: 'noResponse', get label() { return t('lost.noResponse'); } },
+  { id: 'timing', get label() { return t('lost.timing'); } },
+  { id: 'notFit', get label() { return t('lost.notFit'); } },
+  { id: 'other', get label() { return t('lost.other'); } },
+];
+
+/** Motivo de pérdida legible: el de la lista y, si lo hay, el detalle ("Precio · muy caro para julio"). */
+export function lostReasonLabel(lead: Pick<Lead, 'lostCode' | 'lostReason'>): string {
+  const code = LOST_REASONS.find((r) => r.id === lead.lostCode)?.label ?? '';
+  return [code, lead.lostReason.trim()].filter(Boolean).join(' · ');
 }
 
 export function isClosed(stage: Stage): boolean {

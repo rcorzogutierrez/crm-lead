@@ -1,9 +1,10 @@
 <div class="flex h-[calc(100dvh-3.5rem)] flex-col pt-6 lg:h-dvh lg:pt-10">
   <header class="flex flex-wrap items-end justify-between gap-4 px-4 sm:px-6 lg:px-10">
     <div>
-      <h1 class="date-face text-[2rem] leading-tight font-bold">Pipeline</h1>
+      <h1 class="date-face text-[2rem] leading-tight font-bold">{{ t('nav.leads') }}</h1>
       <p class="mt-1 text-sm text-ink-2 max-lg:hidden">{{ t('pipe.hintDesktop') }}</p>
       <p class="mt-1 text-sm text-ink-2 lg:hidden">{{ t('pipe.hintMobile') }}</p>
+      <app-section-tabs class="mt-3 block" [tabs]="dealTabs" label="deals.views" />
     </div>
     <div class="flex flex-wrap gap-2">
     <div class="inline-flex rounded-lg border border-rule-strong bg-sheet p-0.5" role="radiogroup" [attr.aria-label]="t('pipe.kind')">
@@ -23,6 +24,19 @@
 
   @if (leadsService.error(); as err) {
     <p class="mx-4 mt-4 rounded-lg bg-ribbon-soft px-4 py-3 text-sm font-medium text-ribbon sm:mx-6 lg:mx-10" role="alert">{{ err }}</p>
+  }
+
+  @if (closing(); as c) {
+    <div class="mx-4 mt-4 max-w-2xl sm:mx-6 lg:mx-10">
+      <app-close-deal [lead]="c.lead" [to]="c.to" (done)="closing.set(null)" (cancelled)="closing.set(null)" />
+    </div>
+  }
+  @if (nexting(); as l) {
+    <section class="mx-4 mt-4 max-w-2xl rounded-lg border border-rule-strong bg-sheet p-4 sm:mx-6 lg:mx-10" aria-labelledby="next-panel-title">
+      <h2 id="next-panel-title" tabindex="-1" class="font-bold outline-none">{{ t('pipe.nextTitle', { name: title(l) }) }}</h2>
+      <p class="mt-0.5 mb-3 text-sm text-ink-2">{{ t('pipe.nextBody') }}</p>
+      <app-schedule-form [lead]="l" (saved)="nexting.set(null)" (cancelled)="nexting.set(null)" />
+    </section>
   }
 
   <div class="mt-6 flex min-h-0 flex-1 snap-x snap-proximity scroll-px-4 gap-3 overflow-x-auto overscroll-x-contain px-4 sm:scroll-px-6 lg:scroll-px-10 pb-24 sm:px-6 lg:px-10 lg:pb-8">

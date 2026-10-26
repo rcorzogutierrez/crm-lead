@@ -171,7 +171,7 @@ export class CaptureDrawer {
   protected choose(c: Contact): void {
     this.chosenId.set(c.id);
     this.suggestOpen.set(false);
-    this.model.update((m) => ({ ...m, name: c.name, company: c.company, email: c.email, phone: c.phone }));
+    this.model.update((m) => ({ ...m, name: c.name, company: c.company, email: c.email, phone: c.phone, assigneeId: this.ownerOf(c) }));
     // Directo a "qué quiere comprar".
     this.focusLater(() => document.getElementById('c-service')?.focus());
   }
@@ -272,6 +272,16 @@ export class CaptureDrawer {
     });
   }
 
+  /**
+   * Responsable del negocio nuevo: el dueño de la cuenta del contacto, si sigue activo.
+   * Solo cuenta para un admin; un vendedor siempre crea negocios a su nombre.
+   */
+  private ownerOf(c: Contact): string {
+    const me = this.auth.uid();
+    if (!this.auth.isAdmin()) return me;
+    return this.members.active().some((m) => m.uid === c.assigneeId) ? c.assigneeId : me;
+  }
+
   /** Mueve el foco cuando el cambio ya está pintado. */
   private focusLater(focus: () => void): void {
     afterNextRender(focus, { injector: this.injector });
@@ -283,7 +293,7 @@ export class CaptureDrawer {
     this.suggestOpen.set(false);
     const fixed = untracked(() => this.fixedContact());
     if (fixed) {
-      Object.assign(model, { name: fixed.name, company: fixed.company, email: fixed.email, phone: fixed.phone });
+      Object.assign(model, { name: fixed.name, company: fixed.company, email: fixed.email, phone: fixed.phone, assigneeId: this.ownerOf(fixed) });
     }
     this.model.set(model);
     this.f().reset();

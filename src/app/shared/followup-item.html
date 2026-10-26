@@ -92,6 +92,9 @@
         (input)="outcome.set($any($event.target).value)"
       ></textarea>
     </div>
+    @if (afterSale()) {
+      <p class="text-sm text-ink-2">{{ t('fu.afterSaleHint') }}</p>
+    }
     <label class="inline-flex items-center gap-2 text-sm font-semibold">
       <input type="checkbox" class="size-4" [checked]="scheduleNext()" (change)="scheduleNext.set(!scheduleNext())" />
       {{ t('fu.scheduleNext') }}
@@ -107,9 +110,14 @@
         (input)="nextNote.set($any($event.target).value)"
       />
     }
-    <div class="flex justify-end gap-2">
+    <div class="flex flex-wrap justify-end gap-2">
       <button type="button" class="btn-ghost btn-sm" (click)="mode.set('idle')">{{ t('common.cancel') }}</button>
-      <button type="submit" class="btn-primary btn-sm" [disabled]="busy()">{{ busy() ? t('common.saving') : t('common.save') }}</button>
+      @if (afterSale()) {
+        <button type="submit" class="btn-secondary btn-sm" [disabled]="busy()">{{ t('fu.doneOnly') }}</button>
+        <button type="button" class="btn-primary btn-sm" [disabled]="busy()" (click)="complete($event, true)">{{ t('fu.doneNewDeal') }}</button>
+      } @else {
+        <button type="submit" class="btn-primary btn-sm" [disabled]="busy()">{{ busy() ? t('common.saving') : t('common.save') }}</button>
+      }
     </div>
   </form>
 }

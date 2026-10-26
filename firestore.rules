@@ -257,6 +257,8 @@ service cloud.firestore {
         && isString(d.notes, 5000)
         && isString(d.get('detail', ''), 1000)
         && isString(d.get('lostReason', ''), 5000)
+        && (d.get('lostCode', null) == null
+            || d.lostCode in ['price', 'competitor', 'noResponse', 'timing', 'notFit', 'other'])
         && d.stage in ['new', 'contacted', 'qualified', 'proposal', 'negotiation', 'won', 'lost']
         && d.source in ['web', 'whatsapp', 'phone', 'referral', 'social', 'event', 'email', 'other']
         && d.value is number && d.value >= 0

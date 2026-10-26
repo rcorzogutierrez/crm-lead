@@ -17,7 +17,7 @@ import { addDays, dayDiff } from './dates';
 import { t } from './i18n/i18n';
 import { FIRESTORE } from './firebase';
 import { toDate } from './firestore-utils';
-import { ContactChannel, FollowUp, Lead } from './models';
+import { ActivityType, ContactChannel, FollowUp, Lead } from './models';
 import { teamQuery } from './team-query';
 
 function mapFollowUp(id: string, d: DocumentData): FollowUp {
@@ -41,6 +41,12 @@ export interface CompleteInput {
   outcome: string;
   /** Siguiente follow-up, si se programa en el mismo paso. */
   next?: { dueAt: Date; channel: ContactChannel; note: string } | null;
+  /** Canal real del contacto, si no fue el previsto (se registró una llamada en vez del WhatsApp agendado). */
+  channel?: ContactChannel;
+}
+
+function activityTypeFor(channel: ContactChannel): ActivityType {
+  return channel === 'task' ? 'followup' : channel;
 }
 
 /**
@@ -137,7 +143,7 @@ export class FollowUpsService {
       completedBy: uid,
     });
     batch.set(doc(collection(this.db, 'leads', fu.leadId, 'activities')), {
-      type: fu.channel === 'task' ? 'followup' : fu.channel,
+      type: activityTypeFor(input.channel ?? fu.channel),
       body: input.outcome.trim() || fu.note,
       createdBy: uid,
       createdAt: serverTimestamp(),

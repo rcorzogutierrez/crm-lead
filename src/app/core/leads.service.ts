@@ -18,7 +18,8 @@ import { DealState, initialStats, statsPatch } from './contact-stats';
 import { FIRESTORE } from './firebase';
 import { toDate } from './firestore-utils';
 import { t } from './i18n/i18n';
-import { ContactChannel, ContactDraft, Lead, LeadDraft, LeadPricing, LeadSource, PriceTier, Stage, isClosed, stageMeta } from './models';
+import { FollowUpsService } from './followups.service';
+import { ContactChannel, ContactDraft, Lead, LeadDraft, LeadPricing, LeadSource, LostCode, PriceTier, Stage, isClosed, lostReasonLabel, stageMeta } from './models';
 import { teamQuery } from './team-query';
 
 function mapLead(id: string, d: DocumentData): Lead {
@@ -34,6 +35,7 @@ function mapLead(id: string, d: DocumentData): Lead {
     assigneeId: d['assigneeId'] ?? '',
     notes: d['notes'] ?? '',
     lostReason: d['lostReason'] ?? '',
+    lostCode: d['lostCode'] ?? null,
     nextFollowUpAt: toDate(d['nextFollowUpAt']),
     lastContactAt: toDate(d['lastContactAt']),
     createdBy: d['createdBy'] ?? '',
@@ -79,6 +81,7 @@ export type PricingPatch = Omit<LeadPricing, 'serviceName'> & { serviceName: str
 export class LeadsService {
   private readonly db = inject(FIRESTORE);
   private readonly auth = inject(AuthService);
+  private readonly followUps = inject(FollowUpsService);
   private readonly live = teamQuery(
     () =>
       this.auth.isAdmin()
@@ -158,6 +161,7 @@ export class LeadsService {
       value: p?.value ?? 0,
       priceAck: null,
       lostReason: '',
+      lostCode: null,
       nextFollowUpAt: next ? Timestamp.fromDate(next.dueAt) : null,
       lastContactAt: null,
       wonAt: input.stage === 'won' ? serverTimestamp() : null,
@@ -234,25 +238,38 @@ export class LeadsService {
     await batch.commit();
   }
 
-  /** Cambia de etapa y deja constancia en el historial. */
-  async moveToStage(lead: Lead, to: Stage, lostReason = ''): Promise<void> {
+  /**
+   * Cambia de etapa y deja constancia en el historial. Cerrar (ganado o perdido) cancela en el
+   * mismo batch los follow-ups pendientes del lead: un negocio cerrado no vuelve a salir en Hoy.
+   */
+  async moveToStage(lead: Lead, to: Stage, lost: { code: LostCode | null; detail: string } | null = null): Promise<void> {
     if (lead.stage === to) return;
     if (this.locked(lead)) throw new Error(t('detail.wonLocked'));
     const after: DealState = { ...lead, stage: to };
+    const closing = isClosed(to) && !isClosed(lead.stage);
     const batch = writeBatch(this.db);
     this.patchContact(batch, lead, after, await this.firstWonMissing(lead.contactId, after));
+    const isLost = to === 'lost';
+    const detail = isLost ? (lost?.detail.trim() ?? '') : '';
+    const code = isLost ? (lost?.code ?? null) : null;
     batch.update(doc(this.db, 'leads', lead.id), {
       stage: to,
-      lostReason: to === 'lost' ? lostReason : '',
+      lostReason: detail,
+      lostCode: code,
       wonAt: to === 'won' ? serverTimestamp() : null,
-      lostAt: to === 'lost' ? serverTimestamp() : null,
+      lostAt: isLost ? serverTimestamp() : null,
+      ...(closing ? { nextFollowUpAt: null } : {}),
       updatedAt: serverTimestamp(),
     });
+    if (closing) {
+      for (const fu of this.followUps.forLead(lead.id)) batch.update(doc(this.db, 'followups', fu.id), { status: 'cancelled' });
+    }
+    const reason = isLost ? lostReasonLabel({ lostCode: code, lostReason: detail }) : '';
     batch.set(doc(collection(this.db, 'leads', lead.id, 'activities')), {
       type: 'stage',
       from: lead.stage,
       to,
-      body: to === 'lost' && lostReason ? lostReason : `${stageMeta(lead.stage).label} → ${stageMeta(to).label}`,
+      body: reason || `${stageMeta(lead.stage).label} → ${stageMeta(to).label}`,
       createdBy: this.auth.uid(),
       createdAt: serverTimestamp(),
     });
