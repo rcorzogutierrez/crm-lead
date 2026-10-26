@@ -1,0 +1,189 @@
+<div class="mx-auto max-w-[56rem] px-4 pt-6 pb-10 sm:px-6 lg:px-10 lg:pt-10">
+  <h1 class="date-face text-[2rem] leading-tight font-bold">{{ t('nav.settings') }}</h1>
+  <app-section-tabs class="mt-3 block" [tabs]="settingsTabs" label="settings.views" />
+  <p class="mt-3 text-ink-2">{{ t('company.intro') }}</p>
+
+  @if (!auth.isAdmin()) {
+    <p class="mt-3 flex items-center gap-1.5 text-sm text-ink-2">
+      <svg lucideLock [size]="14" aria-hidden="true" class="shrink-0 text-ink-3"></svg>
+      {{ t('company.adminOnly') }}
+    </p>
+  }
+
+  @if (!companies.loaded()) {
+    <div class="mt-8 space-y-3" aria-hidden="true">
+      <div class="h-48 animate-pulse rounded-page bg-sheet-2"></div>
+      <div class="h-40 animate-pulse rounded-page bg-sheet-2"></div>
+    </div>
+  } @else {
+    <form class="mt-8 space-y-8" novalidate (submit)="save($event)">
+      <fieldset class="min-w-0 space-y-8" [disabled]="!auth.isAdmin()">
+        <!-- Empresa -->
+        <section aria-labelledby="co-who">
+          <h2 id="co-who" class="text-sm font-bold">{{ t('company.who') }}</h2>
+          <div class="sheet mt-2 grid gap-4 p-4 sm:grid-cols-2">
+            <div class="sm:col-span-2">
+              <p class="field-label" id="co-logo-label">{{ t('company.logo') }}</p>
+              <div class="flex flex-wrap items-center gap-3">
+                <div
+                  class="grid h-20 w-60 max-w-full place-items-center rounded-lg border bg-sheet p-2"
+                  [class]="model().logo ? 'border-rule' : 'border-dashed border-rule-strong'"
+                >
+                  @if (model().logo) {
+                    <img [src]="model().logo" alt="" class="max-h-full max-w-full object-contain" />
+                  } @else {
+                    <span class="text-xs text-ink-3">{{ t('company.noLogo') }}</span>
+                  }
+                </div>
+                @if (auth.isAdmin()) {
+                  <div class="flex flex-wrap gap-2">
+                    <label class="btn-secondary btn-sm cursor-pointer has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-pen" [class.opacity-60]="logoBusy()">
+                      <svg lucideImageUp [size]="16"></svg>
+                      {{ model().logo ? t('company.changeLogo') : t('company.uploadLogo') }}
+                      <input
+                        type="file"
+                        class="sr-only"
+                        accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                        aria-describedby="co-logo-hint"
+                        [disabled]="logoBusy()"
+                        (change)="pickLogo($event)"
+                      />
+                    </label>
+                    @if (model().logo) {
+                      <button type="button" class="btn-ghost btn-sm" (click)="removeLogo()">
+                        <svg lucideTrash2 [size]="14"></svg>
+                        {{ t('company.removeLogo') }}
+                      </button>
+                    }
+                  </div>
+                }
+              </div>
+              <p id="co-logo-hint" class="mt-1.5 text-xs text-ink-3">{{ t('company.logoHint') }}</p>
+            </div>
+            <div>
+              <label class="field-label" for="co-trade">{{ t('company.tradeName') }}</label>
+              <input id="co-trade" class="input" autocomplete="organization" [placeholder]="t('common.optional')" [formField]="f.tradeName" />
+            </div>
+            <div>
+              <label class="field-label" for="co-legal">{{ t('company.legalName') }}</label>
+              <input id="co-legal" class="input" autocomplete="off" [formField]="f.legalName" />
+              @if (f.legalName().touched() && f.legalName().invalid()) {
+                <p class="field-error">{{ t($any(f.legalName().errors()[0].message)) }}</p>
+              }
+            </div>
+            <div>
+              <label class="field-label" for="co-ein">{{ t('company.taxId') }}</label>
+              <input id="co-ein" class="input tabular" autocomplete="off" placeholder="12-3456789" [formField]="f.taxId" />
+            </div>
+          </div>
+        </section>
+
+        <!-- Dirección y contacto -->
+        <section aria-labelledby="co-where">
+          <h2 id="co-where" class="text-sm font-bold">{{ t('company.where') }}</h2>
+          <div class="sheet mt-2 grid gap-4 p-4 sm:grid-cols-6">
+            <div class="sm:col-span-6">
+              <label class="field-label" for="co-a1">{{ t('company.address1') }}</label>
+              <input id="co-a1" class="input" autocomplete="address-line1" [formField]="f.address1" />
+            </div>
+            <div class="sm:col-span-6">
+              <label class="field-label" for="co-a2">{{ t('company.address2') }}</label>
+              <input id="co-a2" class="input" autocomplete="address-line2" [placeholder]="t('common.optional')" [formField]="f.address2" />
+            </div>
+            <div class="sm:col-span-3">
+              <label class="field-label" for="co-city">{{ t('company.city') }}</label>
+              <input id="co-city" class="input" autocomplete="address-level2" [formField]="f.city" />
+            </div>
+            <div class="sm:col-span-2">
+              <label class="field-label" for="co-state">{{ t('company.state') }}</label>
+              <select id="co-state" class="input" [value]="model().state" (change)="setField('state', $any($event.target).value)">
+                <option value="">—</option>
+                @for (s of states; track s.code) {
+                  <option [value]="s.code" [selected]="s.code === model().state">{{ s.code }} · {{ s.name }}</option>
+                }
+              </select>
+            </div>
+            <div class="sm:col-span-1">
+              <label class="field-label" for="co-zip">{{ t('company.zip') }}</label>
+              <input id="co-zip" class="input tabular" autocomplete="postal-code" inputmode="numeric" [formField]="f.zip" />
+            </div>
+            <div class="sm:col-span-2">
+              <label class="field-label" for="co-phone">{{ t('company.phone') }}</label>
+              <input id="co-phone" class="input tabular" type="tel" autocomplete="tel" [formField]="f.phone" />
+            </div>
+            <div class="sm:col-span-2">
+              <label class="field-label" for="co-email">{{ t('field.email') }}</label>
+              <input id="co-email" class="input" type="email" autocomplete="email" [formField]="f.email" />
+              @if (f.email().touched() && f.email().invalid()) {
+                <p class="field-error">{{ t($any(f.email().errors()[0].message)) }}</p>
+              }
+            </div>
+            <div class="sm:col-span-2">
+              <label class="field-label" for="co-web">{{ t('company.website') }}</label>
+              <input id="co-web" class="input" type="url" autocomplete="url" placeholder="example.com" [formField]="f.website" />
+            </div>
+          </div>
+        </section>
+
+        <!-- Facturación -->
+        <section aria-labelledby="co-billing">
+          <h2 id="co-billing" class="text-sm font-bold">{{ t('company.billing') }}</h2>
+          <div class="sheet mt-2 grid gap-4 p-4 sm:grid-cols-2">
+            <div>
+              <label class="field-label" for="co-tax">{{ t('company.taxRate') }}</label>
+              <div class="relative">
+                <input id="co-tax" class="input pr-9 tabular" type="number" inputmode="decimal" step="0.001" aria-describedby="co-tax-hint" [formField]="f.taxRate" />
+                <span class="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-sm text-ink-3" aria-hidden="true">%</span>
+              </div>
+              @if (f.taxRate().touched() && f.taxRate().invalid()) {
+                <p class="field-error">{{ t($any(f.taxRate().errors()[0].message)) }}</p>
+              }
+              <p id="co-tax-hint" class="mt-1.5 text-xs text-ink-3">{{ t('company.taxRateHint') }}</p>
+            </div>
+            <div>
+              <label class="field-label" for="co-fy">{{ t('company.fiscalYear') }}</label>
+              <select id="co-fy" class="input" aria-describedby="co-fy-hint" (change)="setField('fiscalYearStart', $any($event.target).value)">
+                @for (m of months(); track m.value) {
+                  <option [value]="m.value" [selected]="m.value === model().fiscalYearStart">{{ m.label }}</option>
+                }
+              </select>
+              <p id="co-fy-hint" class="mt-1.5 text-xs text-ink-3">{{ t('company.fiscalYearHint') }}</p>
+            </div>
+            <div>
+              <label class="field-label" for="co-prefix">{{ t('company.prefix') }}</label>
+              <input id="co-prefix" class="input" autocomplete="off" [formField]="f.invoicePrefix" />
+              @if (f.invoicePrefix().touched() && f.invoicePrefix().invalid()) {
+                <p class="field-error">{{ t($any(f.invoicePrefix().errors()[0].message)) }}</p>
+              }
+            </div>
+            <div>
+              <label class="field-label" for="co-next">{{ t('company.nextNumber') }}</label>
+              <input
+                id="co-next"
+                class="input tabular"
+                type="number"
+                inputmode="numeric"
+                step="1"
+                [min]="invoicesNext()"
+                aria-describedby="co-next-hint"
+                [attr.aria-invalid]="nextInvalid()"
+                [value]="next()"
+                (input)="next.set($any($event.target).valueAsNumber)"
+              />
+              <p id="co-next-hint" class="mt-1.5 text-xs" [class]="nextInvalid() ? 'font-semibold text-ribbon' : 'text-ink-3'">
+                {{ nextInvalid() ? t('company.nextInvalid', { n: invoicesNext() }) : t('company.nextHint', { sample: sample() }) }}
+              </p>
+            </div>
+          </div>
+        </section>
+      </fieldset>
+
+      @if (auth.isAdmin() && dirty()) {
+        <div class="sticky bottom-20 z-10 flex justify-end gap-2 rounded-lg border border-rule-strong bg-sheet p-3 shadow-lift lg:bottom-4">
+          <button type="button" class="btn-ghost btn-sm" (click)="discard()">{{ t('fu.discard') }}</button>
+          <button type="submit" class="btn-primary btn-sm" [disabled]="f().submitting()">{{ t('common.save') }}</button>
+        </div>
+      }
+    </form>
+  }
+</div>

@@ -10,7 +10,7 @@ import { ToastService } from './core/toast.service';
   template: `
     <router-outlet />
     <div
-      class="pointer-events-none fixed inset-x-0 bottom-20 z-50 flex flex-col items-center gap-2 px-4 lg:right-6 lg:bottom-6 lg:left-auto lg:items-end"
+      class="pointer-events-none fixed inset-x-0 bottom-20 z-50 flex print:hidden flex-col items-center gap-2 px-4 lg:right-6 lg:bottom-6 lg:left-auto lg:items-end"
       aria-live="polite"
       role="status"
     >

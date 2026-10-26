@@ -16,7 +16,7 @@ export type LeadSource =
 
 export type ContactChannel = 'call' | 'whatsapp' | 'email' | 'meeting' | 'task';
 
-export type ActivityType = ContactChannel | 'note' | 'stage' | 'created' | 'followup' | 'pricing';
+export type ActivityType = ContactChannel | 'note' | 'stage' | 'created' | 'followup' | 'pricing' | 'invoice';
 
 /** Motivo de pérdida, de una lista corta para que los reportes puedan agruparlo. */
 export type LostCode = 'price' | 'competitor' | 'noResponse' | 'timing' | 'notFit' | 'other';
@@ -99,9 +99,11 @@ export interface ServiceItem {
   /** Unidad de cobro ("persona", "noche"…); vacío = precio único. */
   unit: string;
   active: boolean;
+  /** ¿Se le suma el impuesto de venta en la factura? (los anteriores a este campo, sí). */
+  taxable: boolean;
 }
 
-export type ServiceItemDraft = Pick<ServiceItem, 'name' | 'description' | 'price' | 'unit' | 'active'>;
+export type ServiceItemDraft = Pick<ServiceItem, 'name' | 'description' | 'price' | 'unit' | 'active' | 'taxable'>;
 
 /** Porcentaje de cada categoría (doc `meta/pricing`). */
 export type TierRates = Record<PriceTier, number>;
@@ -168,6 +170,8 @@ export interface Lead {
   wonAt: Date | null;
   /** Cuándo pasó a Perdido (null en los anteriores a este campo y en los no perdidos). */
   lostAt: Date | null;
+  /** Factura vigente de la venta (`invoices/{id}`); null si no se ha facturado o se anuló. */
+  invoiceId: string | null;
 }
 
 /** Fecha en que se ganó un lead (los anteriores a `wonAt` usan su última actualización). */
@@ -293,6 +297,7 @@ const ACTIVITY_LABEL: Record<ActivityType, I18nKey> = {
   created: 'act.created',
   followup: 'act.followup',
   pricing: 'act.pricing',
+  invoice: 'act.invoice',
 };
 
 /** Nombre de un tipo de actividad en el idioma actual. */

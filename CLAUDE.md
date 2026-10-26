@@ -56,7 +56,9 @@ src/app/
     shell/         riel/barra de navegación (Hoy, Contactos, Negocios, Reportes, Ajustes) + panel de captura rápida (tecla N)
     today/         "Hoy": página de agenda (vencidos, horas del día, sin próxima acción)
     contacts/      clientes y prospectos; ficha con negocios abiertos, servicios comprados e historial
-    services/      catálogo de servicios y % de categorías (solo admin edita); con team/, la entrada "Ajustes"
+    services/      catálogo de servicios y % de categorías (solo admin edita); con team/ y company/, la entrada "Ajustes"
+    company/       datos de la empresa que factura (logo, EIN, dirección, % de impuesto, numeración)
+    invoices/      factura imprimible (`/invoices/:id`, imprimir o guardar PDF; el admin la anula)
     leads/         Negocios en lista, con búsqueda/filtros en la URL
     lead-detail/   ficha del negocio: etapas, próxima acción, historial, datos editables
     pipeline/      Negocios en tablero por etapas (drag & drop, Alt+←/→); lista y tablero son dos vistas
@@ -74,8 +76,11 @@ src/app/
 | `sessions/{uid}` | última entrada/salida | `signInAt`, `signOutAt`, `signOutReason: manual\|idle` — cada uno escribe solo el suyo con `serverTimestamp()`; solo el admin lee (se muestra en *Equipo*) |
 | `invites/{emailEnMinúsculas}` | invitación | `email`, `role`, `invitedBy` — se consume al entrar |
 | `contacts/{id}` | persona/empresa | `name`, `company`, `email` (minúsculas), `phone`, `assigneeId`, `notes`, `createdBy` + resumen `statsV`, `wonCount`, `wonTotal`, `firstWonAt`, `openBy` (uid → nº abiertos), `archived`, `archivedAt` — "cliente" si `wonCount > 0` |
-| `leads/{id}` | lead = oportunidad (un servicio para un contacto) | `contactId`, copia del contacto (`name`, `company`, `email`, `phone`), `serviceId`, `serviceName`, `detail`, `quantity`, `unitPrice`, `tier`, `tierPct`, `value`, `priceAck`, `extras` (más servicios de la misma compra), `source`, `stage`, `wonAt`, `lostAt`, `assigneeId`, `notes`, `lostCode` (motivo de la lista `LOST_REASONS`), `lostReason` (detalle libre), `nextFollowUpAt`, `lastContactAt`, `createdBy`, timestamps |
-| `services/{id}` | catálogo | `name`, `description`, `price` (oficial, por unidad), `unit`, `active` — solo admin escribe; se archivan, no se borran |
+| `leads/{id}` | lead = oportunidad (un servicio para un contacto) | `contactId`, copia del contacto (`name`, `company`, `email`, `phone`), `serviceId`, `serviceName`, `detail`, `quantity`, `unitPrice`, `tier`, `tierPct`, `value`, `priceAck`, `extras` (más servicios de la misma compra), `source`, `stage`, `wonAt`, `lostAt`, `assigneeId`, `notes`, `lostCode` (motivo de la lista `LOST_REASONS`), `lostReason` (detalle libre), `nextFollowUpAt`, `lastContactAt`, `invoiceId` (factura vigente), `createdBy`, timestamps |
+| `services/{id}` | catálogo | `name`, `description`, `price` (oficial, por unidad), `unit`, `active`, `taxable` (sin campo = sí) — solo admin escribe; se archivan, no se borran |
+| `meta/company` | único | `legalName`, `tradeName`, `taxId` (EIN), dirección (`address1/2`, `city`, `state`, `zip`), `phone`, `email`, `website`, `logo` (data URL ≤ 200 KB), `fiscalYearStart` (1–12), `taxRate` (0–30 %), `invoicePrefix` — todos leen, solo admin escribe |
+| `meta/invoiceSeq` | único | `next`: próximo número de factura; sube de uno en uno en el mismo lote que la factura; el admin fija el arranque (nunca hacia atrás) |
+| `invoices/{número}` | factura | `number`, `prefix`, `leadId`, `contactId`, `assigneeId`, `billTo`, `issuer` (copia), `lines` (`name`, `quantity`, `unit`, `unitPrice`, `amount`, `taxable`), `subtotal`, `taxable` (base), `taxRate`, `tax`, `total`, `currency: USD`, `notes`, `dueAt`, `status: issued\|void`, `issuedAt/By/ByName`, `voidReason/At/By` |
 | `meta/pricing` | único | `bronze`, `silver`, `gold` (% sobre el precio oficial; por defecto 3/5/7) — solo admin |
 | `leads/{id}/activities/{id}` | historial | `type` (call, whatsapp, email, meeting, note, stage, created, followup), `body`, `from`/`to`, `createdBy`, `createdAt` |
 | `followups/{id}` | próxima acción | `leadId`, `leadName`, `company`, `assigneeId`, `dueAt`, `channel`, `note`, `status: pending\|done\|cancelled`, `completedAt`/`outcome` al hacerlo |
@@ -96,6 +101,7 @@ Reglas de dominio:
 - Editar un contacto copia nombre/empresa/email/teléfono a sus leads y follow-ups pendientes (`ContactsService.update`). Los leads antiguos sin `contactId` se vinculan con el botón del admin en *Clientes* (`migrateLegacy`).
 - Un equipo pequeño cabe en memoria: leads y follow-ups pendientes se escuchan completos en vivo y se filtran en el cliente. Si el volumen crece (> ~5.000 leads), paginar y filtrar en servidor.
 - Resumen del contacto: un vendedor no ve los leads de otros, así que el contacto guarda sus compras y quién tiene negocios abiertos. Toda escritura de leads que cambie etapa, responsable o existencia actualiza el contacto en el **mismo batch** (`statsPatch` en `core/contact-stats.ts`, usado por `LeadsService`). La app de un admin lo recalcula desde todos los leads si no coincide (`ContactsService.syncStats`); solo se confía en él si `statsV` coincide. Las reglas solo dejan a un vendedor moverlo lo que mueve un lead suyo (±1 venta, ±1 en su propio `openBy`, sin tocar `statsV`).
+- Facturas (EE. UU.): se emiten desde una venta ganada (su responsable o un admin; `InvoicesService.issue`, cálculos puros en `core/invoice-math.ts`). Cada línea lleva su precio con la categoría aplicada (no se muestra el desglose) y suma el valor del negocio; el impuesto de venta va **aparte**, al `taxRate` de la empresa y solo sobre servicios `taxable`. Sin descuentos por ahora. Las reglas exigen el número siguiente, subtotal = `value`, el % vigente y que la venta no tenga ya factura. No se editan ni borran: el admin anula (con motivo) y la venta se puede volver a facturar. Con factura vigente la venta no se reabre ni se borra (`LeadsService.locked`). Las reglas de leads van justas del tope de 1000 expresiones (4 servicios): medir antes de añadir más comprobaciones.
 - Índices compuestos requeridos (`firestore.indexes.json`): `followups (status, dueAt)` y `(assigneeId, status, dueAt)`; `leads (assigneeId, createdAt desc)`.
 
 ## Acceso y seguridad

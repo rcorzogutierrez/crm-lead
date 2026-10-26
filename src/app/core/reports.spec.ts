@@ -16,6 +16,7 @@ function lead(p: Partial<Lead>): Lead {
     lostReason: '',
     lostCode: null,
     extras: [],
+    invoiceId: null,
     nextFollowUpAt: null,
     lastContactAt: null,
     createdBy: 'u1',

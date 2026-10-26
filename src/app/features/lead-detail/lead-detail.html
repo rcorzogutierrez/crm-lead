@@ -68,7 +68,7 @@
     @if (locked()) {
       <p id="won-locked" class="mt-2 flex items-center gap-1.5 text-sm text-ink-2">
         <svg lucideLock [size]="14" aria-hidden="true" class="shrink-0 text-ink-3"></svg>
-        {{ t('detail.wonLocked') }}
+        {{ leadsService.lockMessage(lead) }}
       </p>
     }
 
@@ -165,6 +165,10 @@
             }
           </div>
         </section>
+
+        @if (lead.stage === 'won') {
+          <app-deal-invoice [lead]="lead" />
+        }
 
         <!-- Próxima acción -->
         <section aria-labelledby="next-title">

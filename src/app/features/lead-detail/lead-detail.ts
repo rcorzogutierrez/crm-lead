@@ -51,6 +51,7 @@ import { FollowUpItem } from '../../shared/followup-item';
 import { ScheduleForm } from '../../shared/schedule-form';
 import { LinesEditor } from '../../shared/lines-editor';
 import { TierPicker } from '../../shared/tier-picker';
+import { DealInvoice } from '../../shared/deal-invoice';
 import { CloseDeal } from '../../shared/close-deal';
 
 const LOG_TYPES: { id: ActivityType; label: I18nKey }[] = [
@@ -75,6 +76,7 @@ const LOG_TYPES: { id: ActivityType; label: I18nKey }[] = [
     TierPicker,
     LinesEditor,
     CloseDeal,
+    DealInvoice,
     LucideArrowLeft,
     LucideTriangleAlert,
     LucideUserRound,
@@ -93,7 +95,7 @@ export class LeadDetail {
   private readonly router = inject(Router);
   private readonly clock = inject(Clock);
   protected readonly auth = inject(AuthService);
-  private readonly leadsService = inject(LeadsService);
+  protected readonly leadsService = inject(LeadsService);
   private readonly activitiesService = inject(ActivitiesService);
   protected readonly followUps = inject(FollowUpsService);
   protected readonly members = inject(MembersService);
@@ -453,6 +455,7 @@ export class LeadDetail {
     // Igual que las reglas: el admin, o su creador si sigue siendo el responsable y no está ganado.
     return (
       !!lead &&
+      !lead.invoiceId &&
       (this.auth.isAdmin() || (lead.createdBy === this.auth.uid() && lead.assigneeId === this.auth.uid() && lead.stage !== 'won'))
     );
   }

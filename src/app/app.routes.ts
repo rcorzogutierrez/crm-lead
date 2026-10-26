@@ -69,6 +69,16 @@ export const routes: Routes = [
         title: 'nav.team',
         loadComponent: () => import('./features/team/team').then((m) => m.Team),
       },
+      {
+        path: 'company',
+        title: 'nav.company',
+        loadComponent: () => import('./features/company/company-page').then((m) => m.CompanyPage),
+      },
+      {
+        path: 'invoices/:id',
+        title: 'invoice.title',
+        loadComponent: () => import('./features/invoices/invoice-page').then((m) => m.InvoicePage),
+      },
     ],
   },
   { path: '**', redirectTo: '' },

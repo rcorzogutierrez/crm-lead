@@ -35,7 +35,9 @@ interface Formats {
   dayMonth: Intl.DateTimeFormat;
   time: Intl.DateTimeFormat;
   full: Intl.DateTimeFormat;
+  date: Intl.DateTimeFormat;
   money: Intl.NumberFormat;
+  cents: Intl.NumberFormat;
 }
 const cache = new Map<Lang, Formats>();
 
@@ -50,7 +52,10 @@ function fmt(): Formats {
       dayMonth: new Intl.DateTimeFormat(loc, { day: 'numeric', month: 'short' }),
       time: new Intl.DateTimeFormat(loc, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }),
       full: new Intl.DateTimeFormat(loc, { dateStyle: 'medium', timeStyle: 'short', hourCycle: 'h23' }),
+      date: new Intl.DateTimeFormat(loc, { dateStyle: 'long' }),
       money: new Intl.NumberFormat(loc, { maximumFractionDigits: 0 }),
+      // Facturas en dólares de EE. UU.: separadores de allí también en español ("$2,472.00").
+      cents: new Intl.NumberFormat(loc === 'es' ? 'es-US' : loc, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
     };
     cache.set(current, f);
   }
@@ -123,4 +128,14 @@ export function presetDate(preset: 'tomorrow' | 'in3' | 'nextWeek', now: Date): 
 
 export function moneyLabel(value: number): string {
   return `$${fmt().money.format(value || 0)}`;
+}
+
+/** Importe con centavos ("$1,030.00"), para facturas. */
+export function centsLabel(value: number): string {
+  return `$${fmt().cents.format(value || 0)}`;
+}
+
+/** Fecha larga sin hora ("26 de octubre de 2026"). */
+export function dateLabel(d: Date | null): string {
+  return d ? fmt().date.format(d) : '';
 }

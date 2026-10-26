@@ -6,7 +6,7 @@
 
 <!-- Riel pizarra (escritorio) -->
 <aside
-  class="rail-surface fixed inset-y-0 left-0 z-30 hidden w-60 flex-col text-rail-ink lg:flex"
+  class="rail-surface fixed inset-y-0 left-0 z-30 hidden w-60 flex-col text-rail-ink lg:flex print:hidden"
   [attr.aria-label]="t('shell.mainNav')"
 >
   <div class="flex items-center gap-2.5 px-5 pt-6 pb-5">
@@ -69,7 +69,7 @@
 </aside>
 
 <!-- Barra superior (móvil) -->
-<header class="rail-surface sticky top-0 z-30 flex h-14 items-center gap-2.5 pr-[max(1rem,env(safe-area-inset-right))] pl-[max(1rem,env(safe-area-inset-left))] text-rail-ink lg:hidden">
+<header class="rail-surface sticky top-0 z-30 flex h-14 print:hidden items-center gap-2.5 pr-[max(1rem,env(safe-area-inset-right))] pl-[max(1rem,env(safe-area-inset-left))] text-rail-ink lg:hidden">
   <app-logo [size]="28" />
   <span class="date-face text-base font-bold">CRM Lead</span>
   <app-lang-switch tone="rail" class="ml-auto" />
@@ -104,13 +104,13 @@
   }
 </header>
 
-<main id="main" class="min-h-dvh pb-24 lg:pb-0" tabindex="-1">
+<main id="main" class="min-h-dvh pb-24 lg:pb-0 print:min-h-0 print:pb-0" tabindex="-1">
   <router-outlet />
 </main>
 
 <!-- Navegación inferior (móvil) -->
 <nav
-  class="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-rule bg-sheet pb-[env(safe-area-inset-bottom)] shadow-[0_-1px_0_var(--color-rule)] lg:hidden"
+  class="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 print:hidden border-t border-rule bg-sheet pb-[env(safe-area-inset-bottom)] shadow-[0_-1px_0_var(--color-rule)] lg:hidden"
   [attr.aria-label]="t('shell.mainNav')"
 >
   @for (item of mobileMain().slice(0, 2); track item.icon) {
