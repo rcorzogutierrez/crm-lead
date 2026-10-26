@@ -31,8 +31,8 @@ import { t } from '../core/i18n/i18n';
               [attr.aria-describedby]="i === 0 && invalid() ? errorId() : null"
               (change)="setService(i, $any($event.target).value)"
             >
-              @if (i === 0 ? allowNone() : !line.serviceId) {
-                <option value="" [selected]="!line.serviceId">{{ i === 0 ? t('capture.noService') : t('lines.choose') }}</option>
+              @if ((i === 0 && allowNone()) || !line.serviceId) {
+                <option value="" [selected]="!line.serviceId">{{ i === 0 && allowNone() ? t('capture.noService') : t('lines.choose') }}</option>
               }
               @for (s of optionsFor(i); track s.id) {
                 <option [value]="s.id" [selected]="s.id === line.serviceId">

@@ -458,6 +458,17 @@ describe('Precio de un lead', () => {
     await assertFails(updateDoc(doc(db(LUIS), 'leads/n'), { value: 500 }));
   });
 
+  it('una venta lleva al menos un servicio: ni se crea ganada ni se gana sin él', async () => {
+    const bare = { serviceId: null, serviceName: null, quantity: null, unitPrice: null, tier: null, tierPct: null, value: 0 };
+    await assertFails(setDoc(doc(db(LUIS), 'leads/n'), lead(LUIS, { ...bare, stage: 'won' })));
+    await assertSucceeds(setDoc(doc(db(LUIS), 'leads/n'), lead(LUIS, bare)));
+    await assertFails(updateDoc(doc(db(LUIS), 'leads/n'), { stage: 'won' }));
+    await assertSucceeds(updateDoc(doc(db(LUIS), 'leads/luis-1'), { stage: 'won' }));
+    // Las ventas antiguas sin servicio siguen pudiendo editarse.
+    await seed({ 'leads/legacy': lead(LUIS, { ...bare, stage: 'won' }) });
+    await assertSucceeds(updateDoc(doc(db(LUIS), 'leads/legacy'), { notes: 'ok' }));
+  });
+
   it('si sube el precio oficial, un lead abierto conserva el pactado o toma el nuevo', async () => {
     await seed({
       'services/web': { name: 'Sitio web', description: '', price: 1200, unit: 'u', active: true },

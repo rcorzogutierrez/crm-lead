@@ -163,11 +163,12 @@
             <app-lines-editor
               idPrefix="c"
               [(lines)]="lines"
+              [allowNone]="false"
               [invalid]="showNeedService() && needService()"
               errorId="c-service-error"
             />
             @if (showNeedService() && needService()) {
-              <p id="c-service-error" class="field-error" role="alert">{{ t('capture.soldNeedsService') }}</p>
+              <p id="c-service-error" class="field-error" role="alert">{{ sold() ? t('capture.soldNeedsService') : t('capture.needsService') }}</p>
             }
             @if (priced().length) {
               <div>

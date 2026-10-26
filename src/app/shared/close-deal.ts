@@ -1,4 +1,5 @@
 import { Component, ElementRef, afterNextRender, computed, inject, input, output, signal, viewChild } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import { dealTitle } from '../core/deal-lines';
 import { moneyLabel } from '../core/dates';
 import { firestoreErrorMessage } from '../core/firestore-utils';
@@ -14,6 +15,7 @@ import { ToastService } from '../core/toast.service';
  */
 @Component({
   selector: 'app-close-deal',
+  imports: [RouterLink],
   template: `
     <form
       #box
@@ -27,7 +29,12 @@ import { ToastService } from '../core/toast.service';
         {{ to() === 'won' ? t('close.wonTitle', { name: title() }) : t('close.lostTitle', { name: title() }) }}
       </p>
 
-      @if (to() === 'won') {
+      @if (needsService()) {
+        <p class="text-sm" role="alert">
+          {{ t('close.needsService') }}
+          <a class="font-semibold text-pen hover:underline" [routerLink]="['/leads', lead().id]">{{ t('close.goChooseService') }}</a>
+        </p>
+      } @else if (to() === 'won') {
         @if (lead().value) {
           <p class="text-sm text-ink-2">{{ t('close.wonValue', { value: money(lead().value) }) }}</p>
         }
@@ -73,7 +80,7 @@ import { ToastService } from '../core/toast.service';
       }
       <div class="flex flex-wrap items-center justify-end gap-2">
         <button type="button" class="btn-ghost btn-sm" [disabled]="busy()" (click)="cancelled.emit()">{{ t('common.cancel') }}</button>
-        <button type="submit" class="btn-primary btn-sm" [disabled]="busy() || (to() === 'lost' && !code())">
+        <button type="submit" class="btn-primary btn-sm" [disabled]="busy() || needsService() || (to() === 'lost' && !code())">
           {{ busy() ? t('common.saving') : to() === 'won' ? t('close.markWon') : t('detail.markLost') }}
         </button>
       </div>
@@ -99,6 +106,8 @@ export class CloseDeal {
   protected readonly busy = signal(false);
   protected readonly error = signal<string | null>(null);
 
+  /** Una venta lleva al menos un servicio (los negocios antiguos sin servicio lo eligen antes en la ficha). */
+  protected readonly needsService = computed(() => this.to() === 'won' && !this.lead().serviceId);
   protected readonly title = computed(() => dealTitle(this.lead()) || this.lead().name);
   protected readonly pendingCount = computed(() => this.followUps.forLead(this.lead().id).length);
 
@@ -113,7 +122,7 @@ export class CloseDeal {
     event.preventDefault();
     const lead = this.lead();
     const to = this.to();
-    if (to === 'lost' && !this.code()) return;
+    if ((to === 'lost' && !this.code()) || this.needsService()) return;
     this.busy.set(true);
     this.error.set(null);
     try {
