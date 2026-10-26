@@ -120,7 +120,8 @@ export class CaptureDrawer {
   protected readonly sold = computed(() => this.outcome() === 'won');
   protected readonly postSale = signal(true);
   /** Una venta necesita saber qué se vendió (si hay catálogo). */
-  protected readonly needService = computed(() => this.sold() && this.catalog.active().length > 0 && !this.priced().length);
+  /** Un negocio es un servicio para un contacto: con catálogo, siempre se elige al menos uno. */
+  protected readonly needService = computed(() => this.catalog.active().length > 0 && !this.priced().length);
   protected readonly showNeedService = signal(false);
 
   protected readonly scheduleNext = signal(true);

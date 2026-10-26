@@ -28,9 +28,9 @@
         (input)="setParam('search', $any($event.target).value)"
       />
     </div>
-    <select class="input h-9 w-auto text-sm" [attr.aria-label]="t('field.stage')" [value]="stage()" (change)="setParam('stage', $any($event.target).value === 'open' ? null : $any($event.target).value)">
-      <option value="open">{{ t('today.active') }}</option>
+    <select class="input h-9 w-auto text-sm" [attr.aria-label]="t('field.stage')" [value]="stage()" (change)="setParam('stage', $any($event.target).value === 'all' ? null : $any($event.target).value)">
       <option value="all">{{ t('list.allStages') }}</option>
+      <option value="open">{{ t('today.active') }}</option>
       @for (s of stages; track s.id) {
         <option [value]="s.id">{{ s.label }}</option>
       }

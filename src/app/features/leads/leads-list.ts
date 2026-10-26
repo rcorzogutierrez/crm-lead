@@ -47,7 +47,8 @@ export class LeadsList {
 
   private readonly params = toSignal(this.route.queryParamMap, { requireSync: true });
   protected readonly search = computed(() => this.params().get('search') ?? '');
-  protected readonly stage = computed(() => this.params().get('stage') ?? 'open');
+  /** Por defecto se ven todos (también los ganados y perdidos); `?stage=open` deja solo los activos. */
+  protected readonly stage = computed(() => this.params().get('stage') ?? 'all');
   protected readonly source = computed(() => this.params().get('source') ?? '');
   protected readonly assignee = computed(() => this.params().get('assignee') ?? '');
   protected readonly onlyOrphans = computed(() => this.params().get('filter') === 'no-action');
@@ -101,10 +102,13 @@ export class LeadsList {
     });
   });
 
-  protected readonly totalValue = computed(() => moneyLabel(this.filtered().reduce((s, l) => s + l.value, 0)));
+  /** "En juego": solo lo que sigue abierto de lo que se ve. */
+  protected readonly totalValue = computed(() =>
+    moneyLabel(this.filtered().reduce((s, l) => s + (isClosed(l.stage) ? 0 : l.value), 0)),
+  );
   protected readonly hasFilters = computed(
     () =>
-      !!(this.search() || this.source() || this.assignee() || this.onlyOrphans() || this.onlyPriceChanges() || this.stage() !== 'open'),
+      !!(this.search() || this.source() || this.assignee() || this.onlyOrphans() || this.onlyPriceChanges() || this.stage() !== 'all'),
   );
 
   constructor() {

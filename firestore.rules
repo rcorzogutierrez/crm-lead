@@ -434,6 +434,8 @@ service cloud.firestore {
         && (adminRole() || isMine(request.resource.data))
         && validLead(request.resource.data)
         && pricingOnCreate(request.resource.data)
+        // Una venta lleva al menos un servicio del catálogo.
+        && (request.resource.data.stage != 'won' || hasService(request.resource.data))
         && request.resource.data.get('invoiceId', null) == null
         && request.resource.data.createdBy == request.auth.uid;
       // Solo un admin cambia el responsable (reasignar) o el contacto del lead,
@@ -445,6 +447,7 @@ service cloud.firestore {
         && validLead(request.resource.data)
         && pricingOnUpdate(request.resource.data, resource.data)
         && invoiceOnUpdate(request.resource.data, resource.data, leadId)
+        && (request.resource.data.stage != 'won' || resource.data.stage == 'won' || hasService(request.resource.data))
         && request.resource.data.createdBy == resource.data.createdBy;
       // Una venta ganada solo la borra un admin, y nunca con factura vigente (se anula antes).
       allow delete: if resource.data.get('invoiceId', null) == null && (isAdmin()
