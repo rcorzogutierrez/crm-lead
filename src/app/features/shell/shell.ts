@@ -1,17 +1,17 @@
 import { Component, DestroyRef, computed, effect, inject, signal } from '@angular/core';
-import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { toSignal } from '@angular/core/rxjs-interop';
+import { NavigationEnd, Router, RouterLink, RouterOutlet } from '@angular/router';
+import { filter, map } from 'rxjs';
 import {
   LucideBookUser,
   LucideCalendarDays,
   LucideChartColumn,
   LucideClock,
-  LucideColumns3,
   LucideEllipsis,
-  LucidePackage,
+  LucideHandshake,
   LucideLogOut,
   LucidePlus,
-  LucideUsers,
-  LucideUserRoundCog,
+  LucideSettings,
 } from '@lucide/angular';
 import { AuthService } from '../../core/auth.service';
 import { FollowUpsService } from '../../core/followups.service';
@@ -26,7 +26,8 @@ import { CaptureDrawer } from './capture-drawer';
 interface NavItem {
   path: string;
   label: I18nKey;
-  icon: 'today' | 'contacts' | 'leads' | 'pipeline' | 'reports' | 'services' | 'team';
+  icon: 'today' | 'contacts' | 'deals' | 'reports' | 'settings';
+  match: readonly string[];
 }
 
 /** Marco de la app: riel pizarra (escritorio) o barra inferior (móvil). */
@@ -35,7 +36,6 @@ interface NavItem {
   imports: [
     RouterOutlet,
     RouterLink,
-    RouterLinkActive,
     Avatar,
     CaptureDrawer,
     Logo,
@@ -44,13 +44,11 @@ interface NavItem {
     LucideCalendarDays,
     LucideChartColumn,
     LucideClock,
-    LucideColumns3,
     LucideEllipsis,
-    LucidePackage,
+    LucideHandshake,
     LucideLogOut,
     LucidePlus,
-    LucideUsers,
-    LucideUserRoundCog,
+    LucideSettings,
   ],
   templateUrl: './shell.html',
   host: {
@@ -90,18 +88,34 @@ export class Shell {
     });
   }
 
-  protected readonly nav: readonly NavItem[] = [
-    { path: '/today', label: 'nav.today', icon: 'today' },
-    { path: '/contacts', label: 'nav.contacts', icon: 'contacts' },
-    { path: '/leads', label: 'nav.leads', icon: 'leads' },
-    { path: '/pipeline', label: 'nav.pipeline', icon: 'pipeline' },
-    { path: '/reports', label: 'nav.reports', icon: 'reports' },
-    { path: '/services', label: 'nav.services', icon: 'services' },
-    { path: '/team', label: 'nav.team', icon: 'team' },
-  ];
-  /** Barra móvil: los cuatro más usados; el resto va en "Más". */
-  protected readonly mobileMain = this.nav.filter((n) => ['today', 'contacts', 'pipeline'].includes(n.icon));
-  protected readonly mobileMore = this.nav.filter((n) => !['today', 'contacts', 'pipeline'].includes(n.icon));
+  /**
+   * Cinco entradas: Negocios reúne la lista y el tablero (vuelve a la última vista usada)
+   * y Ajustes reúne servicios y equipo. `match` marca la entrada activa en sus subpáginas.
+   */
+  protected readonly nav = computed<readonly NavItem[]>(() => [
+    { path: '/today', label: 'nav.today', icon: 'today', match: ['/today'] },
+    { path: '/contacts', label: 'nav.contacts', icon: 'contacts', match: ['/contacts'] },
+    { path: this.ui.dealsView(), label: 'nav.leads', icon: 'deals', match: ['/leads', '/pipeline'] },
+    { path: '/reports', label: 'nav.reports', icon: 'reports', match: ['/reports'] },
+    { path: '/services', label: 'nav.settings', icon: 'settings', match: ['/services', '/team'] },
+  ]);
+  /** Barra móvil: Hoy, Contactos y Negocios; el resto va en "Más". */
+  protected readonly mobileMain = computed(() => this.nav().filter((n) => ['today', 'contacts', 'deals'].includes(n.icon)));
+  protected readonly mobileMore = computed(() => this.nav().filter((n) => !['today', 'contacts', 'deals'].includes(n.icon)));
+
+  private readonly url = toSignal(
+    this.router.events.pipe(
+      filter((e) => e instanceof NavigationEnd),
+      map(() => this.router.url),
+    ),
+    { initialValue: this.router.url },
+  );
+
+  protected isActive(item: NavItem): boolean {
+    const path = this.url().split(/[?#]/)[0];
+    return item.match.some((m) => path === m || path.startsWith(`${m}/`));
+  }
+
   protected readonly moreOpen = signal(false);
   /** Menú de la cuenta en la barra superior móvil (nombre, rol y cerrar sesión). */
   protected readonly accountOpen = signal(false);

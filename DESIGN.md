@@ -38,6 +38,8 @@ Estrategia: Restrained. Base neutra gris azulada; el índigo solo para acciones 
 - `.sheet`: hoja con borde `rule`, radio 10px, sombra suave con desplazamiento.
 - Chips de fecha (`app-due-chip`): vencido sólido rojo con texto blanco, hoy resaltador, sin próxima acción borde rojo punteado.
 - Toggles segmentados para "Lo mío / Todo el equipo".
+- Pestañas de sección (`shared/section-tabs.ts`): mismo aspecto que los toggles segmentados pero son enlaces (`aria-current="page"`). Negocios: Lista / Tablero; Ajustes: Servicios / Equipo. El riel tiene cinco entradas: Hoy, Contactos, Negocios, Reportes, Ajustes.
+- Cerrar un negocio (`shared/close-deal.ts`): panel en línea bajo las etapas (ficha) o encima del tablero (pipeline). Ganado en `ok-soft` con la casilla de postventa marcada; perdido en hoja blanca con los motivos como chips de radio (mismo estilo que el tipo de registro del historial) y un detalle opcional. Dice cuántos follow-ups se cancelan. Sin modal.
 - Panel de captura: `<dialog>` lateral derecho, entra 240ms ease-out-quart.
 - Cerrar la captura con algo escrito (Esc, fondo, Cancelar, X) pregunta en el pie del panel: "Seguir editando" o "Descartar". Nunca se pierde lo escrito sin aviso.
 - Confirmaciones en línea (archivar, eliminar, quitar acceso): el foco pasa a la confirmación y vuelve al botón al cancelar. Solo lo irreversible (eliminar) confirma con `.btn-danger`; archivar es reversible y usa `.btn-secondary`.

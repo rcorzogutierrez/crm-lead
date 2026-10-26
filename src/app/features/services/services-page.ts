@@ -13,6 +13,7 @@ import { mediaQuery } from '../../core/media';
 import { ServiceItem, ServiceItemDraft, TIERS, TierRates, isClosed } from '../../core/models';
 import { ToastService } from '../../core/toast.service';
 import { EmptyState } from '../../shared/empty-state';
+import { SETTINGS_TABS, SectionTabs } from '../../shared/section-tabs';
 
 
 function emptyDraft(): ServiceItemDraft {
@@ -25,7 +26,7 @@ function emptyDraft(): ServiceItemDraft {
  */
 @Component({
   selector: 'app-services-page',
-  imports: [FormField, NgTemplateOutlet, EmptyState, LucidePlus, LucideSearch, LucideLock],
+  imports: [FormField, NgTemplateOutlet, EmptyState, SectionTabs, LucidePlus, LucideSearch, LucideLock],
   templateUrl: './services-page.html',
 })
 export class ServicesPage {
@@ -35,6 +36,7 @@ export class ServicesPage {
   private readonly toast = inject(ToastService);
 
   protected readonly t = t;
+  protected readonly settingsTabs = SETTINGS_TABS;
   protected readonly money = moneyLabel;
   protected readonly tiers = TIERS;
 

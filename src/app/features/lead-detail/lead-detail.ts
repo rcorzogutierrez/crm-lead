@@ -42,6 +42,7 @@ import {
   tierLabel,
 } from '../../core/models';
 import { ToastService } from '../../core/toast.service';
+import { UiService } from '../../core/ui.service';
 import { ChannelIcon } from '../../shared/channel-icon';
 import { mailHref, telHref, whatsappHref } from '../../shared/contact-links';
 import { EmptyState } from '../../shared/empty-state';
@@ -96,6 +97,7 @@ export class LeadDetail {
   protected readonly catalog = inject(CatalogService);
   protected readonly contacts = inject(ContactsService);
   private readonly toast = inject(ToastService);
+  protected readonly ui = inject(UiService);
 
   protected readonly t = t;
   protected readonly stages = STAGES;

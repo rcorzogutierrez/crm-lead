@@ -42,11 +42,16 @@ y deja cada contacto con su siguiente paso.
 - **Captura rápida** con la tecla <kbd>N</kbd>. El primer campo, "¿Para quién?", busca contactos existentes
   por nombre, empresa, email o teléfono para no duplicarlos. <kbd>/</kbd> abre la búsqueda de clientes.
 
-### Leads, contactos y servicios
+### Contactos, negocios y servicios
 
-- **Pipeline** por etapas, `Nuevo → Contactado → Calificado → Propuesta → Negociación → Ganado | Perdido`,
-  con arrastrar y soltar o teclado (<kbd>Alt</kbd> + <kbd>←</kbd>/<kbd>→</kbd>).
-- **Ficha del lead** con etapas, próxima acción, historial de interacciones y datos editables.
+El flujo es **Contacto → Negocio → Próxima acción → Venta**. Un negocio es un servicio que se le ofrece a un contacto.
+
+- **Negocios** en lista o en tablero por etapas, `Nuevo → Contactado → Calificado → Propuesta → Negociación → Ganado | Perdido`,
+  con arrastrar y soltar o teclado (<kbd>Alt</kbd> + <kbd>←</kbd>/<kbd>→</kbd>). Un negocio que se queda sin próxima acción la pide al momento.
+- **Cerrar un negocio** es el mismo paso en la ficha y en el tablero: perdido pide el motivo (de una lista), ganado propone
+  la postventa a 30 días, y sus follow-ups pendientes se cancelan. Al completar la postventa se puede abrir un negocio nuevo.
+- **Ficha del negocio** con etapas, próxima acción, historial de interacciones y datos editables. Registrar una llamada
+  o un mensaje da por hecho el follow-up que tocaba.
 - **Clientes y prospectos**: un contacto con negocios abiertos, servicios comprados e historial.
   Un contacto pasa a "cliente" con su primera venta ganada.
 - **Catálogo de servicios** con precio oficial. El vendedor no escribe el precio: elige servicio, cantidad

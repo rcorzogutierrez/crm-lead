@@ -15,6 +15,8 @@ import { Avatar } from '../../shared/avatar';
 import { CloseDeal } from '../../shared/close-deal';
 import { DueChip } from '../../shared/due-chip';
 import { ScheduleForm } from '../../shared/schedule-form';
+import { DEAL_TABS, SectionTabs } from '../../shared/section-tabs';
+import { UiService } from '../../core/ui.service';
 
 /**
  * Pipeline por etapas. Arrastrar una tarjeta la cambia de etapa;
@@ -22,7 +24,7 @@ import { ScheduleForm } from '../../shared/schedule-form';
  */
 @Component({
   selector: 'app-pipeline',
-  imports: [RouterLink, DueChip, Avatar, CloseDeal, ScheduleForm, LucideLock],
+  imports: [RouterLink, DueChip, Avatar, CloseDeal, ScheduleForm, SectionTabs, LucideLock],
   templateUrl: './pipeline.html',
 })
 export class Pipeline {
@@ -34,7 +36,9 @@ export class Pipeline {
   private readonly toast = inject(ToastService);
   private readonly injector = inject(Injector);
 
+
   protected readonly t = t;
+  protected readonly dealTabs = DEAL_TABS;
   protected readonly money = moneyLabel;
   protected readonly scope = signal<'mine' | 'team'>('team');
   /** Todos, solo clientes nuevos (prospectos) o solo recompras de clientes. */
@@ -63,7 +67,11 @@ export class Pipeline {
     });
   });
 
-  /** Recompra: el contacto ya había ganado otro lead. */
+  constructor() {
+    inject(UiService).rememberDealsView('/pipeline');
+  }
+
+  /** Recompra: el contacto ya había ganado otro negocio. */
   protected isRepeat(lead: Lead): boolean {
     return this.contacts.summary(lead.contactId).wonCount > (lead.stage === 'won' ? 1 : 0);
   }

@@ -15,6 +15,7 @@ import { UiService } from '../../core/ui.service';
 import { Avatar } from '../../shared/avatar';
 import { DueChip } from '../../shared/due-chip';
 import { EmptyState } from '../../shared/empty-state';
+import { DEAL_TABS, SectionTabs } from '../../shared/section-tabs';
 import { StageBadge } from '../../shared/stage-badge';
 
 type SortKey = 'next' | 'name' | 'value' | 'created' | 'contact';
@@ -23,7 +24,7 @@ type SortKey = 'next' | 'name' | 'value' | 'created' | 'contact';
 /** Lista de leads con búsqueda, filtros y orden, sincronizados con la URL. */
 @Component({
   selector: 'app-leads-list',
-  imports: [RouterLink, StageBadge, DueChip, Avatar, EmptyState, LucideSearch, LucideX, LucideArrowUp, LucideArrowDown],
+  imports: [RouterLink, SectionTabs, StageBadge, DueChip, Avatar, EmptyState, LucideSearch, LucideX, LucideArrowUp, LucideArrowDown],
   templateUrl: './leads-list.html',
 })
 export class LeadsList {
@@ -34,9 +35,11 @@ export class LeadsList {
   protected readonly leadsService = inject(LeadsService);
   protected readonly members = inject(MembersService);
   protected readonly ui = inject(UiService);
+
   private readonly catalog = inject(CatalogService);
 
   protected readonly t = t;
+  protected readonly dealTabs = DEAL_TABS;
   protected readonly stages = STAGES;
   protected readonly sources = SOURCES;
 
@@ -101,6 +104,10 @@ export class LeadsList {
     () =>
       !!(this.search() || this.source() || this.assignee() || this.onlyOrphans() || this.onlyPriceChanges() || this.stage() !== 'open'),
   );
+
+  constructor() {
+    this.ui.rememberDealsView('/leads');
+  }
 
   protected setParam(key: string, value: string | null): void {
     void this.router.navigate([], {

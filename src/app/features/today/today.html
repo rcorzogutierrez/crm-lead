@@ -53,7 +53,7 @@
       <section class="sheet relative overflow-hidden" aria-labelledby="today-title">
         <header class="flex items-center justify-between border-b border-rule-strong px-4 py-2.5">
           <h2 id="today-title" class="text-sm font-bold">{{ t('due.today') }}</h2>
-          <button type="button" class="btn-ghost btn-sm text-pen hover:text-pen-strong" (click)="ui.openCapture()">+ Lead</button>
+          <button type="button" class="btn-ghost btn-sm text-pen hover:text-pen-strong" (click)="ui.openCapture()">{{ t('today.addDeal') }}</button>
         </header>
 
         @if (loading()) {

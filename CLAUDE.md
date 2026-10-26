@@ -53,13 +53,14 @@ src/app/
   shared/          componentes reutilizables (followup-item, schedule-form, pickers, badges…)
   features/
     auth/          login, acceso pendiente
-    shell/         riel/barra de navegación + panel de captura rápida (tecla N)
+    shell/         riel/barra de navegación (Hoy, Contactos, Negocios, Reportes, Ajustes) + panel de captura rápida (tecla N)
     today/         "Hoy": página de agenda (vencidos, horas del día, sin próxima acción)
     contacts/      clientes y prospectos; ficha con negocios abiertos, servicios comprados e historial
-    services/      catálogo de servicios y % de categorías (solo admin edita)
-    leads/         lista con búsqueda/filtros en la URL
-    lead-detail/   ficha: etapas, próxima acción, historial, datos editables
-    pipeline/      tablero por etapas (drag & drop, Alt+←/→)
+    services/      catálogo de servicios y % de categorías (solo admin edita); con team/, la entrada "Ajustes"
+    leads/         Negocios en lista, con búsqueda/filtros en la URL
+    lead-detail/   ficha del negocio: etapas, próxima acción, historial, datos editables
+    pipeline/      Negocios en tablero por etapas (drag & drop, Alt+←/→); lista y tablero son dos vistas
+                   de la misma entrada del menú (`shared/section-tabs.ts`), que recuerda la última usada
     reports/       informe semanal del equipo (admin) y "Mis números" (cada vendedor)
     team/          miembros, roles, invitaciones
 ```
@@ -73,7 +74,7 @@ src/app/
 | `sessions/{uid}` | última entrada/salida | `signInAt`, `signOutAt`, `signOutReason: manual\|idle` — cada uno escribe solo el suyo con `serverTimestamp()`; solo el admin lee (se muestra en *Equipo*) |
 | `invites/{emailEnMinúsculas}` | invitación | `email`, `role`, `invitedBy` — se consume al entrar |
 | `contacts/{id}` | persona/empresa | `name`, `company`, `email` (minúsculas), `phone`, `assigneeId`, `notes`, `createdBy` + resumen `statsV`, `wonCount`, `wonTotal`, `firstWonAt`, `openBy` (uid → nº abiertos), `archived`, `archivedAt` — "cliente" si `wonCount > 0` |
-| `leads/{id}` | lead = oportunidad (un servicio para un contacto) | `contactId`, copia del contacto (`name`, `company`, `email`, `phone`), `serviceId`, `serviceName`, `detail`, `quantity`, `unitPrice`, `tier`, `tierPct`, `value`, `priceAck`, `source`, `stage`, `wonAt`, `lostAt`, `assigneeId`, `notes`, `lostReason`, `nextFollowUpAt`, `lastContactAt`, `createdBy`, timestamps |
+| `leads/{id}` | lead = oportunidad (un servicio para un contacto) | `contactId`, copia del contacto (`name`, `company`, `email`, `phone`), `serviceId`, `serviceName`, `detail`, `quantity`, `unitPrice`, `tier`, `tierPct`, `value`, `priceAck`, `source`, `stage`, `wonAt`, `lostAt`, `assigneeId`, `notes`, `lostCode` (motivo de la lista `LOST_REASONS`), `lostReason` (detalle libre), `nextFollowUpAt`, `lastContactAt`, `createdBy`, timestamps |
 | `services/{id}` | catálogo | `name`, `description`, `price` (oficial, por unidad), `unit`, `active` — solo admin escribe; se archivan, no se borran |
 | `meta/pricing` | único | `bronze`, `silver`, `gold` (% sobre el precio oficial; por defecto 3/5/7) — solo admin |
 | `leads/{id}/activities/{id}` | historial | `type` (call, whatsapp, email, meeting, note, stage, created, followup), `body`, `from`/`to`, `createdBy`, `createdAt` |
@@ -83,7 +84,12 @@ Reglas de dominio:
 - Etapas en orden: `new → contacted → qualified → proposal → negotiation → won | lost`. `won`/`lost` son cerradas y no necesitan follow-up.
 - `leads.nextFollowUpAt` es una **copia desnormalizada** del follow-up pendiente más próximo. Toda escritura de follow-ups (programar, completar, reprogramar, descartar) debe recalcularla en el **mismo batch** (`FollowUpsService`).
 - Completar un follow-up = marcarlo `done` + crear actividad + actualizar `lastContactAt` + (opcional) programar el siguiente, todo en un batch.
-- Cambiar etapa siempre deja una actividad `stage` (`LeadsService.moveToStage`); ganar guarda `wonAt` y perder `lostAt` (los perdidos anteriores usan `updatedAt`).
+- Vocabulario de la interfaz: **Contacto → Negocio → Próxima acción → Venta**. En el código y en Firestore el negocio sigue siendo `lead`; en pantalla siempre se llama "negocio" (deal en inglés).
+- Cambiar etapa siempre deja una actividad `stage` (`LeadsService.moveToStage`); ganar guarda `wonAt` y perder `lostAt` (los perdidos anteriores usan `updatedAt`). **Cerrar (ganado o perdido) cancela en el mismo batch los follow-ups pendientes del negocio.** Se cierra siempre con `shared/close-deal.ts`, igual desde la ficha y el pipeline: perdido pide `lostCode` (+ detalle opcional), ganado propone la postventa a 30 días.
+- Un negocio abierto que se queda sin próxima acción la pide en el momento: la ficha muestra el formulario y el pipeline lo abre encima del tablero al cambiar de etapa.
+- Registrar en la ficha una llamada, WhatsApp, email o reunión da por hecho el follow-up que vence hoy o ya venció (`FollowUpsService.complete` con el canal real); la nota suelta no toca la agenda.
+- Completar una postventa (follow-up de un negocio ganado) ofrece abrir un negocio nuevo con el contacto, en vez de otro seguimiento sobre la venta cerrada.
+- El responsable del contacto es el "dueño de la cuenta": un admin que abre un negocio nuevo para un contacto existente lo asigna por defecto a ese dueño (si sigue activo).
 - Reportes (`/reports`, cálculos puros en `core/reports.ts`): el admin ve el informe de la semana (`?week=AAAA-MM-DD`) o de unas fechas elegidas (`?from=AAAA-MM-DD&to=AAAA-MM-DD`, ambos días incluidos; vencidos, quietos y próximos solo si el rango incluye hoy) y puede pasar a sus números (`?view=mine`); un vendedor solo ve "Mis números" (`?period=week|month|quarter`, o `?period=custom&from=&to=` comparado con los mismos días justo antes). Los follow-ups hechos se piden puntualmente con `FollowUpsService.doneBetween` (índice `assigneeId, status, dueAt`).
 - Precio: `value = unitPrice × quantity × (100 + tierPct) / 100` (`salePrice`). El vendedor no escribe el precio: elige servicio, cantidad y categoría (bronce por defecto). Las reglas validan que `unitPrice` y `tierPct` sean los vigentes (o los ya pactados) y que un lead ganado no cambie de precio.
 - Cambio de precio oficial: los leads guardan su `unitPrice`; los abiertos muestran aviso (actualizar o mantener → `priceAck`). Los ganados nunca cambian.

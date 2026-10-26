@@ -11,6 +11,7 @@ import { MembersService } from '../../core/members.service';
 import { Invite, Member, MemberRole, SessionLog } from '../../core/models';
 import { ToastService } from '../../core/toast.service';
 import { Avatar } from '../../shared/avatar';
+import { SETTINGS_TABS, SectionTabs } from '../../shared/section-tabs';
 
 interface Stamp {
   label: string;
@@ -21,7 +22,7 @@ interface Stamp {
 /** Equipo: miembros, roles e invitaciones (solo admins pueden cambiar). */
 @Component({
   selector: 'app-team',
-  imports: [FormField, Avatar, LucideLogIn, LucideLogOut],
+  imports: [FormField, Avatar, SectionTabs, LucideLogIn, LucideLogOut],
   templateUrl: './team.html',
 })
 export class Team {
@@ -33,6 +34,7 @@ export class Team {
   private readonly clock = inject(Clock);
 
   protected readonly t = t;
+  protected readonly settingsTabs = SETTINGS_TABS;
   protected readonly inviteModel = signal<{ email: string; role: MemberRole }>({ email: '', role: 'member' });
   protected readonly inviteForm = form(this.inviteModel, (p) => {
     required(p.email, { message: 'team.emailRequired' });
