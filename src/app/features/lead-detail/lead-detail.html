@@ -260,13 +260,34 @@
                       <p class="text-[0.6875rem] text-ink-3">{{ activityHour(a) }}</p>
                     </div>
                     <div class="min-w-0 flex-1 border-l border-margin/70 py-3 pr-4 pl-4">
-                      <p class="flex items-center gap-1.5 text-[0.8125rem] font-semibold text-ink-2">
-                        <app-channel-icon [type]="a.type" [size]="14" />
-                        {{ activityLabel(a) }}
-                        <span class="font-normal text-ink-3">· {{ members.name(a.createdBy) }}</span>
-                      </p>
+                      <div class="flex items-start gap-2">
+                        <p class="flex min-w-0 flex-1 items-center gap-1.5 text-[0.8125rem] font-semibold text-ink-2">
+                          <app-channel-icon [type]="a.type" [size]="14" />
+                          {{ activityLabel(a) }}
+                          <span class="font-normal text-ink-3">· {{ members.name(a.createdBy) }}</span>
+                        </p>
+                        @if (auth.isAdmin() && removingActivity() !== a.id) {
+                          <button
+                            [id]="'del-act-' + a.id"
+                            type="button"
+                            class="btn-ghost btn-icon -my-2 -mr-2 size-8 text-ink-3 hover:bg-ribbon-soft hover:text-ribbon"
+                            [attr.aria-label]="t('detail.deleteEntry', { what: activityLabel(a) })"
+                            [title]="t('detail.deleteEntry', { what: activityLabel(a) })"
+                            (click)="askRemoveActivity(a)"
+                          >
+                            <svg lucideTrash2 [size]="14"></svg>
+                          </button>
+                        }
+                      </div>
                       @if (a.body) {
                         <p class="mt-0.5 whitespace-pre-line text-ink">{{ activityBody(a) }}</p>
+                      }
+                      @if (removingActivity() === a.id) {
+                        <div class="mt-2 flex flex-wrap items-center gap-2 rounded-lg bg-ribbon-soft px-3 py-2" role="group" [attr.aria-label]="t('detail.deleteEntryConfirm')">
+                          <p [id]="'del-act-q-' + a.id" tabindex="-1" class="min-w-40 flex-1 text-xs font-semibold text-ink">{{ t('detail.deleteEntryConfirm') }}</p>
+                          <button type="button" class="btn-ghost btn-sm" [disabled]="busy()" (click)="cancelRemoveActivity(a)">{{ t('common.cancel') }}</button>
+                          <button type="button" class="btn-danger btn-sm" [disabled]="busy()" (click)="removeActivity(a)">{{ t('detail.deleteEntryDo') }}</button>
+                        </div>
                       }
                     </div>
                   </li>

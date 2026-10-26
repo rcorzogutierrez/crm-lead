@@ -13,6 +13,12 @@
             {{ t('invoice.void') }}
           </button>
         }
+        @if (auth.isAdmin() && inv.status === 'void' && !removing()) {
+          <button id="inv-delete" type="button" class="btn-ghost btn-sm text-ribbon hover:bg-ribbon-soft hover:text-ribbon" [attr.aria-expanded]="false" (click)="askRemove()">
+            <svg lucideTrash2 [size]="14"></svg>
+            {{ t('invoice.delete') }}
+          </button>
+        }
         <button type="button" class="btn-primary btn-sm" (click)="print()">
           <svg lucidePrinter [size]="16"></svg>
           {{ t('invoice.print') }}
@@ -41,6 +47,17 @@
           <button type="submit" class="btn-danger btn-sm" [disabled]="saving() || !reason().trim()">{{ t('invoice.voidNow') }}</button>
         </div>
       </form>
+    }
+
+    @if (removing()) {
+      <div class="sheet mt-3 border-ribbon/40 p-4 print:hidden" role="group" [attr.aria-label]="t('invoice.delete')">
+        <p id="inv-delete-q" tabindex="-1" class="text-sm font-semibold">{{ t('invoice.deleteConfirm', { n: number() }) }}</p>
+        <p class="mt-1 text-xs text-ink-2">{{ t('invoice.deleteHint') }}</p>
+        <div class="mt-3 flex justify-end gap-2">
+          <button type="button" class="btn-ghost btn-sm" [disabled]="saving()" (click)="cancelRemove()">{{ t('common.cancel') }}</button>
+          <button type="button" class="btn-danger btn-sm" [disabled]="saving()" (click)="remove(inv)">{{ t('invoice.deleteDo') }}</button>
+        </div>
+      </div>
     }
 
     <!-- La factura -->

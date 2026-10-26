@@ -3,7 +3,6 @@ import {
   DocumentData,
   Timestamp,
   collection,
-  deleteDoc,
   doc,
   orderBy,
   query,
@@ -13,6 +12,7 @@ import {
 } from 'firebase/firestore';
 import { AuthService } from './auth.service';
 import { STATS_VERSION } from './contact-stats';
+import { CascadeCounts, DeletionsService, addCounts, cascadeDetail } from './deletions.service';
 import { FIRESTORE } from './firebase';
 import { toDate } from './firestore-utils';
 import { FollowUpsService } from './followups.service';
@@ -110,6 +110,7 @@ export class ContactsService {
   private readonly auth = inject(AuthService);
   private readonly leadsService = inject(LeadsService);
   private readonly followUps = inject(FollowUpsService);
+  private readonly deletions = inject(DeletionsService);
   private readonly live = teamQuery(() => query(collection(this.db, 'contacts'), orderBy('name')), mapContact);
 
   readonly contacts = this.live.data;
@@ -332,16 +333,26 @@ export class ContactsService {
   }
 
   /**
-   * Solo admin: borra el contacto con sus negocios (historial y follow-ups incluidos).
-   * Un cliente con ventas ganadas no se borra: se archiva, para no perder lo vendido.
+   * Solo admin: borra el contacto con todos sus negocios (también ventas ganadas), su historial,
+   * sus follow-ups y sus facturas anuladas, y lo anota en el registro de borrados. Una venta con
+   * factura vigente lo impide: primero se anula la factura.
    */
-  async remove(contact: Contact): Promise<void> {
+  async remove(contact: Contact): Promise<CascadeCounts> {
     const leads = this.leadsService.leads().filter((l) => l.contactId === contact.id);
-    if (this.summary(contact.id).wonCount > 0 || leads.some((l) => l.stage === 'won')) {
-      throw new Error(t('contact.cantDeleteCustomer'));
-    }
-    for (const l of leads) await this.leadsService.remove(l, false);
-    await deleteDoc(doc(this.db, 'contacts', contact.id));
+    if (leads.some((l) => l.invoiceId)) throw new Error(t('contact.deleteInvoiced'));
+    let counts: CascadeCounts = { deals: leads.length };
+    for (const l of leads) counts = addCounts(counts, await this.leadsService.remove(l, true));
+    const batch = writeBatch(this.db);
+    batch.delete(doc(this.db, 'contacts', contact.id));
+    this.deletions.record(batch, {
+      kind: 'contact',
+      refId: contact.id,
+      label: [contact.name, contact.company].filter(Boolean).join(' · '),
+      detail: cascadeDetail(counts),
+      snapshot: { contact, deals: leads },
+    });
+    await batch.commit();
+    return counts;
   }
 
   /**

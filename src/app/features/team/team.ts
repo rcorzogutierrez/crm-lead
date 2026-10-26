@@ -51,6 +51,36 @@ export class Team {
   /** Cambio de rol elegido en el selector, a la espera de confirmación en línea. */
   protected readonly pendingRole = signal<{ uid: string; role: MemberRole } | null>(null);
 
+  /** Miembro sin acceso que el admin está por borrar, y a quién pasan sus datos. */
+  protected readonly deleting = signal<{ uid: string; heir: string; busy: boolean } | null>(null);
+  /** Quien puede heredar negocios y contactos: miembros con acceso. */
+  protected readonly heirs = computed(() => this.members.active());
+
+  protected askDelete(m: Member): void {
+    this.deleting.set({ uid: m.uid, heir: this.auth.uid(), busy: false });
+    this.focusLater(() => document.getElementById('del-member-q-' + m.uid)?.focus());
+  }
+  protected cancelDelete(m: Member): void {
+    this.deleting.set(null);
+    this.focusLater(() => document.getElementById('del-member-' + m.uid)?.focus());
+  }
+  protected setHeir(uid: string): void {
+    this.deleting.update((d) => (d ? { ...d, heir: uid } : d));
+  }
+  protected async remove(m: Member): Promise<void> {
+    const del = this.deleting();
+    if (del?.uid !== m.uid) return;
+    this.deleting.set({ ...del, busy: true });
+    try {
+      await this.members.remove(m, del.heir);
+      this.deleting.set(null);
+      this.toast.show(t('team.deleted', { name: m.displayName }));
+    } catch (err) {
+      this.deleting.set({ ...del, busy: false });
+      this.toast.error(err instanceof Error && !('code' in err) ? err.message : firestoreErrorMessage(err));
+    }
+  }
+
   /** Pide confirmar en línea y lleva el foco al botón que confirma. */
   protected askRevoke(m: Member): void {
     this.confirmUid.set(m.uid);

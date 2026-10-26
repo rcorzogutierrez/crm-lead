@@ -1,5 +1,5 @@
 import { Routes } from '@angular/router';
-import { guestGuard, memberGuard } from './core/auth.guards';
+import { adminGuard, guestGuard, memberGuard } from './core/auth.guards';
 import { LEGACY_ROUTES, legacyParamsGuard } from './core/legacy-urls';
 
 /** `title` es una clave de traducción; `I18nTitleStrategy` la traduce y añade el nombre de la app. */
@@ -73,6 +73,12 @@ export const routes: Routes = [
         path: 'company',
         title: 'nav.company',
         loadComponent: () => import('./features/company/company-page').then((m) => m.CompanyPage),
+      },
+      {
+        path: 'deletions',
+        title: 'nav.deletions',
+        canActivate: [adminGuard],
+        loadComponent: () => import('./features/deletions/deletions-page').then((m) => m.DeletionsPage),
       },
       {
         path: 'invoices/:id',

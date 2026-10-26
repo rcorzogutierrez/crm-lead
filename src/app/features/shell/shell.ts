@@ -97,7 +97,7 @@ export class Shell {
     { path: '/contacts', label: 'nav.contacts', icon: 'contacts', match: ['/contacts'] },
     { path: this.ui.dealsView(), label: 'nav.leads', icon: 'deals', match: ['/leads', '/pipeline', '/invoices'] },
     { path: '/reports', label: 'nav.reports', icon: 'reports', match: ['/reports'] },
-    { path: '/services', label: 'nav.settings', icon: 'settings', match: ['/services', '/team', '/company'] },
+    { path: '/services', label: 'nav.settings', icon: 'settings', match: ['/services', '/team', '/company', '/deletions'] },
   ]);
   /** Barra móvil: Hoy, Contactos y Negocios; el resto va en "Más". */
   protected readonly mobileMain = computed(() => this.nav().filter((n) => ['today', 'contacts', 'deals'].includes(n.icon)));

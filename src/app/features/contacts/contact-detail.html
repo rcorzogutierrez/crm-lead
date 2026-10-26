@@ -320,12 +320,41 @@
                 <p class="mt-1 text-xs text-ink-2">
                   {{ dealCount() === 0 ? t('contact.deleteDeals0') : dealCount() === 1 ? t('contact.deleteDeals1') : t('contact.deleteDealsN', { n: dealCount() }) }}
                 </p>
+                @if (invoiced().length) {
+                  <div class="mt-3 rounded-lg border border-ribbon/40 bg-ribbon-soft px-3 py-2 text-xs" role="status">
+                    <p class="font-semibold text-ink">{{ invoiced().length === 1 ? t('contact.deleteInvoiced1') : t('contact.deleteInvoicedN', { n: invoiced().length }) }}</p>
+                    <ul class="mt-1 space-y-0.5">
+                      @for (l of invoiced(); track l.id) {
+                        <li>
+                          <a class="font-semibold text-pen underline underline-offset-2 hover:text-pen-strong" [routerLink]="['/invoices', l.invoiceId]">
+                            {{ t('contact.invoiceOf', { deal: dealTitle(l) }) }}
+                          </a>
+                        </li>
+                      }
+                    </ul>
+                  </div>
+                } @else if (needsTyping()) {
+                  <p class="mt-2 text-xs font-semibold text-ink">
+                    {{ summary().wonCount === 1 ? t('contact.deleteCustomer1') : t('contact.deleteCustomerN', { n: summary().wonCount }) }}
+                  </p>
+                  <label class="field-label mt-3" for="delete-typed">{{ t('contact.deleteType', { name: c.name }) }}</label>
+                  <input
+                    id="delete-typed"
+                    class="input"
+                    autocomplete="off"
+                    spellcheck="false"
+                    [value]="typed()"
+                    (input)="typed.set($any($event.target).value)"
+                    (keydown.enter)="typedOk() && !busy() && remove(c)"
+                  />
+                }
                 <div class="mt-3 flex gap-2">
                   <button type="button" class="btn-ghost btn-sm" [disabled]="busy()" (click)="closeConfirm()">{{ t('common.cancel') }}</button>
-                  <button type="button" class="btn-danger btn-sm" [disabled]="busy()" (click)="remove(c)">
+                  <button type="button" class="btn-danger btn-sm" [disabled]="busy() || invoiced().length > 0 || !typedOk()" (click)="remove(c)">
                     {{ busy() ? t('contact.deleting') : t('contact.deleteForever') }}
                   </button>
                 </div>
+                <p class="mt-2 text-xs text-ink-3">{{ t('deletion.logged') }}</p>
               }
               @default {
                 <div class="flex flex-wrap gap-2">
@@ -335,15 +364,13 @@
                       {{ t('contact.archive') }}
                     </button>
                   }
-                  @if (canDelete()) {
-                    <button id="manage-delete" type="button" class="btn-ghost btn-sm text-ribbon hover:bg-ribbon-soft hover:text-ribbon" (click)="openConfirm('delete')">
-                      <svg lucideTrash2 [size]="14"></svg>
-                      {{ t('contact.delete') }}
-                    </button>
-                  }
+                  <button id="manage-delete" type="button" class="btn-ghost btn-sm text-ribbon hover:bg-ribbon-soft hover:text-ribbon" (click)="openConfirm('delete')">
+                    <svg lucideTrash2 [size]="14"></svg>
+                    {{ t('contact.delete') }}
+                  </button>
                 </div>
-                @if (!canDelete()) {
-                  <p class="mt-2 text-xs text-ink-3">{{ t('contact.cantDeleteCustomer') }}</p>
+                @if (summary().wonCount > 0 && !c.archived) {
+                  <p class="mt-2 text-xs text-ink-3">{{ t('contact.archiveOrDelete') }}</p>
                 }
               }
             }

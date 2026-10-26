@@ -1,4 +1,4 @@
-import { Component, computed, inject, linkedSignal, signal } from '@angular/core';
+import { Component, computed, effect, inject, linkedSignal, signal } from '@angular/core';
 import { FormField, email, form, max, maxLength, min, required, submit } from '@angular/forms/signals';
 import { LucideImageUp, LucideLock, LucideTrash2 } from '@lucide/angular';
 import { AuthService } from '../../core/auth.service';
@@ -40,12 +40,18 @@ export class CompanyPage {
     maxLength(p.invoicePrefix, 12, { message: 'company.prefixLong' });
   });
 
-  /** Próximo número de factura (aparte: vive en `meta/invoiceSeq`). Nunca baja. */
+  /** Próximo número de factura (aparte: vive en `meta/invoiceSeq`). */
   protected readonly invoicesNext = computed(() => this.invoices.nextNumber() ?? 1);
   protected readonly next = linkedSignal(() => this.invoicesNext());
+  /** Última factura que existe: el contador puede bajar hasta justo después (tras borrar anuladas). */
+  private readonly highest = signal<number | null>(null);
+  protected readonly minNext = computed(() => {
+    const h = this.highest();
+    return h === null ? this.invoicesNext() : h + 1;
+  });
   protected readonly nextInvalid = computed(() => {
     const n = Number(this.next());
-    return !Number.isInteger(n) || n < this.invoicesNext();
+    return !Number.isInteger(n) || n < this.minNext();
   });
 
   protected readonly dirty = computed(() => {
@@ -69,6 +75,18 @@ export class CompanyPage {
   );
 
   protected readonly logoBusy = signal(false);
+
+  constructor() {
+    // Se vuelve a mirar cada vez que cambia el contador (al emitir o al borrar facturas).
+    effect(() => {
+      this.invoices.nextNumber();
+      if (!this.auth.isAdmin()) return;
+      this.invoices.highestNumber().then(
+        (n) => this.highest.set(n),
+        () => this.highest.set(null),
+      );
+    });
+  }
 
   protected setField<K extends 'state' | 'fiscalYearStart'>(key: K, value: string): void {
     this.model.update((m) => ({ ...m, [key]: key === 'fiscalYearStart' ? Number(value) : value }));
@@ -107,7 +125,7 @@ export class CompanyPage {
   protected async save(event: Event): Promise<void> {
     event.preventDefault();
     if (this.nextInvalid()) {
-      this.toast.error(t('company.nextInvalid', { n: this.invoicesNext() }));
+      this.toast.error(t('company.nextInvalid', { n: this.minNext() }));
       return;
     }
     await submit(this.f, async () => {
