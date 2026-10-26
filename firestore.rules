@@ -276,7 +276,7 @@ service cloud.firestore {
         && d.unitPrice is number && d.unitPrice >= 0
         && d.tier in ['bronze', 'silver', 'gold']
         && d.tierPct is number
-        && math.abs(d.value - d.unitPrice * d.quantity * (100 + d.tierPct) / 100) < 0.011;
+        && math.abs(d.value - float(d.unitPrice) * float(d.quantity) * (100.0 + float(d.tierPct)) / 100.0) < 0.011;
     }
     // Al crear: precio y porcentaje deben ser los vigentes.
     function pricingOnCreate(d) {

@@ -127,9 +127,14 @@ export class FollowUpsService {
 
   /** Seguimiento de postventa a los 30 días de ganar, para volver a ofrecer algo. */
   schedulePostSale(lead: Pick<Lead, 'id' | 'name' | 'company' | 'assigneeId'>): Promise<void> {
+    return this.schedule(lead, this.postSaleDate(), 'call', t('postsale.note'));
+  }
+
+  /** Fecha de la postventa: dentro de 30 días, a las 10:00. */
+  postSaleDate(): Date {
     const due = addDays(this.clock.now(), 30);
     due.setHours(10, 0, 0, 0);
-    return this.schedule(lead, due, 'call', t('postsale.note'));
+    return due;
   }
 
   /** Marca hecho, registra el resultado y, opcionalmente, programa el siguiente. */
