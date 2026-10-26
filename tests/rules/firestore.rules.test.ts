@@ -323,6 +323,21 @@ describe('Leads: cada vendedor ve solo los suyos', () => {
     await assertFails(setDoc(doc(db(LUIS), 'leads/luis-3'), lead(PEDRO, { createdBy: LUIS })));
   });
 
+  it('venta en el momento: el vendedor crea contacto y negocio ya ganado, con su postventa', async () => {
+    const fs = db(LUIS);
+    const batch = writeBatch(fs);
+    const won = { statsV: 1, wonCount: 1, wonTotal: 2060, firstWonAt: serverTimestamp(), openBy: {} };
+    batch.set(doc(fs, 'contacts/c9'), { ...contact(LUIS), ...won });
+    batch.set(doc(fs, 'leads/luis-9'), lead(LUIS, { contactId: 'c9', stage: 'won', wonAt: serverTimestamp() }));
+    batch.set(doc(fs, 'followups/f9'), followUp('luis-9', LUIS));
+    await assertSucceeds(batch.commit());
+    // Con un contacto que ya existe: una venta más en su resumen.
+    const again = writeBatch(fs);
+    again.update(doc(fs, 'contacts/c9'), { wonCount: 2, wonTotal: 4120 });
+    again.set(doc(fs, 'leads/luis-10'), lead(LUIS, { contactId: 'c9', stage: 'won', wonAt: serverTimestamp() }));
+    await assertSucceeds(again.commit());
+  });
+
   it('un vendedor no edita ni borra el lead de otro', async () => {
     await assertFails(updateDoc(doc(db(LUIS), 'leads/pedro-1'), { notes: 'mío' }));
     await assertFails(deleteDoc(doc(db(LUIS), 'leads/pedro-1')));

@@ -41,6 +41,8 @@ y deja cada contacto con su siguiente paso.
   sin modales, y completar deja historial, actualiza el último contacto y propone el siguiente paso.
 - **Captura rápida** con la tecla <kbd>N</kbd>. El primer campo, "¿Para quién?", busca contactos existentes
   por nombre, empresa, email o teléfono para no duplicarlos. <kbd>/</kbd> abre la búsqueda de clientes.
+  Al final pregunta "¿Cómo quedó?": *Le interesa* programa la próxima acción; *Vendido* registra la venta
+  en el mismo paso, con la postventa a 30 días.
 
 ### Contactos, negocios y servicios
 

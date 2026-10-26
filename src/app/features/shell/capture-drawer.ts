@@ -2,12 +2,13 @@ import { Component, ElementRef, Injector, afterNextRender, computed, effect, inj
 import { FormField, email, form, min, required, submit } from '@angular/forms/signals';
 import { Router } from '@angular/router';
 import { RouterLink } from '@angular/router';
-import { LucidePlus, LucideUserRound, LucideX } from '@lucide/angular';
+import { LucideBadgeCheck, LucideCalendarClock, LucidePlus, LucideUserRound, LucideX } from '@lucide/angular';
 import { CatalogService } from '../../core/catalog.service';
 import { ContactsService } from '../../core/contacts.service';
 import { moneyLabel } from '../../core/dates';
 import { AuthService } from '../../core/auth.service';
 import { firestoreErrorMessage } from '../../core/firestore-utils';
+import { FollowUpsService } from '../../core/followups.service';
 import { t } from '../../core/i18n/i18n';
 import { LeadsService } from '../../core/leads.service';
 import { MembersService } from '../../core/members.service';
@@ -50,19 +51,21 @@ function emptyModel(uid: string): CaptureModel {
 }
 
 /**
- * Captura rápida: quién (o un contacto que ya existe), qué servicio quiere y la
- * primera próxima acción ya programada por defecto, para que ningún lead nazca huérfano.
- * Crea el contacto y su lead en un solo paso.
+ * Captura rápida: quién (o un contacto que ya existe), qué servicio quiere y cómo quedó.
+ * "Le interesa" programa la primera próxima acción (por defecto, para que ningún negocio
+ * nazca huérfano); "Vendido" lo guarda ya ganado, con la postventa programada.
+ * Crea el contacto y su negocio en un solo paso.
  */
 @Component({
   selector: 'app-capture-drawer',
-  imports: [FormField, RouterLink, ChannelPicker, WhenPicker, TierPicker, LucideX, LucidePlus, LucideUserRound],
+  imports: [FormField, RouterLink, ChannelPicker, WhenPicker, TierPicker, LucideX, LucidePlus, LucideUserRound, LucideCalendarClock, LucideBadgeCheck],
   templateUrl: './capture-drawer.html',
 })
 export class CaptureDrawer {
   protected readonly ui = inject(UiService);
   protected readonly auth = inject(AuthService);
   private readonly leads = inject(LeadsService);
+  private readonly followUps = inject(FollowUpsService);
   protected readonly members = inject(MembersService);
   protected readonly catalog = inject(CatalogService);
   protected readonly contacts = inject(ContactsService);
@@ -112,6 +115,18 @@ export class CaptureDrawer {
   protected readonly quantity = computed(() => (this.service()?.unit ? Math.max(1, Number(this.model().quantity) || 1) : 1));
   protected readonly official = computed(() => (this.service()?.price ?? 0) * this.quantity());
   protected readonly money = moneyLabel;
+  protected readonly value = computed(() => {
+    const svc = this.service();
+    return svc ? salePrice(svc.price, this.quantity(), this.catalog.rate(this.tier())) : 0;
+  });
+
+  /** Cómo quedó: "open" = le interesa (sigue con próxima acción), "won" = ya compró. */
+  protected readonly outcome = signal<'open' | 'won'>('open');
+  protected readonly sold = computed(() => this.outcome() === 'won');
+  protected readonly postSale = signal(true);
+  /** Una venta necesita saber qué se vendió (si hay catálogo). */
+  protected readonly needService = computed(() => this.sold() && this.catalog.active().length > 0 && !this.service());
+  protected readonly showNeedService = signal(false);
 
   protected readonly scheduleNext = signal(true);
   protected readonly nextAt = signal(presetDate('tomorrow', new Date()));
@@ -222,6 +237,11 @@ export class CaptureDrawer {
   protected async save(event: Event, openAfter: boolean): Promise<void> {
     event.preventDefault();
     this.saveError.set(null);
+    if (this.needService()) {
+      this.showNeedService.set(true);
+      document.getElementById('c-service')?.focus();
+      return;
+    }
     await submit(this.f, async () => {
       try {
         const m = this.model();
@@ -251,16 +271,14 @@ export class CaptureDrawer {
             notes: '',
           },
           source: m.source,
-          stage: m.stage,
+          stage: this.sold() ? 'won' : m.stage,
           assigneeId: m.assigneeId,
           notes: m.notes,
           detail: m.detail,
           pricing,
-          firstFollowUp: this.scheduleNext()
-            ? { dueAt: this.nextAt(), channel: this.nextChannel(), note: this.nextNote() }
-            : null,
+          firstFollowUp: this.firstFollowUp(),
         });
-        this.toast.show(t('capture.saved', { name: person.name }), {
+        this.toast.show(t(this.sold() ? 'capture.savedSale' : 'capture.saved', { name: person.name }), {
           action: openAfter ? undefined : { label: t('common.open'), run: () => this.router.navigate(['/leads', id]) },
         });
         this.close();
@@ -270,6 +288,14 @@ export class CaptureDrawer {
       }
       return undefined;
     });
+  }
+
+  /** Vendido: la postventa (si se deja marcada). Le interesa: la próxima acción elegida. */
+  private firstFollowUp(): { dueAt: Date; channel: ContactChannel; note: string } | null {
+    if (this.sold()) {
+      return this.postSale() ? { dueAt: this.followUps.postSaleDate(), channel: 'call', note: t('postsale.note') } : null;
+    }
+    return this.scheduleNext() ? { dueAt: this.nextAt(), channel: this.nextChannel(), note: this.nextNote() } : null;
   }
 
   /**
@@ -299,6 +325,9 @@ export class CaptureDrawer {
     this.f().reset();
     this.useMatch.set(true);
     this.tier.set('bronze');
+    this.outcome.set('open');
+    this.postSale.set(true);
+    this.showNeedService.set(false);
     this.scheduleNext.set(true);
     this.nextAt.set(presetDate('tomorrow', new Date()));
     this.nextChannel.set('call');
