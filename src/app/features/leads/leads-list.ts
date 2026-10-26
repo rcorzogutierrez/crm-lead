@@ -1,4 +1,5 @@
 import { Component, computed, inject, signal } from '@angular/core';
+import { dealServices } from '../../core/deal-lines';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { LucideArrowDown, LucideArrowUp, LucideSearch, LucideX } from '@lucide/angular';
@@ -39,6 +40,7 @@ export class LeadsList {
   private readonly catalog = inject(CatalogService);
 
   protected readonly t = t;
+  protected readonly services = dealServices;
   protected readonly dealTabs = DEAL_TABS;
   protected readonly stages = STAGES;
   protected readonly sources = SOURCES;
@@ -70,7 +72,7 @@ export class LeadsList {
       if (orphans && (isClosed(l.stage) || l.nextFollowUpAt)) return false;
       if (priceChanges && !this.catalog.hasPriceChange(l)) return false;
       if (q) {
-        const hay = normalizeText(`${l.name} ${l.company} ${l.email} ${l.phone} ${l.serviceName}`);
+        const hay = normalizeText(`${l.name} ${l.company} ${l.email} ${l.phone} ${dealServices(l)}`);
         if (!hay.includes(q)) return false;
       }
       return true;

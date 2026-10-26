@@ -1,5 +1,5 @@
 import { Component, ElementRef, Injector, afterNextRender, computed, effect, inject, signal, untracked, viewChild } from '@angular/core';
-import { FormField, email, form, min, required, submit } from '@angular/forms/signals';
+import { FormField, email, form, required, submit } from '@angular/forms/signals';
 import { Router } from '@angular/router';
 import { RouterLink } from '@angular/router';
 import { LucideBadgeCheck, LucideCalendarClock, LucidePlus, LucideUserRound, LucideX } from '@lucide/angular';
@@ -12,10 +12,12 @@ import { FollowUpsService } from '../../core/followups.service';
 import { t } from '../../core/i18n/i18n';
 import { LeadsService } from '../../core/leads.service';
 import { MembersService } from '../../core/members.service';
-import { Contact, ContactChannel, LeadPricing, LeadSource, OPEN_STAGES, PriceTier, SOURCES, Stage, salePrice } from '../../core/models';
+import { EditLine, linesOfficial, linesPricing, linesValue, pricedLines } from '../../core/deal-lines';
+import { Contact, ContactChannel, LeadSource, OPEN_STAGES, PriceTier, SOURCES, Stage } from '../../core/models';
 import { ToastService } from '../../core/toast.service';
 import { UiService } from '../../core/ui.service';
 import { ChannelPicker } from '../../shared/channel-picker';
+import { LinesEditor } from '../../shared/lines-editor';
 import { TierPicker } from '../../shared/tier-picker';
 import { WhenPicker } from '../../shared/when-picker';
 import { presetDate } from '../../core/dates';
@@ -29,8 +31,6 @@ interface CaptureModel {
   stage: Stage;
   assigneeId: string;
   notes: string;
-  serviceId: string;
-  quantity: number;
   detail: string;
 }
 
@@ -44,8 +44,6 @@ function emptyModel(uid: string): CaptureModel {
     stage: 'new',
     assigneeId: uid,
     notes: '',
-    serviceId: '',
-    quantity: 1,
     detail: '',
   };
 }
@@ -58,7 +56,7 @@ function emptyModel(uid: string): CaptureModel {
  */
 @Component({
   selector: 'app-capture-drawer',
-  imports: [FormField, RouterLink, ChannelPicker, WhenPicker, TierPicker, LucideX, LucidePlus, LucideUserRound, LucideCalendarClock, LucideBadgeCheck],
+  imports: [FormField, RouterLink, ChannelPicker, WhenPicker, TierPicker, LinesEditor, LucideX, LucidePlus, LucideUserRound, LucideCalendarClock, LucideBadgeCheck],
   templateUrl: './capture-drawer.html',
 })
 export class CaptureDrawer {
@@ -83,7 +81,6 @@ export class CaptureDrawer {
   protected readonly f = form(this.model, (p) => {
     required(p.name, { message: 'form.nameRequired' });
     email(p.email, { message: 'form.emailInvalid' });
-    min(p.quantity, 1, { message: 'form.quantityMin' });
   });
 
   /** Contacto elegido en el buscador o al abrir desde su ficha ("Nuevo negocio"). */
@@ -111,21 +108,19 @@ export class CaptureDrawer {
   protected readonly targetContact = computed(() => this.fixedContact() ?? (this.useMatch() ? this.match() : null));
 
   protected readonly tier = signal<PriceTier>('bronze');
-  protected readonly service = computed(() => this.catalog.byId().get(this.model().serviceId) ?? null);
-  protected readonly quantity = computed(() => (this.service()?.unit ? Math.max(1, Number(this.model().quantity) || 1) : 1));
-  protected readonly official = computed(() => (this.service()?.price ?? 0) * this.quantity());
+  /** Servicios que quiere comprar (uno o varios) y su precio oficial de hoy. */
+  protected readonly lines = signal<EditLine[]>([{ serviceId: '', quantity: 1 }]);
+  protected readonly priced = computed(() => pricedLines(this.lines(), this.catalog.byId()));
+  protected readonly official = computed(() => linesOfficial(this.priced()));
   protected readonly money = moneyLabel;
-  protected readonly value = computed(() => {
-    const svc = this.service();
-    return svc ? salePrice(svc.price, this.quantity(), this.catalog.rate(this.tier())) : 0;
-  });
+  protected readonly value = computed(() => linesValue(this.priced(), this.catalog.rate(this.tier())));
 
   /** Cómo quedó: "open" = le interesa (sigue con próxima acción), "won" = ya compró. */
   protected readonly outcome = signal<'open' | 'won'>('open');
   protected readonly sold = computed(() => this.outcome() === 'won');
   protected readonly postSale = signal(true);
   /** Una venta necesita saber qué se vendió (si hay catálogo). */
-  protected readonly needService = computed(() => this.sold() && this.catalog.active().length > 0 && !this.service());
+  protected readonly needService = computed(() => this.sold() && this.catalog.active().length > 0 && !this.priced().length);
   protected readonly showNeedService = signal(false);
 
   protected readonly scheduleNext = signal(true);
@@ -140,7 +135,7 @@ export class CaptureDrawer {
   private readonly hasDraft = computed(() => {
     const m = this.model();
     const typedContact = !this.ui.captureContactId() && [m.name, m.company, m.phone, m.email].some((v) => v.trim());
-    return typedContact || !!m.serviceId || !!m.detail.trim() || !!m.notes.trim() || !!this.nextNote().trim();
+    return typedContact || this.lines().some((l) => l.serviceId) || !!m.detail.trim() || !!m.notes.trim() || !!this.nextNote().trim();
   });
 
   constructor() {
@@ -246,19 +241,8 @@ export class CaptureDrawer {
       try {
         const m = this.model();
         const contact = this.targetContact();
-        const svc = this.service();
-        const pct = this.catalog.rate(this.tier());
-        const pricing: LeadPricing | null = svc
-          ? {
-              serviceId: svc.id,
-              serviceName: svc.name,
-              quantity: this.quantity(),
-              unitPrice: svc.price,
-              tier: this.tier(),
-              tierPct: pct,
-              value: salePrice(svc.price, this.quantity(), pct),
-            }
-          : null;
+        const lines = this.priced();
+        const pricing = lines.length ? linesPricing(lines, this.tier(), this.catalog.rate(this.tier())) : null;
         const person = contact ?? m;
         const { leadId: id } = await this.leads.create({
           contactId: contact?.id ?? null,
@@ -324,6 +308,7 @@ export class CaptureDrawer {
     this.model.set(model);
     this.f().reset();
     this.useMatch.set(true);
+    this.lines.set([{ serviceId: '', quantity: 1 }]);
     this.tier.set('bronze');
     this.outcome.set('open');
     this.postSale.set(true);

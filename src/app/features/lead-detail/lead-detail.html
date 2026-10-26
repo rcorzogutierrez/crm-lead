@@ -7,7 +7,7 @@
   @if (lead(); as lead) {
     <header class="mt-4 flex flex-wrap items-start justify-between gap-4">
       <div class="min-w-0">
-        <h1 class="date-face text-[2rem] leading-tight font-bold break-words">{{ lead.serviceName || lead.name }}</h1>
+        <h1 class="date-face text-[2rem] leading-tight font-bold break-words">{{ title() || lead.name }}</h1>
         <p class="mt-1 text-ink-2">
           @if (lead.serviceName) {
             @if (contact(); as c) {
@@ -87,50 +87,48 @@
         <section aria-labelledby="price-title">
           <h2 id="price-title" class="text-sm font-bold">{{ t('pricing.title') }}</h2>
           <div class="sheet mt-2 space-y-4 p-4">
-            @if (priceChange(); as pc) {
-              <div class="rounded-lg border border-highlight bg-highlight-soft px-4 py-3" role="alert">
-                <p class="flex gap-2 text-sm">
-                  <svg lucideTriangleAlert [size]="18" class="mt-0.5 shrink-0"></svg>
-                  <span>{{ t('pricing.changed', { name: lead.serviceName, from: money(pc.from), to: money(pc.to) }) }}</span>
-                </p>
-                <div class="mt-2.5 flex flex-wrap gap-2 pl-7">
-                  <button type="button" class="btn-primary btn-sm" (click)="acceptNewPrice()">{{ t('pricing.accept', { price: money(pc.to) }) }}</button>
-                  <button type="button" class="btn-secondary btn-sm" (click)="keepOldPrice()">{{ t('pricing.keep', { price: money(pc.from) }) }}</button>
+            @if (priceChanges(); as pcs) {
+              @if (pcs.length) {
+                <div class="rounded-lg border border-highlight bg-highlight-soft px-4 py-3" role="alert">
+                  <div class="flex gap-2 text-sm">
+                    <svg lucideTriangleAlert [size]="18" class="mt-0.5 shrink-0"></svg>
+                    @if (pcs.length === 1) {
+                      <p>{{ t('pricing.changed', { name: pcs[0].name, from: money(pcs[0].from), to: money(pcs[0].to) }) }}</p>
+                    } @else {
+                      <div>
+                        <p>{{ t('pricing.changedN', { n: pcs.length }) }}</p>
+                        <ul class="mt-1 list-disc pl-4 tabular">
+                          @for (pc of pcs; track pc.index) {
+                            <li>{{ t('pricing.changedLine', { name: pc.name, from: money(pc.from), to: money(pc.to) }) }}</li>
+                          }
+                        </ul>
+                      </div>
+                    }
+                  </div>
+                  <div class="mt-2.5 flex flex-wrap gap-2 pl-7">
+                    <button type="button" class="btn-primary btn-sm" [disabled]="pSaving()" (click)="acceptNewPrice()">
+                      {{ pcs.length === 1 ? t('pricing.accept', { price: money(pcs[0].to) }) : t('pricing.acceptAll') }}
+                    </button>
+                    <button type="button" class="btn-secondary btn-sm" [disabled]="pSaving()" (click)="keepOldPrice()">
+                      {{ pcs.length === 1 ? t('pricing.keep', { price: money(pcs[0].from) }) : t('pricing.keepAll') }}
+                    </button>
+                  </div>
                 </div>
-              </div>
+              }
             }
 
             @if (isOpen()) {
-              <div class="grid gap-3 sm:grid-cols-[minmax(0,1fr)_8rem]">
-                <div [class]="pService()?.unit ? '' : 'sm:col-span-2'">
-                  <label class="field-label" for="p-service">{{ t('field.service') }}</label>
-                  <select id="p-service" class="input" (change)="pServiceId.set($any($event.target).value)">
-                    @if (!lead.serviceId) {
-                      <option value="" [selected]="!pServiceId()">{{ t('capture.noService') }}</option>
-                    }
-                    @for (s of catalog.active(); track s.id) {
-                      <option [value]="s.id" [selected]="s.id === pServiceId()">{{ s.name }}</option>
-                    }
-                    @if (service(); as cur) {
-                      @if (!cur.active) {
-                        <option [value]="cur.id" [selected]="cur.id === pServiceId()">{{ cur.name }} ({{ t('svc.archivedBadge') }})</option>
-                      }
-                    }
-                  </select>
-                </div>
-                @if (pService()?.unit) {
-                  <div>
-                    <label class="field-label" for="p-qty">{{ t('field.quantity', { unit: pService()!.unit }) }}</label>
-                    <input id="p-qty" class="input tabular" type="number" inputmode="numeric" min="1" step="1" [value]="pQuantity()" (input)="pQuantity.set(+$any($event.target).value || 1)" />
-                  </div>
-                }
-              </div>
-              @if (pService(); as svc) {
+              <app-lines-editor idPrefix="p" [(lines)]="pLines" [allowNone]="!lead.serviceId" [keepIds]="keepIds()" />
+              @if (pPriced().length) {
                 <div>
                   <p class="field-label">{{ t('tier.label') }}</p>
-                  <app-tier-picker [unitPrice]="pUnitPrice()" [quantity]="svc.unit ? pQuantity() : 1" [rates]="pRates()" [(value)]="pTier" />
+                  <app-tier-picker [lines]="pPriced()" [rates]="pRates()" [(value)]="pTier" />
                   <p class="mt-1.5 text-[0.8125rem] text-ink-2 tabular">
-                    {{ t('pricing.officialLine', { price: money(pUnitPrice()), unit: svc.unit ? ' / ' + svc.unit : '' }) }}
+                    @if (pPriced().length > 1) {
+                      {{ t('pricing.officialMulti', { total: money(pOfficial()), n: pPriced().length }) }}
+                    } @else {
+                      {{ t('pricing.officialLine', { price: money(pPriced()[0].unitPrice), unit: unitLabel(pPriced()[0].serviceId) }) }}
+                    }
                   </p>
                 </div>
               } @else if (!lead.serviceId) {
@@ -142,12 +140,22 @@
               @if (pDirty()) {
                 <div class="flex justify-end gap-2 border-t border-rule pt-3">
                   <button type="button" class="btn-ghost btn-sm" (click)="resetPricing()">{{ t('fu.discard') }}</button>
-                  <button type="button" class="btn-primary btn-sm" [disabled]="pSaving() || !pService()" (click)="savePricing()">{{ t('pricing.save') }}</button>
+                  <button type="button" class="btn-primary btn-sm" [disabled]="pSaving() || !pPriced().length" (click)="savePricing()">{{ t('pricing.save') }}</button>
                 </div>
               }
             } @else {
               <dl class="grid gap-3 text-sm sm:grid-cols-3">
-                <div><dt class="text-xs text-ink-3">{{ t('field.service') }}</dt><dd class="font-semibold">{{ lead.serviceName || '—' }}@if (lead.detail) { <span class="font-normal text-ink-2">· {{ lead.detail }}</span> }</dd></div>
+                <div>
+                  <dt class="text-xs text-ink-3">{{ lines().length > 1 ? t('lines.label') : t('field.service') }}</dt>
+                  <dd class="font-semibold">
+                    @for (x of lines(); track $index) {
+                      <span class="block">{{ x.serviceName }}@if (x.quantity > 1) { <span class="font-normal text-ink-2 tabular">× {{ x.quantity }}</span> }</span>
+                    } @empty {
+                      —
+                    }
+                    @if (lead.detail) { <span class="block font-normal text-ink-2">{{ lead.detail }}</span> }
+                  </dd>
+                </div>
                 <div><dt class="text-xs text-ink-3">{{ t('tier.label') }}</dt><dd>{{ lead.serviceId ? tierName(lead.tier) + ' +' + lead.tierPct + ' %' : '—' }}</dd></div>
                 <div><dt class="text-xs text-ink-3">{{ t('list.value') }}</dt><dd class="font-bold tabular">{{ money(lead.value) }}</dd></div>
               </dl>

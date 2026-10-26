@@ -1,4 +1,5 @@
 import { Component, Injector, afterNextRender, computed, inject, signal } from '@angular/core';
+import { dealTitle } from '../../core/deal-lines';
 import { RouterLink } from '@angular/router';
 import { LucideLock } from '@lucide/angular';
 import { AuthService } from '../../core/auth.service';
@@ -77,7 +78,7 @@ export class Pipeline {
   }
 
   protected title(lead: Lead): string {
-    return lead.serviceName || lead.name;
+    return dealTitle(lead) || lead.name;
   }
 
   protected onDragStart(event: DragEvent, lead: Lead): void {

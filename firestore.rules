@@ -262,33 +262,86 @@ service cloud.firestore {
         && d.stage in ['new', 'contacted', 'qualified', 'proposal', 'negotiation', 'won', 'lost']
         && d.source in ['web', 'whatsapp', 'phone', 'referral', 'social', 'event', 'email', 'other']
         && d.value is number && d.value >= 0
+        && validExtras(d)
         && d.assigneeId is string
         && (d.get('contactId', null) == null
             || existsAfter(/databases/$(database)/documents/contacts/$(d.contactId)));
     }
 
     // Lead con servicio: el valor sale del precio oficial × cantidad + % de la categoría.
+    // Una compra puede llevar más servicios en `extras` (hasta 3, con la misma categoría):
+    // el valor es la suma de todas las líneas, cada una a su precio oficial.
     function hasService(d) {
       return d.get('serviceId', null) != null;
     }
+    function extrasOf(d) {
+      return d.get('extras', []);
+    }
+    // Las comparaciones fallan (y deniegan) si cantidad o precio no son números; el servicio
+    // se comprueba contra el catálogo. Se valida lo justo: las reglas tienen un tope de cálculo.
+    function lineShape(x) {
+      return x.keys().hasOnly(['serviceId', 'serviceName', 'quantity', 'unitPrice', 'ack'])
+        && x.serviceName is string && x.serviceName.size() <= 200
+        && x.quantity > 0 && x.unitPrice >= 0
+        && (x.get('ack', null) == null || x.ack is number);
+    }
+    function extraShape(ex, i) {
+      return ex.size() <= i || lineShape(ex[i]);
+    }
+    function validExtras(d) {
+      let ex = extrasOf(d);
+      return ex is list && ex.size() <= 3
+        && (hasService(d) || ex.size() == 0)
+        && extraShape(ex, 0) && extraShape(ex, 1) && extraShape(ex, 2);
+    }
+    function lineValue(x, pct) {
+      return float(x.unitPrice) * float(x.quantity) * (100.0 + float(pct)) / 100.0;
+    }
+    function extraValue(ex, i, pct) {
+      return ex.size() > i ? lineValue(ex[i], pct) : 0.0;
+    }
     function priceMath(d) {
+      let ex = extrasOf(d);
+      let pct = d.tierPct;
       return d.quantity is number && d.quantity > 0
         && d.unitPrice is number && d.unitPrice >= 0
         && d.tier in ['bronze', 'silver', 'gold']
-        && d.tierPct is number
-        && math.abs(d.value - float(d.unitPrice) * float(d.quantity) * (100.0 + float(d.tierPct)) / 100.0) < 0.011;
+        && pct is number
+        && math.abs(d.value - lineValue(d, pct) - extraValue(ex, 0, pct) - extraValue(ex, 1, pct)
+            - extraValue(ex, 2, pct)) < 0.05;
+    }
+    // Precio oficial vigente de un servicio que sigue en el catálogo.
+    function officialNow(serviceId, price) {
+      let svc = get(servicePath(serviceId)).data;
+      return svc.price == price && svc.active == true;
+    }
+    function extraOfficial(ex, i) {
+      return ex.size() <= i || officialNow(ex[i].serviceId, ex[i].unitPrice);
+    }
+    // Al editar, cada servicio extra conserva su precio pactado si sigue en la misma posición;
+    // si no, va al precio oficial vigente.
+    function extraOnUpdate(ex, oldEx, i) {
+      return ex.size() <= i
+        || (oldEx.size() > i && oldEx[i].serviceId == ex[i].serviceId && oldEx[i].unitPrice == ex[i].unitPrice)
+        || officialNow(ex[i].serviceId, ex[i].unitPrice);
+    }
+    function extrasOnUpdate(d, old) {
+      let ex = extrasOf(d);
+      let oldEx = extrasOf(old);
+      return ex == oldEx
+        || (extraOnUpdate(ex, oldEx, 0) && extraOnUpdate(ex, oldEx, 1) && extraOnUpdate(ex, oldEx, 2));
     }
     // Al crear: precio y porcentaje deben ser los vigentes.
     function pricingOnCreate(d) {
       return !hasService(d)
         ? d.value == 0
         : priceMath(d)
-          && get(servicePath(d.serviceId)).data.price == d.unitPrice
-          && get(servicePath(d.serviceId)).data.active == true
-          && d.tierPct == tierRate(d.tier);
+          && officialNow(d.serviceId, d.unitPrice)
+          && d.tierPct == tierRate(d.tier)
+          && extraOfficial(extrasOf(d), 0) && extraOfficial(extrasOf(d), 1) && extraOfficial(extrasOf(d), 2);
     }
     function pricingKeys() {
-      return ['serviceId', 'serviceName', 'quantity', 'unitPrice', 'tier', 'tierPct', 'value'];
+      return ['serviceId', 'serviceName', 'quantity', 'unitPrice', 'extras', 'tier', 'tierPct', 'value'];
     }
     // Al editar: un lead ganado no cambia de precio; uno abierto solo puede tomar el precio
     // oficial vigente (o conservar el pactado) y el porcentaje vigente (o conservar el suyo).
@@ -304,6 +357,7 @@ service cloud.firestore {
                          // Cambiar a otro servicio: solo a uno que siga en el catálogo.
                          && (d.serviceId == old.get('serviceId', null)
                              || get(servicePath(d.serviceId)).data.active == true))
+                  && extrasOnUpdate(d, old)
                   && (d.tierPct == old.get('tierPct', -1) && d.tier == old.get('tier', null)
                       || d.tierPct == tierRate(d.tier))));
     }

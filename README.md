@@ -43,6 +43,7 @@ y deja cada contacto con su siguiente paso.
   por nombre, empresa, email o teléfono para no duplicarlos. <kbd>/</kbd> abre la búsqueda de clientes.
   Al final pregunta "¿Cómo quedó?": *Le interesa* programa la próxima acción; *Vendido* registra la venta
   en el mismo paso, con la postventa a 30 días.
+  Una misma compra puede llevar varios servicios (hasta cuatro) con una sola categoría y un solo total.
 
 ### Contactos, negocios y servicios
 

@@ -1,4 +1,5 @@
 import { Component, computed, inject } from '@angular/core';
+import { dealTitle } from '../../core/deal-lines';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { LucideCalendarRange, LucideChevronLeft, LucideChevronRight } from '@lucide/angular';
@@ -121,7 +122,7 @@ export class WeekReportView {
 
   /** "Servicio B · Plata · Ana": lo que se vendió, en qué categoría y quién. */
   protected dealMeta(l: Lead, withTier: boolean): string {
-    const parts = [l.serviceName || l.company];
+    const parts = [dealTitle(l) || l.company];
     if (withTier && l.serviceId) parts.push(tierLabel(l.tier));
     parts.push(this.members.name(l.assigneeId));
     return parts.filter(Boolean).join(' · ');

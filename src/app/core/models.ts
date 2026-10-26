@@ -1,4 +1,5 @@
 import { I18nKey, t } from './i18n/i18n';
+import type { DealLine } from './deal-lines';
 
 /** Etapas del pipeline, en orden. `won` y `lost` son etapas cerradas. */
 export type Stage = 'new' | 'contacted' | 'qualified' | 'proposal' | 'negotiation' | 'won' | 'lost';
@@ -162,6 +163,8 @@ export interface Lead {
   tierPct: number;
   /** Precio oficial nuevo que se decidió no aplicar (para no volver a avisar). */
   priceAck: number | null;
+  /** Más servicios en la misma compra (el primero va en los campos de arriba). Ver `deal-lines.ts`. */
+  extras: DealLine[];
   wonAt: Date | null;
   /** Cuándo pasó a Perdido (null en los anteriores a este campo y en los no perdidos). */
   lostAt: Date | null;
@@ -173,7 +176,7 @@ export function wonDate(l: Lead): Date | null {
 }
 
 /** Datos de precio de un lead con servicio. */
-export type LeadPricing = Pick<Lead, 'serviceId' | 'serviceName' | 'quantity' | 'unitPrice' | 'tier' | 'tierPct' | 'value'>;
+export type LeadPricing = Pick<Lead, 'serviceId' | 'serviceName' | 'quantity' | 'unitPrice' | 'extras' | 'tier' | 'tierPct' | 'value'>;
 
 export type LeadDraft = Pick<
   Lead,

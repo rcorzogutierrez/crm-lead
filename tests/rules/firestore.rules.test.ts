@@ -487,6 +487,61 @@ describe('Precio de un lead', () => {
   });
 });
 
+describe('Varios servicios en una compra', () => {
+  // Sitio web 2 × 1000 y tour 1 × 180, en bronce (+3 %): 2060 + 185.40 = 2245.40.
+  const tourLine = { serviceId: 'tour', serviceName: 'Tour', quantity: 1, unitPrice: 180, ack: null };
+  const withTour = (extra: Record<string, unknown> = {}) => lead(LUIS, { extras: [tourLine], value: 2245.4, ...extra });
+  beforeEach(async () => {
+    await seed({ 'services/tour': { name: 'Tour', description: '', price: 180, unit: 'persona', active: true } });
+  });
+
+  it('se crea con cada servicio a su precio oficial y el valor es la suma', async () => {
+    await assertSucceeds(setDoc(doc(db(LUIS), 'leads/n'), withTour()));
+    await assertFails(setDoc(doc(db(LUIS), 'leads/n2'), withTour({ value: 2060 })));
+    await assertFails(setDoc(doc(db(LUIS), 'leads/n3'), withTour({ extras: [{ ...tourLine, unitPrice: 100 }], value: 2163 })));
+    await assertFails(setDoc(doc(db(LUIS), 'leads/n4'), withTour({ extras: [{ ...tourLine, descuento: 50 }] })));
+    // Hasta cuatro servicios por compra (el principal y tres más), también al editar.
+    const three = Array.from({ length: 3 }, () => tourLine);
+    await assertSucceeds(setDoc(doc(db(LUIS), 'leads/n6'), lead(LUIS, { extras: three, value: 2060 + 3 * 185.4 })));
+    await assertSucceeds(updateDoc(doc(db(LUIS), 'leads/luis-1'), { extras: three, value: 2060 + 3 * 185.4 }));
+    const four = Array.from({ length: 4 }, () => tourLine);
+    await assertFails(setDoc(doc(db(LUIS), 'leads/n5'), lead(LUIS, { extras: four, value: 2060 + 4 * 185.4 })));
+  });
+
+  it('sin servicio principal no hay servicios extra', async () => {
+    const bare = { serviceId: null, serviceName: '', quantity: 1, unitPrice: 0, tierPct: 0, value: 0 };
+    await assertFails(setDoc(doc(db(LUIS), 'leads/n'), lead(LUIS, { ...bare, extras: [tourLine] })));
+  });
+
+  it('al editar: un servicio nuevo va al precio vigente', async () => {
+    const ref = doc(db(LUIS), 'leads/luis-1');
+    await assertSucceeds(updateDoc(ref, { extras: [tourLine], value: 2245.4 }));
+    await assertFails(updateDoc(ref, { extras: [{ ...tourLine, unitPrice: 150 }], value: 2214.5 }));
+  });
+
+  it('al editar: un servicio que sigue en su lugar conserva su precio pactado', async () => {
+    // El tour sube a 200: el negocio sigue con su 180 pactado al cambiar de categoría…
+    await seed({
+      'leads/luis-1': withTour(),
+      'services/tour': { name: 'Tour', description: '', price: 200, unit: 'persona', active: true },
+    });
+    const ref = doc(db(LUIS), 'leads/luis-1');
+    await assertSucceeds(updateDoc(ref, { tier: 'gold', tierPct: 7, value: 2140 + 192.6 }));
+    // …o descarta el aviso del precio nuevo en esa línea.
+    await assertSucceeds(updateDoc(ref, { extras: [{ ...tourLine, ack: 200 }] }));
+    // Un tour añadido de nuevo ya va al precio de hoy.
+    await assertFails(updateDoc(ref, { extras: [{ ...tourLine, ack: 200 }, tourLine], value: 2140 + 2 * 192.6 }));
+    await assertSucceeds(
+      updateDoc(ref, { extras: [{ ...tourLine, ack: 200 }, { ...tourLine, unitPrice: 200 }], value: 2140 + 192.6 + 214 }),
+    );
+  });
+
+  it('una venta ganada no cambia de servicios', async () => {
+    await seed({ 'leads/luis-won': withTour({ stage: 'won' }) });
+    await assertFails(updateDoc(doc(db(LUIS), 'leads/luis-won'), { extras: [], value: 2060 }));
+  });
+});
+
 describe('Resumen de compras del contacto', () => {
   // c1 con una venta ganada y un negocio abierto de Luis y otro de Pedro.
   const stats = { statsV: 1, wonCount: 1, wonTotal: 2060, firstWonAt: null, openBy: { [LUIS]: 1, [PEDRO]: 1 } };

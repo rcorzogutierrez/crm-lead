@@ -160,43 +160,28 @@
         <fieldset class="space-y-3">
           <legend class="text-sm font-bold">{{ t('capture.whatTitle') }}</legend>
           @if (catalog.active().length) {
-            <div>
-              <label class="field-label" for="c-service">{{ t('field.service') }}</label>
-              <select
-                id="c-service"
-                class="input"
-                [attr.aria-invalid]="showNeedService() && needService()"
-                [attr.aria-describedby]="showNeedService() && needService() ? 'c-service-error' : null"
-                [formField]="f.serviceId"
-              >
-                <option value="">{{ t('capture.noService') }}</option>
-                @for (s of catalog.active(); track s.id) {
-                  <option [value]="s.id">{{ s.name }} · {{ money(s.price) }}@if (s.unit) { / {{ s.unit }}}</option>
-                }
-              </select>
-              @if (showNeedService() && needService()) {
-                <p id="c-service-error" class="field-error" role="alert">{{ t('capture.soldNeedsService') }}</p>
-              }
-            </div>
-            @if (service(); as svc) {
-              <div class="grid gap-3 sm:grid-cols-[8rem_minmax(0,1fr)]">
-                @if (svc.unit) {
-                  <div>
-                    <label class="field-label" for="c-qty">{{ t('field.quantity', { unit: svc.unit }) }}</label>
-                    <input id="c-qty" class="input tabular" type="number" inputmode="numeric" step="1" [formField]="f.quantity" />
-                  </div>
-                }
-                <div [class]="svc.unit ? '' : 'sm:col-span-2'">
-                  <label class="field-label" for="c-detail">{{ t('field.detail') }}</label>
-                  <input id="c-detail" class="input" autocomplete="off" [placeholder]="t('field.detailPlaceholder')" [formField]="f.detail" />
-                </div>
+            <app-lines-editor
+              idPrefix="c"
+              [(lines)]="lines"
+              [invalid]="showNeedService() && needService()"
+              errorId="c-service-error"
+            />
+            @if (showNeedService() && needService()) {
+              <p id="c-service-error" class="field-error" role="alert">{{ t('capture.soldNeedsService') }}</p>
+            }
+            @if (priced().length) {
+              <div>
+                <label class="field-label" for="c-detail">{{ t('field.detail') }}</label>
+                <input id="c-detail" class="input" autocomplete="off" [placeholder]="t('field.detailPlaceholder')" [formField]="f.detail" />
               </div>
               <div>
                 <p class="field-label">{{ t('tier.label') }}</p>
-                <app-tier-picker [unitPrice]="svc.price" [quantity]="quantity()" [(value)]="tier" />
+                <app-tier-picker [lines]="priced()" [(value)]="tier" />
                 <p class="mt-1.5 text-[0.8125rem] text-ink-2 tabular">
-                  @if (svc.unit) {
-                    {{ t('capture.officialQty', { qty: quantity(), price: money(svc.price), total: money(official()) }) }}
+                  @if (priced().length > 1) {
+                    {{ t('capture.officialMulti', { total: money(official()), n: priced().length }) }}
+                  } @else if (catalog.byId().get(priced()[0].serviceId)?.unit) {
+                    {{ t('capture.officialQty', { qty: priced()[0].quantity, price: money(priced()[0].unitPrice), total: money(official()) }) }}
                   } @else {
                     {{ t('capture.official', { total: money(official()) }) }}
                   }
