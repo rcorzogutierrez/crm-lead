@@ -1,4 +1,5 @@
 import { Component, computed, inject, linkedSignal, signal } from '@angular/core';
+import { dealLines } from '../../core/deal-lines';
 import { NgTemplateOutlet } from '@angular/common';
 import { FormField, form, min, required, submit } from '@angular/forms/signals';
 import { LucideLock, LucidePlus, LucideSearch } from '@lucide/angular';
@@ -65,11 +66,13 @@ export class ServicesPage {
   private readonly stats = computed(() => {
     const map = new Map<string, { open: number; won: number }>();
     for (const l of this.leads.leads()) {
-      if (!l.serviceId || l.stage === 'lost') continue;
-      const s = map.get(l.serviceId) ?? { open: 0, won: 0 };
-      if (l.stage === 'won') s.won++;
-      else if (!isClosed(l.stage)) s.open++;
-      map.set(l.serviceId, s);
+      if (l.stage === 'lost') continue;
+      for (const { serviceId } of dealLines(l)) {
+        const s = map.get(serviceId) ?? { open: 0, won: 0 };
+        if (l.stage === 'won') s.won++;
+        else if (!isClosed(l.stage)) s.open++;
+        map.set(serviceId, s);
+      }
     }
     return map;
   });
@@ -114,7 +117,7 @@ export class ServicesPage {
           const before = this.catalog.byId().get(id);
           await this.catalog.update(id, draft);
           if (before && before.price !== draft.price) {
-            const affected = this.leads.open().filter((l) => l.serviceId === id).length;
+            const affected = this.leads.open().filter((l) => dealLines(l).some((x) => x.serviceId === id)).length;
             this.toast.show(affected ? t('svc.priceChanged', { n: affected }) : t('svc.saved'));
           } else {
             this.toast.show(t('svc.saved'));

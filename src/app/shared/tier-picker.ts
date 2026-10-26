@@ -2,7 +2,8 @@ import { Component, computed, inject, input, model } from '@angular/core';
 import { CatalogService } from '../core/catalog.service';
 import { moneyLabel } from '../core/dates';
 import { t } from '../core/i18n/i18n';
-import { PriceTier, TIERS, salePrice } from '../core/models';
+import { linesValue } from '../core/deal-lines';
+import { PriceTier, TIERS } from '../core/models';
 
 /**
  * Categoría de venta (bronce/plata/oro) con el precio final ya calculado.
@@ -37,8 +38,8 @@ import { PriceTier, TIERS, salePrice } from '../core/models';
 export class TierPicker {
   private readonly catalog = inject(CatalogService);
 
-  readonly unitPrice = input.required<number>();
-  readonly quantity = input(1);
+  /** Servicios de la compra (precio oficial por unidad y cantidad). */
+  readonly lines = input.required<readonly { unitPrice: number; quantity: number }[]>();
   /** Porcentajes a mostrar; por defecto los vigentes del catálogo. */
   readonly rates = input<Record<PriceTier, number> | null>(null);
   readonly disabled = input(false);
@@ -51,7 +52,7 @@ export class TierPicker {
       id: tier.id,
       label: tier.label,
       pct: rates[tier.id],
-      price: moneyLabel(salePrice(this.unitPrice(), this.quantity(), rates[tier.id])),
+      price: moneyLabel(linesValue(this.lines(), rates[tier.id])),
     }));
   });
 }

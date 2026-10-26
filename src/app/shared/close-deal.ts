@@ -1,4 +1,5 @@
 import { Component, ElementRef, afterNextRender, computed, inject, input, output, signal, viewChild } from '@angular/core';
+import { dealTitle } from '../core/deal-lines';
 import { moneyLabel } from '../core/dates';
 import { firestoreErrorMessage } from '../core/firestore-utils';
 import { FollowUpsService } from '../core/followups.service';
@@ -98,7 +99,7 @@ export class CloseDeal {
   protected readonly busy = signal(false);
   protected readonly error = signal<string | null>(null);
 
-  protected readonly title = computed(() => this.lead().serviceName || this.lead().name);
+  protected readonly title = computed(() => dealTitle(this.lead()) || this.lead().name);
   protected readonly pendingCount = computed(() => this.followUps.forLead(this.lead().id).length);
 
   private readonly box = viewChild.required<ElementRef<HTMLFormElement>>('box');

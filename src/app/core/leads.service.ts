@@ -19,6 +19,7 @@ import { FIRESTORE } from './firebase';
 import { toDate } from './firestore-utils';
 import { t } from './i18n/i18n';
 import { FollowUpsService } from './followups.service';
+import { DealLine, dealServices } from './deal-lines';
 import { ContactChannel, ContactDraft, Lead, LeadDraft, LeadPricing, LeadSource, LostCode, PriceTier, Stage, isClosed, lostReasonLabel, stageMeta } from './models';
 import { teamQuery } from './team-query';
 
@@ -50,8 +51,19 @@ function mapLead(id: string, d: DocumentData): Lead {
     tier: (d['tier'] as PriceTier) ?? 'bronze',
     tierPct: Number(d['tierPct'] ?? 0),
     priceAck: typeof d['priceAck'] === 'number' ? d['priceAck'] : null,
+    extras: Array.isArray(d['extras']) ? d['extras'].map(mapLine) : [],
     wonAt: toDate(d['wonAt']),
     lostAt: toDate(d['lostAt']),
+  };
+}
+
+function mapLine(x: DocumentData): DealLine {
+  return {
+    serviceId: x['serviceId'] ?? '',
+    serviceName: x['serviceName'] ?? '',
+    quantity: Number(x['quantity'] ?? 1),
+    unitPrice: Number(x['unitPrice'] ?? 0),
+    ack: typeof x['ack'] === 'number' ? x['ack'] : null,
   };
 }
 
@@ -71,7 +83,7 @@ export interface NewLead {
 }
 
 /** Cambio de precio de un lead abierto; `note` queda en el historial. */
-export type PricingPatch = Omit<LeadPricing, 'serviceName'> & { serviceName: string; note: string };
+export type PricingPatch = LeadPricing & { priceAck: number | null; note: string };
 
 /**
  * Leads en vivo: un admin escucha todos; un vendedor solo los suyos (las reglas
@@ -158,6 +170,7 @@ export class LeadsService {
       unitPrice: p?.unitPrice ?? 0,
       tier: p?.tier ?? 'bronze',
       tierPct: p?.tierPct ?? 0,
+      extras: p?.extras ?? [],
       value: p?.value ?? 0,
       priceAck: null,
       lostReason: '',
@@ -171,7 +184,7 @@ export class LeadsService {
     });
     batch.set(doc(collection(this.db, 'leads', leadRef.id, 'activities')), {
       type: 'created',
-      body: p?.serviceName ?? '',
+      body: p ? dealServices(p) : '',
       createdBy: uid,
       createdAt: serverTimestamp(),
     });
@@ -193,24 +206,14 @@ export class LeadsService {
     return { leadId: leadRef.id, contactId };
   }
 
-  /** Cambia servicio, cantidad o categoría de un lead abierto y lo anota en el historial. */
+  /**
+   * Cambia servicios, cantidades o categoría de un lead abierto (también aceptar un precio
+   * oficial nuevo o mantener el pactado) y lo anota en el historial.
+   */
   async updatePricing(lead: Lead, patch: PricingPatch): Promise<void> {
     const { note, ...pricing } = patch;
     const batch = writeBatch(this.db);
-    batch.update(doc(this.db, 'leads', lead.id), { ...pricing, priceAck: null, updatedAt: serverTimestamp() });
-    batch.set(doc(collection(this.db, 'leads', lead.id, 'activities')), {
-      type: 'pricing',
-      body: note,
-      createdBy: this.auth.uid(),
-      createdAt: serverTimestamp(),
-    });
-    await batch.commit();
-  }
-
-  /** Mantiene el precio pactado aunque el oficial haya cambiado (no vuelve a avisar por ese precio); `note` queda en el historial. */
-  async keepPrice(lead: Lead, officialPrice: number, note: string): Promise<void> {
-    const batch = writeBatch(this.db);
-    batch.update(doc(this.db, 'leads', lead.id), { priceAck: officialPrice, updatedAt: serverTimestamp() });
+    batch.update(doc(this.db, 'leads', lead.id), { ...pricing, updatedAt: serverTimestamp() });
     batch.set(doc(collection(this.db, 'leads', lead.id, 'activities')), {
       type: 'pricing',
       body: note,

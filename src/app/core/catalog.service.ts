@@ -1,3 +1,4 @@
+import { dealLines, staleLines } from './deal-lines';
 import { Service, computed, effect, inject, signal } from '@angular/core';
 import {
   DocumentData,
@@ -69,8 +70,7 @@ export class CatalogService {
   /** El precio oficial cambió desde que se cotizó este lead abierto y aún no se decidió qué hacer. */
   hasPriceChange(lead: Lead): boolean {
     if (!lead.serviceId || isClosed(lead.stage)) return false;
-    const svc = this.byId().get(lead.serviceId);
-    return !!svc && svc.price !== lead.unitPrice && svc.price !== lead.priceAck;
+    return staleLines(dealLines(lead), this.byId()).length > 0;
   }
 
   rate(tier: PriceTier): number {

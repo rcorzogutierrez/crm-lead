@@ -22,12 +22,14 @@ import { LiveQuery, firestoreErrorMessage } from '../../core/firestore-utils';
 import { FollowUpsService } from '../../core/followups.service';
 import { I18nKey, intlLocale, t } from '../../core/i18n/i18n';
 import { LeadsService } from '../../core/leads.service';
+import { DealLine, EditLine, dealLines, dealTitle, linesOfficial, linesPricing, linesValue, pricedLines, staleLines } from '../../core/deal-lines';
 import { MembersService } from '../../core/members.service';
 import {
   Activity,
   ActivityType,
   ContactChannel,
   activityLabel,
+  Lead,
   LeadDraft,
   PriceTier,
   SOURCES,
@@ -37,7 +39,6 @@ import {
   channelLabel,
   isClosed,
   lostReasonLabel,
-  salePrice,
   stageMeta,
   tierLabel,
 } from '../../core/models';
@@ -48,6 +49,7 @@ import { mailHref, telHref, whatsappHref } from '../../shared/contact-links';
 import { EmptyState } from '../../shared/empty-state';
 import { FollowUpItem } from '../../shared/followup-item';
 import { ScheduleForm } from '../../shared/schedule-form';
+import { LinesEditor } from '../../shared/lines-editor';
 import { TierPicker } from '../../shared/tier-picker';
 import { CloseDeal } from '../../shared/close-deal';
 
@@ -71,6 +73,7 @@ const LOG_TYPES: { id: ActivityType; label: I18nKey }[] = [
     FollowUpItem,
     ScheduleForm,
     TierPicker,
+    LinesEditor,
     CloseDeal,
     LucideArrowLeft,
     LucideTriangleAlert,
@@ -125,45 +128,41 @@ export class LeadDetail {
     const id = this.lead()?.contactId;
     return id ? (this.contacts.byId().get(id) ?? null) : null;
   });
-  /** Servicio del catálogo tal como está hoy (su precio oficial puede haber cambiado). */
-  protected readonly service = computed(() => {
-    const id = this.lead()?.serviceId;
-    return id ? (this.catalog.byId().get(id) ?? null) : null;
-  });
-  /** Precio oficial nuevo pendiente de decidir (lead abierto, aún no aceptado ni descartado). */
-  protected readonly priceChange = computed(() => {
+  /** Servicios del negocio con su precio pactado. */
+  protected readonly lines = computed(() => {
     const lead = this.lead();
-    const svc = this.service();
-    if (!lead || !svc || !this.isOpen() || svc.price === lead.unitPrice || svc.price === lead.priceAck) return null;
-    return { from: lead.unitPrice, to: svc.price };
+    return lead ? dealLines(lead) : [];
   });
+  protected readonly title = computed(() => {
+    const lead = this.lead();
+    return lead ? dealTitle(lead) : '';
+  });
+  /** Precios oficiales nuevos pendientes de decidir (negocio abierto, aún no aceptados ni descartados). */
+  protected readonly priceChanges = computed(() => (this.isOpen() ? staleLines(this.lines(), this.catalog.byId()) : []));
 
-  // Edición del precio: servicio, cantidad y categoría (solo mientras el lead está abierto).
-  // Cada uno vuelve al valor guardado cuando cambia el precio pactado del lead (no con cualquier cambio del lead).
+  // Edición del precio: servicios, cantidades y categoría (solo mientras el negocio está abierto).
+  // Vuelven a lo guardado cuando cambia lo pactado (no con cualquier cambio del negocio).
   private readonly savedPricing = computed(
     () => {
       const lead = this.lead();
+      const lines: EditLine[] = this.lines().map((x) => ({ serviceId: x.serviceId, quantity: x.quantity }));
       return {
-        serviceId: lead?.serviceId ?? '',
-        quantity: lead?.quantity || 1,
+        lines: lines.length ? lines : [{ serviceId: '', quantity: 1 }],
         tier: (lead?.serviceId ? lead.tier : 'bronze') as PriceTier,
       };
     },
-    { equal: (a, b) => a.serviceId === b.serviceId && a.quantity === b.quantity && a.tier === b.tier },
+    { equal: (a, b) => a.tier === b.tier && sameLines(a.lines, b.lines) },
   );
-  protected readonly pServiceId = linkedSignal(() => this.savedPricing().serviceId);
-  protected readonly pQuantity = linkedSignal(() => this.savedPricing().quantity);
+  protected readonly pLines = linkedSignal(() => this.savedPricing().lines);
   protected readonly pTier = linkedSignal(() => this.savedPricing().tier);
-  protected readonly pService = computed(() => this.catalog.byId().get(this.pServiceId()) ?? null);
+  /** Lo elegido con precio: lo que ya estaba en su lugar conserva el pactado. */
+  protected readonly pPriced = computed(() => pricedLines(this.pLines(), this.catalog.byId(), this.lines()));
+  protected readonly pOfficial = computed(() => linesOfficial(this.pPriced()));
+  protected readonly keepIds = computed(() => this.lines().map((x) => x.serviceId));
   /** Si no cambia la categoría se conserva el % pactado; si cambia, se usa el vigente. */
   protected readonly pPct = computed(() => {
     const lead = this.lead();
     return lead && lead.serviceId && this.pTier() === lead.tier ? lead.tierPct : this.catalog.rate(this.pTier());
-  });
-  protected readonly pUnitPrice = computed(() => {
-    const lead = this.lead();
-    if (lead?.serviceId && lead.serviceId === this.pServiceId()) return lead.unitPrice;
-    return this.pService()?.price ?? 0;
   });
   protected readonly pRates = computed(() => {
     const lead = this.lead();
@@ -174,11 +173,9 @@ export class LeadDetail {
   protected readonly pDirty = computed(() => {
     const lead = this.lead();
     if (!lead) return false;
-    return (
-      this.pServiceId() !== (lead.serviceId ?? '') ||
-      (!!this.pService()?.unit && this.pQuantity() !== lead.quantity) ||
-      (!!this.pServiceId() && this.pTier() !== lead.tier)
-    );
+    const chosen = this.pPriced().map((x) => ({ serviceId: x.serviceId, quantity: x.quantity }));
+    const saved = this.lines().map((x) => ({ serviceId: x.serviceId, quantity: x.quantity }));
+    return !sameLines(chosen, saved) || (chosen.length > 0 && this.pTier() !== lead.tier);
   });
   protected readonly pSaving = signal(false);
 
@@ -283,7 +280,7 @@ export class LeadDetail {
     try {
       const from = lead.stage;
       await this.leadsService.moveToStage(lead, stage);
-      this.toast.show(t('detail.movedTo', { name: lead.serviceName || lead.name, stage: stageMeta(stage).label }), {
+      this.toast.show(t('detail.movedTo', { name: dealTitle(lead) || lead.name, stage: stageMeta(stage).label }), {
         action: {
           label: t('common.undo'),
           run: () => this.toast.follow(this.leadsService.moveToStage({ ...lead, stage }, from), t('common.undone')),
@@ -294,85 +291,80 @@ export class LeadDetail {
     }
   }
 
+  protected unitLabel(serviceId: string): string {
+    const unit = this.catalog.byId().get(serviceId)?.unit;
+    return unit ? ' / ' + unit : '';
+  }
+
   protected resetPricing(): void {
     const saved = this.savedPricing();
-    this.pServiceId.set(saved.serviceId);
-    this.pQuantity.set(saved.quantity);
+    this.pLines.set(saved.lines);
     this.pTier.set(saved.tier);
   }
 
   protected async savePricing(): Promise<void> {
     const lead = this.lead();
-    const svc = this.pService();
-    if (!lead || !svc) return;
-    const quantity = svc.unit ? Math.max(1, Math.floor(Number(this.pQuantity()) || 1)) : 1;
-    const unitPrice = this.pUnitPrice();
+    const lines = this.pPriced();
+    if (!lead || !lines.length) return;
     const tierPct = this.pPct();
-    const value = salePrice(unitPrice, quantity, tierPct);
+    const value = linesValue(lines, tierPct);
+    const before = this.lines();
     const changes: string[] = [];
-    if (lead.serviceId !== svc.id) changes.push(t('pricing.noteService', { name: svc.name }));
-    else {
-      if (quantity !== lead.quantity) changes.push(t('pricing.noteQty', { from: lead.quantity, to: quantity }));
-      if (this.pTier() !== lead.tier) changes.push(`${tierLabel(lead.tier)} → ${tierLabel(this.pTier())}`);
+    const sameServices = lines.length === before.length && lines.every((x, i) => x.serviceId === before[i].serviceId);
+    if (!sameServices) changes.push(t('pricing.noteServices', { names: lines.map((x) => x.serviceName).join(' + ') }));
+    else if (lines.length === 1 && lines[0].quantity !== before[0].quantity) {
+      changes.push(t('pricing.noteQty', { from: before[0].quantity, to: lines[0].quantity }));
+    } else if (lines.some((x, i) => x.quantity !== before[i].quantity)) {
+      changes.push(t('pricing.noteServices', { names: lines.map((x) => `${x.serviceName} × ${x.quantity}`).join(' + ') }));
     }
+    if (lead.serviceId && this.pTier() !== lead.tier) changes.push(`${tierLabel(lead.tier)} → ${tierLabel(this.pTier())}`);
     changes.push(t('pricing.noteValue', { value: moneyLabel(value) }));
+    await this.writePricing(lead, lines, this.pTier(), tierPct, changes.join(' · '), t('pricing.saved'));
+  }
+
+  /** Acepta los precios oficiales nuevos (y el % vigente de su categoría). */
+  protected async acceptNewPrice(): Promise<void> {
+    const lead = this.lead();
+    const changes = this.priceChanges();
+    if (!lead || !changes.length) return;
+    const lines = this.lines().map((x, i) => {
+      const c = changes.find((ch) => ch.index === i);
+      return c ? { ...x, unitPrice: c.to, ack: null } : x;
+    });
+    const tierPct = this.catalog.rate(lead.tier);
+    const value = moneyLabel(linesValue(lines, tierPct));
+    const note =
+      changes.length === 1
+        ? t('pricing.noteAccepted', { from: moneyLabel(changes[0].from), to: moneyLabel(changes[0].to), value })
+        : t('pricing.noteAcceptedN', { names: changes.map((c) => c.name).join(', '), value });
+    await this.writePricing(lead, lines, lead.tier, tierPct, note, t('pricing.saved'));
+  }
+
+  /** Mantiene los precios pactados y no vuelve a avisar por estos precios oficiales. */
+  protected async keepOldPrice(): Promise<void> {
+    const lead = this.lead();
+    const changes = this.priceChanges();
+    if (!lead || !changes.length) return;
+    const lines = this.lines().map((x, i) => {
+      const c = changes.find((ch) => ch.index === i);
+      return c ? { ...x, ack: c.to } : x;
+    });
+    const note =
+      changes.length === 1
+        ? t('pricing.noteKept', { price: moneyLabel(changes[0].from), ignored: moneyLabel(changes[0].to) })
+        : t('pricing.noteKeptN', { names: changes.map((c) => c.name).join(', ') });
+    await this.writePricing(lead, lines, lead.tier, lead.tierPct, note, t('pricing.kept'));
+  }
+
+  private async writePricing(lead: Lead, lines: DealLine[], tier: PriceTier, tierPct: number, note: string, done: string): Promise<void> {
     this.pSaving.set(true);
     try {
-      await this.leadsService.updatePricing(lead, {
-        serviceId: svc.id,
-        serviceName: svc.name,
-        quantity,
-        unitPrice,
-        tier: this.pTier(),
-        tierPct,
-        value,
-        note: changes.join(' · '),
-      });
-      this.toast.show(t('pricing.saved'));
+      await this.leadsService.updatePricing(lead, { ...linesPricing(lines, tier, tierPct), note });
+      this.toast.show(done);
     } catch (err) {
       this.toast.error(firestoreErrorMessage(err));
     } finally {
       this.pSaving.set(false);
-    }
-  }
-
-  /** Acepta el precio oficial nuevo (y el % vigente de su categoría). */
-  protected async acceptNewPrice(): Promise<void> {
-    const lead = this.lead();
-    const change = this.priceChange();
-    if (!lead || !change) return;
-    const tierPct = this.catalog.rate(lead.tier);
-    const value = salePrice(change.to, lead.quantity, tierPct);
-    try {
-      await this.leadsService.updatePricing(lead, {
-        serviceId: lead.serviceId,
-        serviceName: lead.serviceName,
-        quantity: lead.quantity,
-        unitPrice: change.to,
-        tier: lead.tier,
-        tierPct,
-        value,
-        note: t('pricing.noteAccepted', { from: moneyLabel(change.from), to: moneyLabel(change.to), value: moneyLabel(value) }),
-      });
-      this.toast.show(t('pricing.saved'));
-    } catch (err) {
-      this.toast.error(firestoreErrorMessage(err));
-    }
-  }
-
-  protected async keepOldPrice(): Promise<void> {
-    const lead = this.lead();
-    const change = this.priceChange();
-    if (!lead || !change) return;
-    try {
-      await this.leadsService.keepPrice(
-        lead,
-        change.to,
-        t('pricing.noteKept', { price: moneyLabel(change.from), ignored: moneyLabel(change.to) }),
-      );
-      this.toast.show(t('pricing.kept'));
-    } catch (err) {
-      this.toast.error(firestoreErrorMessage(err));
     }
   }
 
@@ -489,4 +481,9 @@ export class LeadDetail {
   protected full = fullLabel;
   protected sourceName = sourceLabel;
   protected stageName = (s: Stage) => stageMeta(s).label;
+}
+
+/** Mismos servicios y cantidades, en el mismo orden. */
+function sameLines(a: readonly EditLine[], b: readonly EditLine[]): boolean {
+  return a.length === b.length && a.every((x, i) => x.serviceId === b[i].serviceId && x.quantity === b[i].quantity);
 }

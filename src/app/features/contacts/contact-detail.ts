@@ -1,4 +1,5 @@
 import { Component, Injector, afterNextRender, computed, effect, inject, input, signal, untracked } from '@angular/core';
+import { dealServices, dealTitle } from '../../core/deal-lines';
 import { FormField, email, form, required, submit } from '@angular/forms/signals';
 import { Router, RouterLink } from '@angular/router';
 import {
@@ -213,8 +214,12 @@ export class ContactDetail {
     return this.followUps.forLead(lead.id)[0] ?? null;
   }
 
+  protected dealServices(l: Lead): string {
+    return dealServices(l) || t('lead.noService');
+  }
+
   protected dealTitle(l: Lead): string {
-    return l.serviceName || t('lead.noService');
+    return dealTitle(l) || t('lead.noService');
   }
 
   protected dateLabel(d: Date | null): string {
@@ -234,7 +239,7 @@ export class ContactDetail {
     return activityLabel(a.type);
   }
   protected activityBody(a: HistoryEntry): string {
-    if (a.type === 'created' && a.body === a.lead.serviceName) return '';
+    if (a.type === 'created' && (a.body === a.lead.serviceName || a.body === dealServices(a.lead))) return '';
     if (a.type === 'stage' && a.from && a.to && a.to !== 'lost') return `${stageMeta(a.from).label} → ${stageMeta(a.to).label}`;
     return a.body;
   }

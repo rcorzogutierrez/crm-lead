@@ -134,7 +134,7 @@
                 @for (l of summary().won; track l.id) {
                   <li class="flex items-start justify-between gap-3 px-4 py-3 text-sm">
                     <div class="min-w-0">
-                      <a [routerLink]="['/leads', l.id]" class="font-semibold hover:text-pen hover:underline">{{ dealTitle(l) }}</a>
+                      <a [routerLink]="['/leads', l.id]" class="font-semibold hover:text-pen hover:underline">{{ dealServices(l) }}</a>
                       @if (l.detail) { <span class="text-ink-3">· {{ l.detail }}</span> }
                       <p class="mt-0.5 text-xs text-ink-2">
                         <span class="tabular">{{ wonOn(l) }}</span> · {{ members.name(l.assigneeId) }}@if (l.serviceId) { · {{ tierName(l.tier) }}}
@@ -160,7 +160,7 @@
                       <tr>
                         <td class="px-4 py-2.5 text-ink-2 tabular">{{ wonOn(l) }}</td>
                         <td class="px-3 py-2.5 font-semibold">
-                          <a [routerLink]="['/leads', l.id]" class="hover:text-pen hover:underline">{{ dealTitle(l) }}</a>
+                          <a [routerLink]="['/leads', l.id]" class="hover:text-pen hover:underline">{{ dealServices(l) }}</a>
                           @if (l.detail) { <span class="font-normal text-ink-3">· {{ l.detail }}</span> }
                         </td>
                         <td class="px-3 py-2.5 text-ink-2">{{ l.serviceId ? tierName(l.tier) : '—' }}</td>
