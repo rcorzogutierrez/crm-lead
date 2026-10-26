@@ -18,9 +18,23 @@
           {{ t(p.label) }}
         </button>
       }
+      <button
+        type="button"
+        role="radio"
+        [attr.aria-checked]="period() === 'custom'"
+        (click)="setPeriod('custom')"
+        class="h-8 rounded-md px-3 text-sm font-semibold transition-colors"
+        [class]="period() === 'custom' ? 'bg-ink text-white' : 'text-ink-2 hover:text-ink'"
+      >
+        {{ t('report.period.custom') }}
+      </button>
     </div>
   </div>
 </header>
+
+@if (period() === 'custom') {
+  <app-range-picker class="mt-5 block" [from]="fromParam()" [to]="toParam()" [max]="today()" (changed)="setRange($event)" />
+}
 
 @if (error(); as err) {
   <p class="mt-6 rounded-lg bg-ribbon-soft px-4 py-3 text-sm font-medium text-ribbon" role="alert">{{ err }}</p>

@@ -1,5 +1,5 @@
 import { FollowUp, Lead } from './models';
-import { followUpScore, myNumbers, periodRange, previousRange, weekRange, weekReport } from './reports';
+import { customRange, dayParam, followUpScore, myNumbers, parseDay, periodRange, precedingRange, previousRange, weekRange, weekReport } from './reports';
 
 function lead(p: Partial<Lead>): Lead {
   return {
@@ -55,6 +55,21 @@ describe('rangos de los reportes', () => {
     const quarter = periodRange('quarter', now);
     expect(quarter).toEqual({ start: new Date(2026, 9, 1), end: new Date(2027, 0, 1) });
     expect(previousRange('quarter', quarter).start).toEqual(new Date(2026, 6, 1));
+  });
+});
+
+describe('rango personalizado', () => {
+  it('incluye los dos días aunque lleguen al revés y compara con los mismos días de antes', () => {
+    const r = customRange(new Date(2026, 9, 15, 18), new Date(2026, 9, 1, 9));
+    expect(r).toEqual({ start: new Date(2026, 9, 1), end: new Date(2026, 9, 16) });
+    expect(precedingRange(r)).toEqual({ start: new Date(2026, 8, 16), end: new Date(2026, 9, 1) });
+  });
+
+  it('lee y escribe fechas de la URL y rechaza las imposibles', () => {
+    expect(parseDay('2026-10-05')).toEqual(new Date(2026, 9, 5));
+    expect(parseDay('2026-02-31')).toBeNull();
+    expect(parseDay('5/10/2026')).toBeNull();
+    expect(dayParam(new Date(2026, 0, 7))).toBe('2026-01-07');
   });
 });
 

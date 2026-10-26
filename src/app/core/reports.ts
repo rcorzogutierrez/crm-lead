@@ -44,6 +44,36 @@ export function previousRange(period: Period, range: Range): Range {
   return { start: new Date(s.getFullYear(), s.getMonth() - months, 1), end: s };
 }
 
+/** Rango de días elegido a mano, ambos incluidos; da igual el orden en que lleguen. */
+export function customRange(a: Date, b: Date): Range {
+  const [from, to] = a <= b ? [a, b] : [b, a];
+  return { start: startOfDay(from), end: addDays(startOfDay(to), 1) };
+}
+
+/** Los mismos días justo antes de `range` (para comparar un rango personalizado). */
+export function precedingRange(range: Range): Range {
+  return { start: addDays(range.start, -rangeDays(range)), end: range.start };
+}
+
+/** Días de calendario que abarca el rango. */
+export function rangeDays(range: Range): number {
+  return dayDiff(range.start, range.end);
+}
+
+/** "AAAA-MM-DD" (fecha local) de la URL; null si no es una fecha válida. */
+export function parseDay(value: string | null | undefined): Date | null {
+  const m = value?.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return null;
+  const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  return d.getMonth() === Number(m[2]) - 1 ? d : null;
+}
+
+/** Fecha local como "AAAA-MM-DD" (URL e `<input type="date">`). */
+export function dayParam(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
 export function inRange(d: Date | null, r: Range): boolean {
   return !!d && d >= r.start && d < r.end;
 }
