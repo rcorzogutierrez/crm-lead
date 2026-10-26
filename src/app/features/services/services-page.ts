@@ -18,7 +18,7 @@ import { SETTINGS_TABS, SectionTabs } from '../../shared/section-tabs';
 
 
 function emptyDraft(): ServiceItemDraft {
-  return { name: '', description: '', price: 0, unit: '', active: true };
+  return { name: '', description: '', price: 0, unit: '', active: true, taxable: true };
 }
 
 /**
@@ -98,7 +98,7 @@ export class ServicesPage {
   }
 
   protected startEdit(s: ServiceItem): void {
-    this.model.set({ name: s.name, description: s.description, price: s.price, unit: s.unit, active: s.active });
+    this.model.set({ name: s.name, description: s.description, price: s.price, unit: s.unit, active: s.active, taxable: s.taxable });
     this.f().reset();
     this.editing.set(s.id);
   }

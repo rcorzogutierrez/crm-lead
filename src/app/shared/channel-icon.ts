@@ -3,6 +3,7 @@ import {
   LucideArrowRightLeft,
   LucideCalendarCheck,
   LucideDynamicIcon,
+  LucideFileText,
   LucideMail,
   LucideMessageCircle,
   LucidePhone,
@@ -25,6 +26,7 @@ const ICONS = {
   created: LucideSparkles,
   followup: LucideCalendarCheck,
   pricing: LucideTag,
+  invoice: LucideFileText,
 } as const;
 
 @Component({

@@ -22,7 +22,12 @@ service cloud.firestore {
         && get(memberPath(request.auth.uid)).data.active == true;
     }
     function isAdmin() {
-      return isMember() && get(memberPath(request.auth.uid)).data.role == 'admin';
+      return isMember() && adminRole();
+    }
+    // Rol de admin sin volver a comprobar que es miembro (usar después de isMember()):
+    // ahorra cálculo en las reglas de leads, que van justas de tope.
+    function adminRole() {
+      return get(memberPath(request.auth.uid)).data.role == 'admin';
     }
     function myEmail() {
       return request.auth.token.email.lower();
@@ -163,12 +168,59 @@ service cloud.firestore {
         && validRate(request.resource.data.gold);
     }
 
+    // ---- Empresa y facturación ----
+    function companyPath() {
+      return /databases/$(database)/documents/meta/company;
+    }
+    function seqPath() {
+      return /databases/$(database)/documents/meta/invoiceSeq;
+    }
+    function invoicePath(id) {
+      return /databases/$(database)/documents/invoices/$(id);
+    }
+    function companyText(d) {
+      return isString(d.legalName, 200) && isString(d.tradeName, 200) && isString(d.taxId, 50)
+        && isString(d.address1, 200) && isString(d.address2, 200) && isString(d.city, 100)
+        && isString(d.state, 50) && isString(d.zip, 20) && isString(d.phone, 50)
+        && isString(d.email, 200) && isString(d.website, 200) && isString(d.invoicePrefix, 12);
+    }
+    // Todo el equipo la lee (el vendedor también factura); solo un admin la cambia.
+    match /meta/company {
+      allow read: if isMember();
+      allow write: if isAdmin()
+        && request.resource.data.keys().hasOnly(['legalName', 'tradeName', 'taxId', 'address1', 'address2',
+             'city', 'state', 'zip', 'phone', 'email', 'website', 'logo', 'fiscalYearStart', 'taxRate',
+             'invoicePrefix', 'updatedAt', 'updatedBy'])
+        && companyText(request.resource.data)
+        && isString(request.resource.data.logo, 200000)
+        && request.resource.data.fiscalYearStart is int
+        && request.resource.data.fiscalYearStart >= 1 && request.resource.data.fiscalYearStart <= 12
+        && request.resource.data.taxRate is number
+        && request.resource.data.taxRate >= 0 && request.resource.data.taxRate <= 30;
+    }
+    // Próximo número de factura. Al emitir sube de uno en uno junto con la factura (mismo lote);
+    // un admin puede fijar el número de arranque, pero nunca hacia atrás.
+    match /meta/invoiceSeq {
+      allow read: if isMember();
+      allow create, update: if isMember()
+        && request.resource.data.keys().hasOnly(['next', 'updatedAt'])
+        && request.resource.data.next is int
+        && (
+          (isAdmin() && request.resource.data.next >= (resource == null ? 1 : resource.data.next))
+          || (request.resource.data.next == (resource == null ? 1 : resource.data.next) + 1
+              && !exists(invoicePath(string(request.resource.data.next - 1)))
+              && existsAfter(invoicePath(string(request.resource.data.next - 1))))
+        );
+      allow delete: if false;
+    }
+
     function validService(d) {
       return isString(d.name, 200) && d.name.size() > 0
         && isString(d.description, 1000)
         && d.price is number && d.price >= 0
         && isString(d.unit, 50)
-        && d.active is bool;
+        && d.active is bool
+        && d.get('taxable', true) is bool;
     }
 
     match /services/{serviceId} {
@@ -362,28 +414,42 @@ service cloud.firestore {
                       || d.tierPct == tierRate(d.tier))));
     }
 
+    // La venta guarda su factura vigente: se pone al emitirla (mismo lote) y solo se quita al
+    // anularla (admin). Mientras tenga factura sigue ganada y no se borra.
+    function invoiceOnUpdate(d, old, leadId) {
+      let inv = d.get('invoiceId', null);
+      let oldInv = old.get('invoiceId', null);
+      return inv == oldInv
+        ? (oldInv == null || d.stage == 'won')
+        : (oldInv == null
+            ? getAfter(invoicePath(inv)).data.leadId == leadId
+            : inv == null && isAdmin() && getAfter(invoicePath(oldInv)).data.status == 'void');
+    }
+
     match /leads/{leadId} {
       // Las consultas de un vendedor deben filtrar por assigneeId == su uid.
       allow read: if isAdmin() || (isMember() && isMine(resource.data));
       // Un vendedor solo crea leads a su nombre.
       allow create: if isMember()
-        && (isAdmin() || isMine(request.resource.data))
+        && (adminRole() || isMine(request.resource.data))
         && validLead(request.resource.data)
         && pricingOnCreate(request.resource.data)
+        && request.resource.data.get('invoiceId', null) == null
         && request.resource.data.createdBy == request.auth.uid;
       // Solo un admin cambia el responsable (reasignar) o el contacto del lead,
       // y solo un admin reabre una venta ganada.
       allow update: if isMember()
-        && (isAdmin() || (isMine(resource.data) && isMine(request.resource.data)
+        && (adminRole() || (isMine(resource.data) && isMine(request.resource.data)
             && request.resource.data.get('contactId', null) == resource.data.get('contactId', null)
             && (resource.data.stage != 'won' || request.resource.data.stage == 'won')))
         && validLead(request.resource.data)
         && pricingOnUpdate(request.resource.data, resource.data)
+        && invoiceOnUpdate(request.resource.data, resource.data, leadId)
         && request.resource.data.createdBy == resource.data.createdBy;
-      // Una venta ganada solo la borra un admin.
-      allow delete: if isAdmin()
+      // Una venta ganada solo la borra un admin, y nunca con factura vigente (se anula antes).
+      allow delete: if resource.data.get('invoiceId', null) == null && (isAdmin()
         || (isMember() && isMine(resource.data) && resource.data.createdBy == request.auth.uid
-            && resource.data.stage != 'won');
+            && resource.data.stage != 'won'));
 
       match /activities/{activityId} {
         // Si el lead aún no existe en el servidor (la app ya lo muestra mientras se guarda),
@@ -409,7 +475,7 @@ service cloud.firestore {
     }
 
     function activityTypes() {
-      return ['call', 'whatsapp', 'email', 'meeting', 'note', 'stage', 'created', 'followup', 'pricing'];
+      return ['call', 'whatsapp', 'email', 'meeting', 'note', 'stage', 'created', 'followup', 'pricing', 'invoice'];
     }
     function followUpChannels() {
       return ['call', 'whatsapp', 'email', 'meeting', 'task'];
@@ -429,7 +495,7 @@ service cloud.firestore {
         && isString(request.resource.data.note, 1000);
       // Al editar se revisa lo mismo que al crear (fecha, canal, tamaños).
       allow update: if isMember()
-        && (isAdmin() || (isMine(resource.data) && isMine(request.resource.data)))
+        && (adminRole() || (isMine(resource.data) && isMine(request.resource.data)))
         && request.resource.data.status in ['pending', 'done', 'cancelled']
         && request.resource.data.dueAt is timestamp
         && request.resource.data.channel in followUpChannels()
@@ -438,6 +504,74 @@ service cloud.firestore {
         && request.resource.data.leadId == resource.data.leadId
         && request.resource.data.createdBy == resource.data.createdBy;
       allow delete: if isAdmin() || (isMember() && isMine(resource.data));
+    }
+
+    // ---- Facturas ----
+    // Se emiten desde una venta ganada (vendedor responsable o admin), con número correlativo
+    // y el impuesto aparte. No se editan ni se borran: un admin las anula.
+    function invoiceTotals(d) {
+      return d.subtotal is number && d.taxable is number && d.tax is number && d.total is number
+        && d.taxable >= 0 && d.taxable <= d.subtotal + 0.005
+        && math.abs(d.tax - d.taxable * float(d.taxRate) / 100.0) < 0.01
+        && math.abs(d.total - d.subtotal - d.tax) < 0.01;
+    }
+    function invoiceParty(m, keys) {
+      return m is map && m.keys().hasOnly(keys);
+    }
+    function invoiceNumberOk(d, id) {
+      let seq = get(seqPath());
+      return d.number is int && id == string(d.number)
+        && d.number == (exists(seqPath()) ? seq.data.next : 1)
+        && getAfter(seqPath()).data.next == d.number + 1;
+    }
+    match /invoices/{invoiceId} {
+      // Las consultas de un vendedor deben filtrar por assigneeId == su uid.
+      allow read: if isAdmin() || (isMember() && isMine(resource.data));
+      allow create: if isMember()
+        && request.resource.data.keys().hasOnly(['number', 'prefix', 'leadId', 'contactId', 'assigneeId',
+             'billTo', 'issuer', 'lines', 'subtotal', 'taxable', 'taxRate', 'tax', 'total', 'currency',
+             'notes', 'dueAt', 'status', 'issuedAt', 'issuedBy', 'issuedByName'])
+        && invoiceNumberOk(request.resource.data, invoiceId)
+        && isString(request.resource.data.prefix, 12)
+        && request.resource.data.status == 'issued'
+        && request.resource.data.issuedBy == request.auth.uid
+        && request.resource.data.issuedAt == request.time
+        && isString(request.resource.data.issuedByName, 200)
+        && request.resource.data.currency == 'USD'
+        && isString(request.resource.data.notes, 2000)
+        && (request.resource.data.dueAt == null || request.resource.data.dueAt is timestamp)
+        && invoiceParty(request.resource.data.billTo, ['name', 'company', 'email', 'phone', 'address'])
+        && invoiceParty(request.resource.data.issuer, ['legalName', 'tradeName', 'taxId', 'address',
+             'phone', 'email', 'website'])
+        && request.resource.data.lines is list
+        && request.resource.data.lines.size() >= 1 && request.resource.data.lines.size() <= 4
+        && request.resource.data.taxRate == get(companyPath()).data.taxRate
+        && invoiceTotals(request.resource.data)
+        && invoiceLeadOk(request.resource.data, invoiceId);
+      // Solo un admin anula (con motivo) o la pasa al nuevo responsable de la venta.
+      allow update: if isAdmin() && (
+        (changedOnly(['status', 'voidReason', 'voidedAt', 'voidedBy'])
+          && resource.data.status == 'issued'
+          && request.resource.data.status == 'void'
+          && request.resource.data.voidedBy == request.auth.uid
+          && request.resource.data.voidedAt == request.time
+          && isString(request.resource.data.voidReason, 500)
+          && request.resource.data.voidReason.size() > 0)
+        || changedOnly(['assigneeId']));
+      allow delete: if false;
+    }
+    // La venta es del que factura (o la factura un admin), está ganada, no tenía factura y queda
+    // apuntando a esta; el subtotal es su valor.
+    function invoiceLeadOk(d, id) {
+      let before = get(leadPath(d.leadId)).data;
+      let after = getAfter(leadPath(d.leadId)).data;
+      return (isAdmin() || before.assigneeId == request.auth.uid)
+        && before.stage == 'won'
+        && before.get('invoiceId', null) == null
+        && after.get('invoiceId', null) == id
+        && d.assigneeId == before.assigneeId
+        && d.contactId == before.get('contactId', null)
+        && math.abs(d.subtotal - before.value) < 0.005;
     }
   }
 }

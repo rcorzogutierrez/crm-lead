@@ -54,6 +54,7 @@ function mapLead(id: string, d: DocumentData): Lead {
     extras: Array.isArray(d['extras']) ? d['extras'].map(mapLine) : [],
     wonAt: toDate(d['wonAt']),
     lostAt: toDate(d['lostAt']),
+    invoiceId: typeof d['invoiceId'] === 'string' ? d['invoiceId'] : null,
   };
 }
 
@@ -111,9 +112,17 @@ export class LeadsService {
   /** Leads activos sin ningún follow-up programado: el error que este CRM no perdona. */
   readonly withoutNextStep = computed(() => this.open().filter((l) => !l.nextFollowUpAt));
 
-  /** Una venta ganada solo la reabre o la borra un admin (las reglas también lo exigen). */
-  locked(lead: Pick<Lead, 'stage'>): boolean {
-    return lead.stage === 'won' && !this.auth.isAdmin();
+  /**
+   * Una venta ganada solo la reabre o la borra un admin, y con factura vigente nadie: antes
+   * hay que anularla (las reglas también lo exigen).
+   */
+  locked(lead: Pick<Lead, 'stage' | 'invoiceId'>): boolean {
+    return !!lead.invoiceId || (lead.stage === 'won' && !this.auth.isAdmin());
+  }
+
+  /** Por qué no se puede mover ni borrar (ver `locked`). */
+  lockMessage(lead: Pick<Lead, 'invoiceId'>): string {
+    return lead.invoiceId ? t('detail.invoiceLocked') : t('detail.wonLocked');
   }
 
   /**
@@ -236,6 +245,8 @@ export class LeadsService {
     if (!assigneeId || lead.assigneeId === assigneeId) return;
     const batch = writeBatch(this.db);
     batch.update(doc(this.db, 'leads', lead.id), { assigneeId, updatedAt: serverTimestamp() });
+    // La factura vigente pasa con la venta, para que el nuevo responsable la vea.
+    if (lead.invoiceId) batch.update(doc(this.db, 'invoices', lead.invoiceId), { assigneeId });
     for (const id of pendingFollowUpIds) batch.update(doc(this.db, 'followups', id), { assigneeId });
     this.patchContact(batch, lead, { ...lead, assigneeId }, false);
     await batch.commit();
@@ -247,7 +258,7 @@ export class LeadsService {
    */
   async moveToStage(lead: Lead, to: Stage, lost: { code: LostCode | null; detail: string } | null = null): Promise<void> {
     if (lead.stage === to) return;
-    if (this.locked(lead)) throw new Error(t('detail.wonLocked'));
+    if (this.locked(lead)) throw new Error(this.lockMessage(lead));
     const after: DealState = { ...lead, stage: to };
     const closing = isClosed(to) && !isClosed(lead.stage);
     const batch = writeBatch(this.db);
@@ -284,7 +295,7 @@ export class LeadsService {
    * borra también el contacto (no hace falta corregir su resumen).
    */
   async remove(lead: Lead, patchContact = true): Promise<void> {
-    if (this.locked(lead)) throw new Error(t('detail.wonLocked'));
+    if (this.locked(lead)) throw new Error(this.lockMessage(lead));
     const id = lead.id;
     // Un vendedor solo puede consultar sus follow-ups: la consulta debe decirlo.
     const fuQuery = this.auth.isAdmin()

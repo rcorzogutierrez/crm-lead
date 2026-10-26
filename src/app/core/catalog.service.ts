@@ -25,6 +25,7 @@ function mapService(id: string, d: DocumentData): ServiceItem {
     price: Number(d['price'] ?? 0),
     unit: d['unit'] ?? '',
     active: d['active'] !== false,
+    taxable: d['taxable'] !== false,
   };
 }
 

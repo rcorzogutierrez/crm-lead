@@ -52,7 +52,7 @@ interface NavItem {
   ],
   templateUrl: './shell.html',
   host: {
-    class: 'block min-h-dvh lg:pl-60',
+    class: 'block min-h-dvh lg:pl-60 print:min-h-0 print:pl-0',
     '(document:keydown)': 'onKey($event)',
   },
 })
@@ -90,14 +90,14 @@ export class Shell {
 
   /**
    * Cinco entradas: Negocios reúne la lista y el tablero (vuelve a la última vista usada)
-   * y Ajustes reúne servicios y equipo. `match` marca la entrada activa en sus subpáginas.
+   * y Ajustes reúne servicios, equipo y empresa. `match` marca la entrada activa en sus subpáginas.
    */
   protected readonly nav = computed<readonly NavItem[]>(() => [
     { path: '/today', label: 'nav.today', icon: 'today', match: ['/today'] },
     { path: '/contacts', label: 'nav.contacts', icon: 'contacts', match: ['/contacts'] },
-    { path: this.ui.dealsView(), label: 'nav.leads', icon: 'deals', match: ['/leads', '/pipeline'] },
+    { path: this.ui.dealsView(), label: 'nav.leads', icon: 'deals', match: ['/leads', '/pipeline', '/invoices'] },
     { path: '/reports', label: 'nav.reports', icon: 'reports', match: ['/reports'] },
-    { path: '/services', label: 'nav.settings', icon: 'settings', match: ['/services', '/team'] },
+    { path: '/services', label: 'nav.settings', icon: 'settings', match: ['/services', '/team', '/company'] },
   ]);
   /** Barra móvil: Hoy, Contactos y Negocios; el resto va en "Más". */
   protected readonly mobileMain = computed(() => this.nav().filter((n) => ['today', 'contacts', 'deals'].includes(n.icon)));

@@ -7,7 +7,7 @@ export interface SectionTab {
   label: I18nKey;
 }
 
-/** Vistas de una misma sección del menú (Negocios: lista / tablero; Ajustes: servicios / equipo). */
+/** Vistas de una misma sección del menú (Negocios: lista / tablero; Ajustes: servicios / equipo / empresa). */
 @Component({
   selector: 'app-section-tabs',
   imports: [RouterLink, RouterLinkActive],
@@ -42,4 +42,5 @@ export const DEAL_TABS: readonly SectionTab[] = [
 export const SETTINGS_TABS: readonly SectionTab[] = [
   { path: '/services', label: 'nav.services' },
   { path: '/team', label: 'nav.team' },
+  { path: '/company', label: 'nav.company' },
 ];

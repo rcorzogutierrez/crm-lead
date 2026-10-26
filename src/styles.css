@@ -73,6 +73,16 @@
     caret-color: var(--color-pen);
   }
 
+  /* Impresión (factura): papel blanco, sin el fondo de la app. */
+  @media print {
+    @page {
+      margin: 12mm;
+    }
+    body {
+      background: var(--color-sheet);
+    }
+  }
+
   ::selection {
     background: var(--color-highlight);
     color: var(--color-ink);

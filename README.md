@@ -61,6 +61,15 @@ El flujo es **Contacto → Negocio → Próxima acción → Venta**. Un negocio 
   y categoría de venta (**Bronce +3 %** por defecto, **Plata +5 %**, **Oro +7 %**, porcentajes editables por el admin).
   Si cambia el precio oficial, las propuestas abiertas reciben un aviso y las ventas ganadas no cambian.
 
+### Facturación (EE. UU.)
+
+- **Ajustes → Empresa**: razón social, nombre comercial, EIN, dirección, logo, % de impuesto de venta, mes de inicio
+  del año fiscal y numeración (prefijo y próximo número). Solo el admin la cambia.
+- **Factura desde una venta ganada**, emitida por su vendedor o el admin, con número correlativo que no se salta ni se repite.
+  El impuesto de venta va aparte, solo sobre los servicios que lo llevan (casilla en el catálogo).
+- **Imprimir o guardar en PDF** desde la vista de la factura. No se editan: el admin la anula con un motivo y la venta
+  se puede volver a facturar.
+
 ### Equipo
 
 - **Roles admin y Vendedor.** Un vendedor ve y trabaja solo sus leads; el admin ve todo el equipo, reasigna,

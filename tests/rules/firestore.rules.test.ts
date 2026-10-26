@@ -696,3 +696,138 @@ describe('Última entrada y salida (sessions)', () => {
     await assertFails(getDocs(collection(db(PEDRO), 'sessions')));
   });
 });
+
+describe('Empresa (meta/company)', () => {
+  const company = (extra: Record<string, unknown> = {}) => ({
+    legalName: 'Viajes SA LLC',
+    tradeName: 'Viajes SA',
+    taxId: '12-3456789',
+    address1: '1 Main St',
+    address2: '',
+    city: 'Miami',
+    state: 'FL',
+    zip: '33101',
+    phone: '',
+    email: '',
+    website: '',
+    logo: '',
+    fiscalYearStart: 1,
+    taxRate: 7,
+    invoicePrefix: 'INV-',
+    ...extra,
+  });
+
+  it('todo el equipo la lee; solo un admin la escribe', async () => {
+    await assertSucceeds(setDoc(doc(db(ANA), 'meta/company'), company()));
+    await assertSucceeds(getDoc(doc(db(LUIS), 'meta/company')));
+    await assertFails(getDoc(doc(db(STRANGER), 'meta/company')));
+    await assertFails(setDoc(doc(db(LUIS), 'meta/company'), company()));
+  });
+
+  it('el impuesto y el mes fiscal tienen límites; no admite otros campos', async () => {
+    await assertFails(setDoc(doc(db(ANA), 'meta/company'), company({ taxRate: 45 })));
+    await assertFails(setDoc(doc(db(ANA), 'meta/company'), company({ fiscalYearStart: 13 })));
+    await assertFails(setDoc(doc(db(ANA), 'meta/company'), company({ logo: 'x'.repeat(200_001) })));
+    await assertFails(setDoc(doc(db(ANA), 'meta/company'), company({ extra: 1 })));
+  });
+});
+
+describe('Facturas', () => {
+  // Venta ganada de luis: 2060 de subtotal, impuesto 7 % = 144.2.
+  const invoice = (n: number, extra: Record<string, unknown> = {}) => ({
+    number: n,
+    prefix: 'INV-',
+    leadId: 'luis-won',
+    contactId: 'c1',
+    assigneeId: LUIS,
+    billTo: { name: 'Cliente', company: 'Empresa', email: '', phone: '', address: '' },
+    issuer: { legalName: 'Viajes SA LLC', tradeName: '', taxId: '', address: '', phone: '', email: '', website: '' },
+    lines: [{ name: 'Sitio web', quantity: 2, unit: 'unidad', unitPrice: 1030, amount: 2060, taxable: true }],
+    subtotal: 2060,
+    taxable: 2060,
+    taxRate: 7,
+    tax: 144.2,
+    total: 2204.2,
+    currency: 'USD',
+    notes: '',
+    dueAt: null,
+    status: 'issued',
+    issuedAt: serverTimestamp(),
+    issuedBy: LUIS,
+    issuedByName: 'luis',
+    ...extra,
+  });
+
+  function issue(uid: string, n: number, extra: Record<string, unknown> = {}, leadId = 'luis-won', next = n + 1) {
+    const fs = db(uid);
+    const batch = writeBatch(fs);
+    batch.set(doc(fs, 'invoices', String(n)), invoice(n, { issuedBy: uid, leadId, ...extra }));
+    batch.set(doc(fs, 'meta/invoiceSeq'), { next });
+    batch.update(doc(fs, 'leads', leadId), { invoiceId: String(n) });
+    return batch.commit();
+  }
+
+  beforeEach(async () => {
+    await seed({
+      'meta/company': { legalName: 'Viajes SA LLC', taxRate: 7 },
+      'leads/luis-won': lead(LUIS, { stage: 'won' }),
+      'leads/pedro-won': lead(PEDRO, { stage: 'won', contactId: 'c2' }),
+    });
+  });
+
+  it('el vendedor factura su venta ganada con el número siguiente y el impuesto aparte', async () => {
+    await assertSucceeds(issue(LUIS, 1));
+    await assertSucceeds(getDoc(doc(db(LUIS), 'invoices/1')));
+    await assertFails(getDoc(doc(db(PEDRO), 'invoices/1')));
+  });
+
+  it('el admin también factura, y puede fijar el número de arranque (nunca hacia atrás)', async () => {
+    await assertSucceeds(setDoc(doc(db(ANA), 'meta/invoiceSeq'), { next: 1001 }));
+    await assertFails(setDoc(doc(db(LUIS), 'meta/invoiceSeq'), { next: 2000 }));
+    await assertFails(setDoc(doc(db(ANA), 'meta/invoiceSeq'), { next: 5 }));
+    await assertFails(issue(LUIS, 1));
+    await assertSucceeds(issue(ANA, 1001, { assigneeId: LUIS }));
+  });
+
+  it('no se salta ni se repite un número, ni se factura dos veces la misma venta', async () => {
+    await assertFails(issue(LUIS, 2));
+    await assertFails(issue(LUIS, 1, {}, 'luis-won', 3));
+    await assertSucceeds(issue(LUIS, 1));
+    await assertFails(issue(LUIS, 2));
+  });
+
+  it('solo ventas ganadas propias, con el subtotal de la venta y el impuesto de la empresa', async () => {
+    await assertFails(issue(LUIS, 1, { leadId: 'pedro-won', assigneeId: PEDRO, contactId: 'c2' }, 'pedro-won'));
+    await seed({ 'leads/luis-open': lead(LUIS) });
+    await assertFails(issue(LUIS, 1, { leadId: 'luis-open' }, 'luis-open'));
+    await assertFails(issue(LUIS, 1, { subtotal: 1000, taxable: 1000, tax: 70, total: 1070 }));
+    await assertFails(issue(LUIS, 1, { taxRate: 0, tax: 0, total: 2060 }));
+    await assertFails(issue(LUIS, 1, { tax: 100, total: 2160 }));
+  });
+
+  it('un servicio sin impuesto baja la base imponible', async () => {
+    await assertSucceeds(issue(LUIS, 1, { taxable: 0, tax: 0, total: 2060 }));
+  });
+
+  it('no se edita ni se borra; solo un admin la anula y libera la venta', async () => {
+    await assertSucceeds(issue(LUIS, 1));
+    await assertFails(updateDoc(doc(db(LUIS), 'invoices/1'), { total: 1 }));
+    await assertFails(deleteDoc(doc(db(ANA), 'invoices/1')));
+    await assertFails(updateDoc(doc(db(LUIS), 'leads/luis-won'), { invoiceId: null }));
+    // Con factura vigente la venta no se reabre ni se borra.
+    await assertFails(updateDoc(doc(db(ANA), 'leads/luis-won'), { stage: 'negotiation' }));
+    await assertFails(deleteDoc(doc(db(ANA), 'leads/luis-won')));
+
+    const voidIt = (uid: string) => {
+      const fs = db(uid);
+      const batch = writeBatch(fs);
+      batch.update(doc(fs, 'invoices/1'), { status: 'void', voidReason: 'Error en datos', voidedAt: serverTimestamp(), voidedBy: uid });
+      batch.update(doc(fs, 'leads/luis-won'), { invoiceId: null });
+      return batch.commit();
+    };
+    await assertFails(voidIt(LUIS));
+    await assertSucceeds(voidIt(ANA));
+    // Anulada, la venta se vuelve a facturar con el número siguiente.
+    await assertSucceeds(issue(LUIS, 2));
+  });
+});

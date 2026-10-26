@@ -114,7 +114,7 @@ export class Pipeline {
     if (!event.altKey || (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft')) return;
     event.preventDefault();
     if (this.leadsService.locked(lead)) {
-      this.toast.show(t('detail.wonLocked'));
+      this.toast.show(this.leadsService.lockMessage(lead));
       return;
     }
     const idx = STAGES.findIndex((s) => s.id === lead.stage);
