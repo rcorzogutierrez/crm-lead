@@ -95,8 +95,15 @@ export class ContactDetail {
     const s = this.summary();
     return s.open.length + s.won.length + s.lost.length;
   });
-  /** Un cliente con ventas no se elimina: se archiva. */
-  protected readonly canDelete = computed(() => this.auth.isAdmin() && this.summary().wonCount === 0);
+  /** Ventas con factura vigente: hay que anularla antes de borrar al contacto. */
+  protected readonly invoiced = computed(() => this.summary().won.filter((l) => l.invoiceId));
+  /** Borrar a un cliente con ventas pide escribir su nombre. */
+  protected readonly typed = signal('');
+  protected readonly needsTyping = computed(() => this.summary().wonCount > 0);
+  protected readonly typedOk = computed(() => {
+    const name = this.contact()?.name.trim().toLocaleLowerCase() ?? '';
+    return !this.needsTyping() || (!!name && this.typed().trim().toLocaleLowerCase() === name);
+  });
   protected readonly editing = signal(false);
 
   protected readonly tel = computed(() => telHref(this.contact()?.phone ?? ''));
@@ -161,6 +168,7 @@ export class ContactDetail {
 
   /** Abre la confirmación en línea y lleva el foco a su pregunta; al cerrar, vuelve al botón. */
   protected openConfirm(kind: 'archive' | 'delete'): void {
+    this.typed.set('');
     this.confirming.set(kind);
     this.focusLater('confirm-title');
   }
@@ -202,6 +210,7 @@ export class ContactDetail {
     try {
       await this.contacts.remove(c);
       this.toast.show(t('contact.deleted', { name: c.name }));
+      this.confirming.set(null);
       void this.router.navigateByUrl('/contacts');
     } catch (err) {
       this.toast.error(firestoreErrorMessage(err));

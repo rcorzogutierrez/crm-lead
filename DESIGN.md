@@ -43,6 +43,8 @@ Estrategia: Restrained. Base neutra gris azulada; el índigo solo para acciones 
 - Panel de captura: `<dialog>` lateral derecho, entra 240ms ease-out-quart.
 - Cerrar la captura con algo escrito (Esc, fondo, Cancelar, X) pregunta en el pie del panel: "Seguir editando" o "Descartar". Nunca se pierde lo escrito sin aviso.
 - Confirmaciones en línea (archivar, eliminar, quitar acceso): el foco pasa a la confirmación y vuelve al botón al cancelar. Solo lo irreversible (eliminar) confirma con `.btn-danger`; archivar es reversible y usa `.btn-secondary`.
+- Borrar (solo admin): la confirmación en línea va en `ribbon-soft` y termina con "Queda anotado en Ajustes → Registro". Borrar a un cliente con ventas pide escribir su nombre; lo que lo impide (una factura vigente) se dice dentro del panel con el enlace para resolverlo y el botón queda desactivado. Los servicios y los usuarios se borran solo después de archivarlos o quitarles el acceso. Las entradas del historial llevan una papelera pequeña en `ink-3`.
+- Registro de borrados (Ajustes → Registro): mismo formato de agenda que el historial (fecha y hora en el margen), filtro segmentado por tipo, y la copia de los datos plegada en un `<details>` con monoespaciada (son datos) y botón Copiar.
 - Móvil: las tablas anchas (Servicios, servicios comprados) se vuelven listas apiladas; los filtros segmentados van en una fila que se desliza; los controles de una fila bajan a su propio renglón antes de cortar un nombre. La cuenta se abre desde el avatar (botón de 44px con menú), no cierra sesión al tocarlo.
 
 - Táctil: los campos van a 16px (si no, iOS amplía la página al enfocarlos); `viewport-fit=cover` con `env(safe-area-inset-*)` en la barra inferior, la barra superior y el pie del panel de captura.

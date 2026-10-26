@@ -11,8 +11,10 @@ import {
   serverTimestamp,
   setDoc,
   updateDoc,
+  writeBatch,
 } from 'firebase/firestore';
 import { AuthService } from './auth.service';
+import { DeletionsService } from './deletions.service';
 import { FIRESTORE } from './firebase';
 import { DEFAULT_TIER_RATES, Lead, PriceTier, ServiceItem, ServiceItemDraft, TierRates, isClosed } from './models';
 import { teamQuery } from './team-query';
@@ -37,6 +39,7 @@ function mapService(id: string, d: DocumentData): ServiceItem {
 export class CatalogService {
   private readonly db = inject(FIRESTORE);
   private readonly auth = inject(AuthService);
+  private readonly deletions = inject(DeletionsService);
   private readonly live = teamQuery(() => query(collection(this.db, 'services'), orderBy('name')), mapService);
 
   readonly services = this.live.data;
@@ -90,6 +93,17 @@ export class CatalogService {
 
   update(id: string, patch: Partial<ServiceItemDraft>): Promise<void> {
     return updateDoc(doc(this.db, 'services', id), { ...clean(patch), updatedAt: serverTimestamp() });
+  }
+
+  /**
+   * Solo admin: borra el servicio del catálogo. Los negocios guardan su nombre y precio, así que
+   * lo vendido no cambia; quien llama comprueba antes que ningún negocio abierto lo use.
+   */
+  remove(service: ServiceItem): Promise<void> {
+    const batch = writeBatch(this.db);
+    batch.delete(doc(this.db, 'services', service.id));
+    this.deletions.record(batch, { kind: 'service', refId: service.id, label: service.name, snapshot: service });
+    return batch.commit();
   }
 
   saveRates(rates: TierRates): Promise<void> {

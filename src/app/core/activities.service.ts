@@ -1,6 +1,7 @@
 import { Service, inject } from '@angular/core';
 import { DocumentData, collection, doc, limit, orderBy, query, serverTimestamp, writeBatch } from 'firebase/firestore';
 import { AuthService } from './auth.service';
+import { DeletionsService } from './deletions.service';
 import { FIRESTORE } from './firebase';
 import { LiveQuery, liveQuery, toDate } from './firestore-utils';
 import { Activity, ActivityType } from './models';
@@ -24,6 +25,7 @@ const CONTACT_TYPES: ActivityType[] = ['call', 'whatsapp', 'email', 'meeting'];
 export class ActivitiesService {
   private readonly db = inject(FIRESTORE);
   private readonly auth = inject(AuthService);
+  private readonly deletions = inject(DeletionsService);
 
   /** Escucha el historial de un lead; quien la abre la cierra con `stop()` (p. ej. en la limpieza de un effect). */
   watch(leadId: string, max = 200): LiveQuery<Activity> {
@@ -31,6 +33,20 @@ export class ActivitiesService {
       query(collection(this.db, 'leads', leadId, 'activities'), orderBy('createdAt', 'desc'), limit(max)),
       mapActivity,
     );
+  }
+
+  /** Solo admin: borra una entrada del historial y la anota en el registro de borrados. */
+  remove(leadId: string, activity: Activity, dealLabel: string): Promise<void> {
+    const batch = writeBatch(this.db);
+    batch.delete(doc(this.db, 'leads', leadId, 'activities', activity.id));
+    this.deletions.record(batch, {
+      kind: 'activity',
+      refId: `${leadId}/${activity.id}`,
+      label: dealLabel,
+      detail: activity.body,
+      snapshot: { leadId, ...activity },
+    });
+    return batch.commit();
   }
 
   /** Registra una interacción. Si es un contacto, actualiza la fecha de último contacto (en el mismo batch). */

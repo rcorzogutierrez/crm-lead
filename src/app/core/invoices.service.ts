@@ -6,7 +6,11 @@ import {
   collection,
   doc,
   getDoc,
+  getDocs,
+  limit,
   onSnapshot,
+  orderBy,
+  query,
   serverTimestamp,
   setDoc,
   writeBatch,
@@ -14,6 +18,7 @@ import {
 import { AuthService } from './auth.service';
 import { CatalogService } from './catalog.service';
 import { Company, CompanyService, companyAddress } from './company.service';
+import { DeletionsService } from './deletions.service';
 import { FIRESTORE } from './firebase';
 import { toDate } from './firestore-utils';
 import { t } from './i18n/i18n';
@@ -142,6 +147,7 @@ export class InvoicesService {
   private readonly auth = inject(AuthService);
   private readonly catalog = inject(CatalogService);
   private readonly companies = inject(CompanyService);
+  private readonly deletions = inject(DeletionsService);
 
   private readonly _next = signal<number | null>(null);
   /** Próximo número de factura (null mientras carga). */
@@ -246,7 +252,34 @@ export class InvoicesService {
     await batch.commit();
   }
 
-  /** Solo admin: número con el que arranca (o sigue) la numeración. Nunca hacia atrás. */
+  /**
+   * Solo admin: borra una factura ya anulada (las vigentes se anulan antes) y lo anota en el
+   * registro de borrados. Su número queda libre si se baja el contador.
+   */
+  remove(inv: Invoice): Promise<void> {
+    if (inv.status !== 'void') return Promise.reject(new Error(t('invoice.deleteOnlyVoid')));
+    const batch = writeBatch(this.db);
+    batch.delete(doc(this.db, 'invoices', inv.id));
+    this.deletions.record(batch, {
+      kind: 'invoice',
+      refId: inv.id,
+      label: `${invoiceLabel(inv)} · ${inv.billTo.name}`,
+      detail: inv.voidReason,
+      snapshot: inv,
+    });
+    return batch.commit();
+  }
+
+  /** Solo admin: número de la última factura que existe (0 si no hay ninguna). */
+  async highestNumber(): Promise<number> {
+    const snap = await getDocs(query(collection(this.db, 'invoices'), orderBy('number', 'desc'), limit(1)));
+    return snap.empty ? 0 : Number(snap.docs[0].data()['number'] ?? 0);
+  }
+
+  /**
+   * Solo admin: número con el que arranca (o sigue) la numeración. Puede bajar, pero no a un
+   * número usado: la página no deja ir por debajo de la última factura que quede.
+   */
   setNextNumber(next: number): Promise<void> {
     return setDoc(doc(this.db, 'meta', 'invoiceSeq'), { next, updatedAt: serverTimestamp() });
   }

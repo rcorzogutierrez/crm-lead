@@ -221,8 +221,14 @@ describe('Roles y acceso', () => {
     await assertSucceeds(updateDoc(doc(db(ANA), 'invites/nuevo@ejemplo.com'), { role: 'admin' }));
   });
 
-  it('nadie borra miembros', async () => {
+  it('un admin borra solo a otro miembro sin acceso, con su última sesión', async () => {
+    await seed({ [`sessions/${INES}`]: { signInAt: Timestamp.now() } });
     await assertFails(deleteDoc(doc(db(ANA), `members/${LUIS}`)));
+    await assertFails(deleteDoc(doc(db(LUIS), `members/${INES}`)));
+    await assertFails(deleteDoc(doc(db(ANA), `members/${ANA}`)));
+    await assertFails(deleteDoc(doc(db(LUIS), `sessions/${INES}`)));
+    await assertSucceeds(deleteDoc(doc(db(ANA), `sessions/${INES}`)));
+    await assertSucceeds(deleteDoc(doc(db(ANA), `members/${INES}`)));
   });
 });
 
@@ -268,12 +274,10 @@ describe('Contactos (todo el equipo)', () => {
     await assertSucceeds(batch.commit());
   });
 
-  it('un admin no borra a un cliente con ventas ganadas', async () => {
+  it('solo un admin borra un contacto, aunque sea un cliente con ventas', async () => {
     await seed({ 'contacts/c3': { ...contact(LUIS), wonCount: 1, wonTotal: 2060 } });
-    await assertFails(deleteDoc(doc(db(ANA), 'contacts/c3')));
-    await seed({ 'contacts/c4': { ...contact(LUIS), wonCount: 0, wonTotal: 0 } });
-    await assertFails(deleteDoc(doc(db(LUIS), 'contacts/c4')));
-    await assertSucceeds(deleteDoc(doc(db(ANA), 'contacts/c4')));
+    await assertFails(deleteDoc(doc(db(LUIS), 'contacts/c3')));
+    await assertSucceeds(deleteDoc(doc(db(ANA), 'contacts/c3')));
   });
 
   it('un admin borra un contacto con sus negocios, historial y follow-ups', async () => {
@@ -394,11 +398,14 @@ describe('Catálogo y categorías de venta (solo admin)', () => {
     await assertFails(updateDoc(doc(db(LUIS), 'services/web'), { price: 1 }));
   });
 
-  it('un admin crea y cambia precios, pero no borra servicios', async () => {
+  it('un admin crea, cambia precios y borra servicios; un vendedor no borra', async () => {
     await assertSucceeds(setDoc(doc(db(ANA), 'services/seo'), service));
     await assertSucceeds(updateDoc(doc(db(ANA), 'services/web'), { price: 1200 }));
     await assertFails(updateDoc(doc(db(ANA), 'services/web'), { price: -1 }));
-    await assertFails(deleteDoc(doc(db(ANA), 'services/web')));
+    await assertFails(deleteDoc(doc(db(LUIS), 'services/web')));
+    await assertSucceeds(deleteDoc(doc(db(ANA), 'services/web')));
+    // Un negocio con el servicio borrado se sigue editando si no cambia su precio.
+    await assertSucceeds(updateDoc(doc(db(LUIS), 'leads/luis-1'), { stage: 'contacted', notes: 'sigue' }));
   });
 
   it('solo un admin cambia los % de categoría, entre 0 y 100', async () => {
@@ -792,10 +799,9 @@ describe('Facturas', () => {
     await assertFails(getDoc(doc(db(PEDRO), 'invoices/1')));
   });
 
-  it('el admin también factura, y puede fijar el número de arranque (nunca hacia atrás)', async () => {
+  it('el admin también factura, y puede fijar el número de arranque', async () => {
     await assertSucceeds(setDoc(doc(db(ANA), 'meta/invoiceSeq'), { next: 1001 }));
     await assertFails(setDoc(doc(db(LUIS), 'meta/invoiceSeq'), { next: 2000 }));
-    await assertFails(setDoc(doc(db(ANA), 'meta/invoiceSeq'), { next: 5 }));
     await assertFails(issue(LUIS, 1));
     await assertSucceeds(issue(ANA, 1001, { assigneeId: LUIS }));
   });
@@ -820,7 +826,15 @@ describe('Facturas', () => {
     await assertSucceeds(issue(LUIS, 1, { taxable: 0, tax: 0, total: 2060 }));
   });
 
-  it('no se edita ni se borra; solo un admin la anula y libera la venta', async () => {
+  it('el admin baja el contador solo a un número libre', async () => {
+    await assertSucceeds(issue(LUIS, 1));
+    await assertSucceeds(setDoc(doc(db(ANA), 'meta/invoiceSeq'), { next: 10 }));
+    await assertFails(setDoc(doc(db(ANA), 'meta/invoiceSeq'), { next: 1 }));
+    await assertFails(setDoc(doc(db(ANA), 'meta/invoiceSeq'), { next: 0 }));
+    await assertSucceeds(setDoc(doc(db(ANA), 'meta/invoiceSeq'), { next: 2 }));
+  });
+
+  it('no se edita ni se borra vigente; solo un admin la anula, y luego la puede borrar', async () => {
     await assertSucceeds(issue(LUIS, 1));
     await assertFails(updateDoc(doc(db(LUIS), 'invoices/1'), { total: 1 }));
     await assertFails(deleteDoc(doc(db(ANA), 'invoices/1')));
@@ -840,5 +854,49 @@ describe('Facturas', () => {
     await assertSucceeds(voidIt(ANA));
     // Anulada, la venta se vuelve a facturar con el número siguiente.
     await assertSucceeds(issue(LUIS, 2));
+    // La anulada la borra solo un admin; la vigente, nadie.
+    await assertFails(deleteDoc(doc(db(LUIS), 'invoices/1')));
+    await assertFails(deleteDoc(doc(db(ANA), 'invoices/2')));
+    await assertSucceeds(deleteDoc(doc(db(ANA), 'invoices/1')));
+  });
+});
+
+describe('Registro de borrados', () => {
+  const entry = (by: string, extra: Record<string, unknown> = {}) => ({
+    kind: 'lead',
+    refId: 'luis-1',
+    label: 'Cliente · Sitio web',
+    detail: '1 nota',
+    snapshot: { stage: 'new', value: 2060 },
+    by,
+    byName: by,
+    at: serverTimestamp(),
+    ...extra,
+  });
+
+  it('el admin deja la entrada en el mismo lote que el borrado', async () => {
+    const fs = db(ANA);
+    const batch = writeBatch(fs);
+    batch.delete(doc(fs, 'leads/luis-1'));
+    batch.set(doc(collection(fs, 'deletions')), entry(ANA));
+    await assertSucceeds(batch.commit());
+  });
+
+  it('un vendedor anota sus borrados pero no lee el registro', async () => {
+    await assertSucceeds(setDoc(doc(db(LUIS), 'deletions/z'), entry(LUIS)));
+    await assertFails(setDoc(doc(db(LUIS), 'deletions/w'), entry(ANA)));
+    await assertFails(setDoc(doc(db(STRANGER), 'deletions/w'), entry(STRANGER)));
+    await seed({ 'deletions/x': { ...entry(ANA), at: Timestamp.now() } });
+    await assertFails(getDoc(doc(db(LUIS), 'deletions/x')));
+    await assertSucceeds(getDoc(doc(db(ANA), 'deletions/x')));
+  });
+
+  it('nadie lo edita ni lo borra, y no se inventa autor, fecha ni tipo', async () => {
+    await seed({ 'deletions/x': { ...entry(ANA), at: Timestamp.now() } });
+    await assertFails(updateDoc(doc(db(ANA), 'deletions/x'), { label: 'otra cosa' }));
+    await assertFails(deleteDoc(doc(db(ANA), 'deletions/x')));
+    await assertFails(setDoc(doc(db(ANA), 'deletions/y'), entry(LUIS)));
+    await assertFails(setDoc(doc(db(ANA), 'deletions/y'), entry(ANA, { at: Timestamp.now() })));
+    await assertFails(setDoc(doc(db(ANA), 'deletions/y'), entry(ANA, { kind: 'otro' })));
   });
 });
