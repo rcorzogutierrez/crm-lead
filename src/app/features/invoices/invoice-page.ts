@@ -1,6 +1,6 @@
-import { Component, computed, effect, inject, input, signal } from '@angular/core';
-import { RouterLink } from '@angular/router';
-import { LucideArrowLeft, LucideBan, LucidePrinter } from '@lucide/angular';
+import { Component, Injector, afterNextRender, computed, effect, inject, input, signal } from '@angular/core';
+import { Router, RouterLink } from '@angular/router';
+import { LucideArrowLeft, LucideBan, LucidePrinter, LucideTrash2 } from '@lucide/angular';
 import { AuthService } from '../../core/auth.service';
 import { CompanyService } from '../../core/company.service';
 import { centsLabel, dateLabel } from '../../core/dates';
@@ -17,7 +17,7 @@ import { EmptyState } from '../../shared/empty-state';
  */
 @Component({
   selector: 'app-invoice-page',
-  imports: [RouterLink, EmptyState, LucideArrowLeft, LucidePrinter, LucideBan],
+  imports: [RouterLink, EmptyState, LucideArrowLeft, LucidePrinter, LucideBan, LucideTrash2],
   templateUrl: './invoice-page.html',
 })
 export class InvoicePage {
@@ -25,6 +25,8 @@ export class InvoicePage {
   protected readonly companies = inject(CompanyService);
   private readonly invoices = inject(InvoicesService);
   private readonly toast = inject(ToastService);
+  private readonly router = inject(Router);
+  private readonly injector = inject(Injector);
 
   readonly id = input.required<string>();
 
@@ -39,6 +41,8 @@ export class InvoicePage {
   protected readonly voiding = signal(false);
   protected readonly reason = signal('');
   protected readonly saving = signal(false);
+  /** Confirmación en línea para borrar una factura anulada (solo admin). */
+  protected readonly removing = signal(false);
 
   protected readonly number = computed(() => {
     const inv = this.invoice();
@@ -76,6 +80,29 @@ export class InvoicePage {
 
   protected print(): void {
     window.print();
+  }
+
+  protected askRemove(): void {
+    this.removing.set(true);
+    afterNextRender(() => document.getElementById('inv-delete-q')?.focus(), { injector: this.injector });
+  }
+
+  protected cancelRemove(): void {
+    this.removing.set(false);
+    afterNextRender(() => document.getElementById('inv-delete')?.focus(), { injector: this.injector });
+  }
+
+  protected async remove(inv: Invoice): Promise<void> {
+    this.saving.set(true);
+    try {
+      await this.invoices.remove(inv);
+      this.toast.show(t('invoice.deleted', { n: invoiceLabel(inv) }));
+      void this.router.navigate(['/leads', inv.leadId]);
+    } catch (err) {
+      this.toast.error(firestoreErrorMessage(err));
+    } finally {
+      this.saving.set(false);
+    }
   }
 
   protected async confirmVoid(event: Event): Promise<void> {

@@ -3,6 +3,8 @@ rules_version = '2';
 // Reglas del CRM para un equipo pequeño compartido.
 // - Solo miembros activos (members/{uid}.active == true) leen y escriben datos.
 // - Contactos y catálogo: visibles para todo el equipo. Solo un admin archiva o borra contactos.
+// - Borrar datos es cosa del admin: contactos (aunque tengan ventas), servicios, miembros sin
+//   acceso y facturas ya anuladas. Una factura vigente se anula antes de borrarse.
 // - Leads, su historial y sus follow-ups: un vendedor solo ve y toca los suyos (assigneeId);
 //   un admin ve todo y es el único que reasigna.
 // - El primer usuario crea meta/team y queda como admin.
@@ -100,7 +102,8 @@ service cloud.firestore {
                     || (isMember() && uid == request.auth.uid && changedOnly(['displayName', 'photoURL'])
                         && isString(request.resource.data.displayName, 200)
                         && (request.resource.data.photoURL == null || isString(request.resource.data.photoURL, 2000)));
-      allow delete: if false;
+      // Un admin borra a otro miembro al que ya quitó el acceso (antes pasa sus datos a otro).
+      allow delete: if isAdmin() && uid != request.auth.uid && resource.data.active == false;
     }
 
     // Última entrada y salida de cada miembro (lo ve el admin en Equipo).
@@ -124,7 +127,9 @@ service cloud.firestore {
         && sessionOk(request.resource.data.keys());
       allow update: if isMember() && uid == request.auth.uid
         && sessionOk(request.resource.data.diff(resource.data).affectedKeys());
-      allow delete: if false;
+      // Se va con el miembro borrado (solo de alguien sin acceso).
+      allow delete: if isAdmin() && uid != request.auth.uid
+        && (!exists(memberPath(uid)) || get(memberPath(uid)).data.active == false);
     }
 
     match /invites/{email} {
@@ -199,14 +204,17 @@ service cloud.firestore {
         && request.resource.data.taxRate >= 0 && request.resource.data.taxRate <= 30;
     }
     // Próximo número de factura. Al emitir sube de uno en uno junto con la factura (mismo lote);
-    // un admin puede fijar el número de arranque, pero nunca hacia atrás.
+    // un admin puede fijar el número de arranque, y bajarlo solo a un número que no esté usado
+    // (tras borrar facturas anuladas; la app no deja bajarlo de la última que quede).
     match /meta/invoiceSeq {
       allow read: if isMember();
       allow create, update: if isMember()
         && request.resource.data.keys().hasOnly(['next', 'updatedAt'])
         && request.resource.data.next is int
         && (
-          (isAdmin() && request.resource.data.next >= (resource == null ? 1 : resource.data.next))
+          (isAdmin() && request.resource.data.next >= 1
+            && (request.resource.data.next >= (resource == null ? 1 : resource.data.next)
+                || !exists(invoicePath(string(request.resource.data.next)))))
           || (request.resource.data.next == (resource == null ? 1 : resource.data.next) + 1
               && !exists(invoicePath(string(request.resource.data.next - 1)))
               && existsAfter(invoicePath(string(request.resource.data.next - 1))))
@@ -227,8 +235,9 @@ service cloud.firestore {
       allow read: if isMember();
       allow create: if isAdmin() && validService(request.resource.data);
       allow update: if isAdmin() && validService(request.resource.data);
-      // Nunca se borran: se archivan para conservar el historial de lo vendido.
-      allow delete: if false;
+      // Se suelen archivar; borrar es del admin. Los negocios guardan nombre y precio del
+      // servicio, así que lo vendido no se pierde.
+      allow delete: if isAdmin();
     }
 
     // ---- Contactos (prospectos y clientes) ----
@@ -296,8 +305,8 @@ service cloud.firestore {
         && validStats(request.resource.data)
         && statsOnUpdate(request.resource.data, resource.data)
         && archiveOk();
-      // Solo un admin borra, y nunca a un cliente con ventas ganadas (ese se archiva).
-      allow delete: if isAdmin() && resource.data.get('wonCount', 0) == 0;
+      // Solo un admin borra, también a un cliente con ventas (la app borra antes sus negocios).
+      allow delete: if isAdmin();
     }
 
     // ---- Leads (oportunidades) ----
@@ -511,7 +520,7 @@ service cloud.firestore {
 
     // ---- Facturas ----
     // Se emiten desde una venta ganada (vendedor responsable o admin), con número correlativo
-    // y el impuesto aparte. No se editan ni se borran: un admin las anula.
+    // y el impuesto aparte. No se editan: un admin las anula, y solo una anulada se puede borrar.
     function invoiceTotals(d) {
       return d.subtotal is number && d.taxable is number && d.tax is number && d.total is number
         && d.taxable >= 0 && d.taxable <= d.subtotal + 0.005
@@ -561,7 +570,25 @@ service cloud.firestore {
           && isString(request.resource.data.voidReason, 500)
           && request.resource.data.voidReason.size() > 0)
         || changedOnly(['assigneeId']));
-      allow delete: if false;
+      allow delete: if isAdmin() && resource.data.status == 'void';
+    }
+
+    // ---- Registro de borrados ----
+    // La app deja una entrada en el mismo lote que cada borrado: qué, quién, cuándo y una copia
+    // de los datos. Cualquiera anota los suyos; solo el admin lo lee y nadie lo edita ni lo borra.
+    match /deletions/{entryId} {
+      allow read: if isAdmin();
+      allow create: if isMember()
+        && request.resource.data.keys().hasOnly(['kind', 'refId', 'label', 'detail', 'snapshot', 'by', 'byName', 'at'])
+        && request.resource.data.kind in ['contact', 'lead', 'activity', 'service', 'member', 'invoice']
+        && isString(request.resource.data.refId, 200)
+        && isString(request.resource.data.label, 300)
+        && isString(request.resource.data.detail, 1000)
+        && request.resource.data.snapshot is map
+        && request.resource.data.by == request.auth.uid
+        && isString(request.resource.data.byName, 200)
+        && request.resource.data.at == request.time;
+      allow update, delete: if false;
     }
     // La venta es del que factura (o la factura un admin), está ganada, no tenía factura y queda
     // apuntando a esta; el subtotal es su valor.

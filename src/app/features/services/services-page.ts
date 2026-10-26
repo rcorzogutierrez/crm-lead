@@ -1,4 +1,4 @@
-import { Component, computed, inject, linkedSignal, signal } from '@angular/core';
+import { Component, Injector, afterNextRender, computed, inject, linkedSignal, signal } from '@angular/core';
 import { dealLines } from '../../core/deal-lines';
 import { NgTemplateOutlet } from '@angular/common';
 import { FormField, form, min, required, submit } from '@angular/forms/signals';
@@ -35,6 +35,7 @@ export class ServicesPage {
   protected readonly catalog = inject(CatalogService);
   private readonly leads = inject(LeadsService);
   private readonly toast = inject(ToastService);
+  private readonly injector = inject(Injector);
 
   protected readonly t = t;
   protected readonly settingsTabs = SETTINGS_TABS;
@@ -90,6 +91,37 @@ export class ServicesPage {
     const all = this.catalog.services();
     return { active: all.filter((s) => s.active).length, archived: all.filter((s) => !s.active).length };
   });
+
+  /** Servicio archivado que el admin está por borrar (confirmación en línea). */
+  protected readonly deletingId = signal<string | null>(null);
+  protected readonly deleting = signal(false);
+
+  protected askDelete(s: ServiceItem): void {
+    this.deletingId.set(s.id);
+    this.focusLater('svc-del-q-' + s.id);
+  }
+
+  protected cancelDelete(s: ServiceItem): void {
+    this.deletingId.set(null);
+    this.focusLater('svc-del-' + s.id);
+  }
+
+  protected async remove(s: ServiceItem): Promise<void> {
+    this.deleting.set(true);
+    try {
+      await this.catalog.remove(s);
+      this.deletingId.set(null);
+      this.toast.show(t('svc.deleted', { name: s.name }));
+    } catch (err) {
+      this.toast.error(firestoreErrorMessage(err));
+    } finally {
+      this.deleting.set(false);
+    }
+  }
+
+  private focusLater(id: string): void {
+    afterNextRender(() => document.getElementById(id)?.focus(), { injector: this.injector });
+  }
 
   protected startNew(): void {
     this.model.set(emptyDraft());

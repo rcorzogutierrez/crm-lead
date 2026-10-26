@@ -171,7 +171,7 @@
                 (input)="next.set($any($event.target).valueAsNumber)"
               />
               <p id="co-next-hint" class="mt-1.5 text-xs" [class]="nextInvalid() ? 'font-semibold text-ribbon' : 'text-ink-3'">
-                {{ nextInvalid() ? t('company.nextInvalid', { n: invoicesNext() }) : t('company.nextHint', { sample: sample() }) }}
+                {{ nextInvalid() ? t('company.nextInvalid', { n: minNext() }) : t('company.nextHint', { sample: sample() }) }}
               </p>
             </div>
           </div>

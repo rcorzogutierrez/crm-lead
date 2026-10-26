@@ -19,7 +19,8 @@ import { FIRESTORE } from './firebase';
 import { toDate } from './firestore-utils';
 import { t } from './i18n/i18n';
 import { FollowUpsService } from './followups.service';
-import { DealLine, dealServices } from './deal-lines';
+import { DealLine, dealServices, dealTitle } from './deal-lines';
+import { CascadeCounts, DeletionsService, cascadeDetail } from './deletions.service';
 import { ContactChannel, ContactDraft, Lead, LeadDraft, LeadPricing, LeadSource, LostCode, PriceTier, Stage, isClosed, lostReasonLabel, stageMeta } from './models';
 import { teamQuery } from './team-query';
 
@@ -95,6 +96,7 @@ export class LeadsService {
   private readonly db = inject(FIRESTORE);
   private readonly auth = inject(AuthService);
   private readonly followUps = inject(FollowUpsService);
+  private readonly deletions = inject(DeletionsService);
   private readonly live = teamQuery(
     () =>
       this.auth.isAdmin()
@@ -291,25 +293,51 @@ export class LeadsService {
   }
 
   /**
-   * Borra el lead con su historial y sus follow-ups. `patchContact = false` cuando se
-   * borra también el contacto (no hace falta corregir su resumen).
+   * Borra el lead con su historial, sus follow-ups y (si borra un admin) sus facturas anuladas,
+   * y lo anota en el registro de borrados. `fromContact` cuando se borra también el contacto:
+   * no hace falta corregir su resumen y la entrada del registro es la del contacto.
+   * Devuelve lo que se llevó.
    */
-  async remove(lead: Lead, patchContact = true): Promise<void> {
+  async remove(lead: Lead, fromContact = false): Promise<CascadeCounts> {
     if (this.locked(lead)) throw new Error(this.lockMessage(lead));
     const id = lead.id;
+    const admin = this.auth.isAdmin();
     // Un vendedor solo puede consultar sus follow-ups: la consulta debe decirlo.
-    const fuQuery = this.auth.isAdmin()
+    const fuQuery = admin
       ? query(collection(this.db, 'followups'), where('leadId', '==', id))
       : query(collection(this.db, 'followups'), where('leadId', '==', id), where('assigneeId', '==', this.auth.uid()));
-    const [acts, fus] = await Promise.all([getDocs(collection(this.db, 'leads', id, 'activities')), getDocs(fuQuery)]);
+    const [acts, fus, invs] = await Promise.all([
+      getDocs(collection(this.db, 'leads', id, 'activities')),
+      getDocs(fuQuery),
+      // Las facturas solo las borra un admin, y solo anuladas (sin factura vigente, lo están todas).
+      admin ? getDocs(query(collection(this.db, 'invoices'), where('leadId', '==', id))).then((s) => s.docs) : Promise.resolve([]),
+    ]);
+    const voided = invs.filter((d) => d.data()['status'] === 'void');
     const batch = writeBatch(this.db);
     acts.forEach((d) => batch.delete(d.ref));
     fus.forEach((d) => batch.delete(d.ref));
+    voided.forEach((d) => batch.delete(d.ref));
     await batch.commit();
+    const counts: CascadeCounts = {
+      won: lead.stage === 'won' ? 1 : 0,
+      history: acts.size,
+      followUps: fus.size,
+      invoices: voided.length,
+    };
     const last = writeBatch(this.db);
     last.delete(doc(this.db, 'leads', id));
-    if (patchContact) this.patchContact(last, lead, null, false);
+    if (!fromContact) {
+      this.patchContact(last, lead, null, false);
+      this.deletions.record(last, {
+        kind: 'lead',
+        refId: id,
+        label: [lead.name, dealTitle(lead)].filter(Boolean).join(' · '),
+        detail: cascadeDetail(counts),
+        snapshot: lead,
+      });
+    }
     await last.commit();
+    return counts;
   }
 
   /** Actualiza el resumen de compras del contacto del lead en el mismo batch. */

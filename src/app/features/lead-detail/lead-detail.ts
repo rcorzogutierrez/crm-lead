@@ -1,4 +1,4 @@
-import { Component, computed, effect, inject, input, linkedSignal, signal, untracked } from '@angular/core';
+import { Component, Injector, afterNextRender, computed, effect, inject, input, linkedSignal, signal, untracked } from '@angular/core';
 import { FormField, email, form, min, required, submit } from '@angular/forms/signals';
 import { Router, RouterLink } from '@angular/router';
 import {
@@ -93,6 +93,7 @@ export class LeadDetail {
   readonly id = input.required<string>();
 
   private readonly router = inject(Router);
+  private readonly injector = inject(Injector);
   private readonly clock = inject(Clock);
   protected readonly auth = inject(AuthService);
   protected readonly leadsService = inject(LeadsService);
@@ -220,6 +221,9 @@ export class LeadDetail {
 
   // Borrado
   protected readonly confirmDelete = signal(false);
+  /** Entrada del historial que el admin está por borrar (confirmación en línea). */
+  protected readonly removingActivity = signal<string | null>(null);
+  protected readonly busy = signal(false);
 
   // Edición de datos
   protected readonly model = signal<LeadDraft>({
@@ -447,6 +451,31 @@ export class LeadDetail {
       void this.router.navigateByUrl('/leads');
     } catch (err) {
       this.toast.error(firestoreErrorMessage(err));
+    }
+  }
+
+  protected askRemoveActivity(a: Activity): void {
+    this.removingActivity.set(a.id);
+    afterNextRender(() => document.getElementById('del-act-q-' + a.id)?.focus(), { injector: this.injector });
+  }
+
+  protected cancelRemoveActivity(a: Activity): void {
+    this.removingActivity.set(null);
+    afterNextRender(() => document.getElementById('del-act-' + a.id)?.focus(), { injector: this.injector });
+  }
+
+  protected async removeActivity(a: Activity): Promise<void> {
+    const lead = this.lead();
+    if (!lead) return;
+    this.busy.set(true);
+    try {
+      await this.activitiesService.remove(lead.id, a, [lead.name, dealTitle(lead)].filter(Boolean).join(' · '));
+      this.removingActivity.set(null);
+      this.toast.show(t('detail.entryDeleted'));
+    } catch (err) {
+      this.toast.error(firestoreErrorMessage(err));
+    } finally {
+      this.busy.set(false);
     }
   }
 
