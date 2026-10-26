@@ -9,7 +9,7 @@ import {
 } from './invoice-math';
 import { ServiceItem } from './models';
 
-const svc = (id: string, price: number, unit: string, taxable = true): ServiceItem => ({ id, name: id, description: '', price, unit, active: true, taxable });
+const svc = (id: string, price: number, unit: string, taxable = true): ServiceItem => ({ id, kind: 'service', name: id, description: '', price, unit, active: true, taxable });
 const catalog = new Map([
   ['web', svc('web', 1000, 'unidad')],
   ['tour', svc('tour', 180, 'persona', false)],

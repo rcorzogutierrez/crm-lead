@@ -91,6 +91,14 @@
         @if (r.won.length > listLimit) {
           <p class="mt-2 text-sm text-ink-2">{{ t('report.more', { n: r.won.length - listLimit }) }}</p>
         }
+        @if (wonByKind().length) {
+          <p class="mt-2 flex flex-wrap gap-x-4 gap-y-1 border-t border-rule-strong pt-2 text-[0.8125rem] text-ink-2 tabular">
+            <span>{{ t('report.byKind') }}</span>
+            @for (x of wonByKind(); track x.kind) {
+              <span>{{ x.label }} <b class="text-ink">{{ money(x.total) }}</b></span>
+            }
+          </p>
+        }
       } @else {
         <p class="text-sm text-ink-2">{{ t('report.won.empty') }}</p>
       }

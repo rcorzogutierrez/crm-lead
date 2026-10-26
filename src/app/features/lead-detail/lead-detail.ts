@@ -13,7 +13,7 @@ import {
 } from '@lucide/angular';
 import { CatalogService } from '../../core/catalog.service';
 import { ContactsService } from '../../core/contacts.service';
-import { moneyLabel } from '../../core/dates';
+import { moneyLabel, qtyLabel, unitPriceLabel } from '../../core/dates';
 import { ActivitiesService } from '../../core/activities.service';
 import { AuthService } from '../../core/auth.service';
 import { Clock } from '../../core/clock.service';
@@ -122,6 +122,8 @@ export class LeadDetail {
   protected readonly stageIndex = computed(() => STAGES.findIndex((s) => s.id === this.lead()?.stage));
 
   protected readonly money = moneyLabel;
+  protected readonly unitPrice = unitPriceLabel;
+  protected readonly qty = qtyLabel;
   protected readonly tierName = tierLabel;
   protected readonly isOpen = computed(() => {
     const lead = this.lead();
@@ -319,9 +321,9 @@ export class LeadDetail {
     const sameServices = lines.length === before.length && lines.every((x, i) => x.serviceId === before[i].serviceId);
     if (!sameServices) changes.push(t('pricing.noteServices', { names: lines.map((x) => x.serviceName).join(' + ') }));
     else if (lines.length === 1 && lines[0].quantity !== before[0].quantity) {
-      changes.push(t('pricing.noteQty', { from: before[0].quantity, to: lines[0].quantity }));
+      changes.push(t('pricing.noteQty', { from: qtyLabel(before[0].quantity), to: qtyLabel(lines[0].quantity) }));
     } else if (lines.some((x, i) => x.quantity !== before[i].quantity)) {
-      changes.push(t('pricing.noteServices', { names: lines.map((x) => `${x.serviceName} × ${x.quantity}`).join(' + ') }));
+      changes.push(t('pricing.noteServices', { names: lines.map((x) => `${x.serviceName} × ${qtyLabel(x.quantity)}`).join(' + ') }));
     }
     if (lead.serviceId && this.pTier() !== lead.tier) changes.push(`${tierLabel(lead.tier)} → ${tierLabel(this.pTier())}`);
     changes.push(t('pricing.noteValue', { value: moneyLabel(value) }));

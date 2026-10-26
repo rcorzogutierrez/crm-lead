@@ -408,6 +408,15 @@ describe('Catálogo y categorías de venta (solo admin)', () => {
     await assertSucceeds(updateDoc(doc(db(LUIS), 'leads/luis-1'), { stage: 'contacted', notes: 'sigue' }));
   });
 
+  it('el tipo es servicio, producto o material (sin tipo = servicio)', async () => {
+    await assertSucceeds(setDoc(doc(db(ANA), 'services/cable'), { ...service, kind: 'material', unit: 'metro', price: 3.5 }));
+    await assertSucceeds(setDoc(doc(db(ANA), 'services/router'), { ...service, kind: 'product', unit: 'unidad' }));
+    await assertSucceeds(updateDoc(doc(db(ANA), 'services/web'), { kind: 'service' }));
+    await assertFails(setDoc(doc(db(ANA), 'services/x'), { ...service, kind: 'stock' }));
+    await assertFails(updateDoc(doc(db(ANA), 'services/web'), { kind: 3 }));
+    await assertFails(setDoc(doc(db(LUIS), 'services/y'), { ...service, kind: 'product' }));
+  });
+
   it('solo un admin cambia los % de categoría, entre 0 y 100', async () => {
     const pricing = { bronze: 4, silver: 6, gold: 8 };
     await assertFails(setDoc(doc(db(LUIS), 'meta/pricing'), pricing));
@@ -430,6 +439,13 @@ describe('Precio de un lead', () => {
     await assertSucceeds(setDoc(doc(db(LUIS), 'leads/n'), lead(LUIS, { ...tour, value: 185.4 })));
     await assertSucceeds(setDoc(doc(db(LUIS), 'leads/n3'), lead(LUIS, { ...tour, quantity: 3, value: 556.2 })));
     await assertFails(setDoc(doc(db(LUIS), 'leads/n2'), lead(LUIS, { ...tour, value: 185 })));
+  });
+
+  it('la cantidad admite decimales (2,5 metros de un material a 3,50 = 9,01 con bronce)', async () => {
+    await seed({ 'services/cable': { kind: 'material', name: 'Cable', description: '', price: 3.5, unit: 'metro', active: true } });
+    const cable = { serviceId: 'cable', serviceName: 'Cable', unitPrice: 3.5, quantity: 2.5 };
+    await assertSucceeds(setDoc(doc(db(LUIS), 'leads/n'), lead(LUIS, { ...cable, value: 9.01 })));
+    await assertFails(setDoc(doc(db(LUIS), 'leads/n2'), lead(LUIS, { ...cable, quantity: 0, value: 0 })));
   });
 
   it('no se puede vender por debajo del precio oficial', async () => {

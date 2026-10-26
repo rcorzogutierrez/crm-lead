@@ -1,17 +1,20 @@
 import { Component, ElementRef, Injector, afterNextRender, computed, inject, input, model, viewChildren } from '@angular/core';
+import { NgTemplateOutlet } from '@angular/common';
 import { LucidePlus, LucideX } from '@lucide/angular';
 import { CatalogService } from '../core/catalog.service';
-import { moneyLabel } from '../core/dates';
-import { EditLine, MAX_LINES } from '../core/deal-lines';
+import { unitPriceLabel } from '../core/dates';
+import { EditLine, MAX_LINES, parseQuantity } from '../core/deal-lines';
+import { ITEM_KINDS, ServiceItem } from '../core/models';
 import { t } from '../core/i18n/i18n';
 
 /**
- * Servicios de una compra: uno o varios, cada uno con su cantidad si se cobra por unidad.
- * Un servicio no se repite (para eso está la cantidad). Lo usan la captura y la ficha.
+ * Lo que lleva una compra (servicios, productos o materiales del catálogo): uno o varios,
+ * cada uno con su cantidad si se cobra por unidad. Un elemento no se repite (para eso está
+ * la cantidad). Lo usan la captura y la ficha.
  */
 @Component({
   selector: 'app-lines-editor',
-  imports: [LucidePlus, LucideX],
+  imports: [NgTemplateOutlet, LucidePlus, LucideX],
   host: { class: 'block' },
   template: `
     <ul class="space-y-3 sm:space-y-2" [attr.aria-label]="t('lines.label')">
@@ -34,29 +37,40 @@ import { t } from '../core/i18n/i18n';
               @if ((i === 0 && allowNone()) || !line.serviceId) {
                 <option value="" [selected]="!line.serviceId">{{ i === 0 && allowNone() ? t('capture.noService') : t('lines.choose') }}</option>
               }
-              @for (s of optionsFor(i); track s.id) {
-                <option [value]="s.id" [selected]="s.id === line.serviceId">
-                  {{ s.name }} · {{ money(s.price) }}@if (s.unit) { / {{ s.unit }}}@if (!s.active) { ({{ t('svc.archivedBadge') }})}
-                </option>
+              <!-- Con más de un tipo en el catálogo, agrupados (Servicios, Productos, Materiales). -->
+              @for (g of groupsFor(i); track g.kind) {
+                @if (g.label) {
+                  <optgroup [label]="g.label">
+                    @for (s of g.items; track s.id) {
+                      <ng-container [ngTemplateOutlet]="option" [ngTemplateOutletContext]="{ $implicit: s, selected: s.id === line.serviceId }" />
+                    }
+                  </optgroup>
+                } @else {
+                  @for (s of g.items; track s.id) {
+                    <ng-container [ngTemplateOutlet]="option" [ngTemplateOutletContext]="{ $implicit: s, selected: s.id === line.serviceId }" />
+                  }
+                }
               }
             </select>
           </div>
           @if (unitOf(line); as unit) {
-            <div class="w-28 shrink-0">
+            <div class="w-36 shrink-0">
               @if (i === 0) {
                 <label class="field-label" [for]="idPrefix() + '-qty'">{{ t('lines.qty') }}</label>
               }
               <div class="relative">
+                <!-- Admite decimales (2,5 metros); lo que no sirve se ignora y al salir vuelve a la última cantidad válida. -->
                 <input
                   class="input pr-16 tabular"
                   type="number"
-                  inputmode="numeric"
-                  min="1"
-                  step="1"
+                  inputmode="decimal"
+                  min="0.01"
+                  step="any"
                   [id]="i === 0 ? idPrefix() + '-qty' : idPrefix() + '-qty-' + i"
                   [attr.aria-label]="t('field.quantity', { unit })"
                   [value]="line.quantity"
                   (input)="setQuantity(i, $any($event.target).value)"
+                  (change)="$any($event.target).value = line.quantity"
                 />
                 <span class="pointer-events-none absolute inset-y-0 right-3 flex max-w-12 items-center truncate text-xs text-ink-3" aria-hidden="true">{{ unit }}</span>
               </div>
@@ -81,6 +95,11 @@ import { t } from '../core/i18n/i18n';
         {{ t('lines.add') }}
       </button>
     }
+    <ng-template #option let-s let-selected="selected">
+      <option [value]="s.id" [selected]="selected">
+        {{ s.name }} · {{ unitPrice(s.price) }}@if (s.unit) { / {{ s.unit }}}@if (!s.active) { ({{ t('svc.archivedBadge') }})}
+      </option>
+    </ng-template>
   `,
 })
 export class LinesEditor {
@@ -98,7 +117,7 @@ export class LinesEditor {
   readonly errorId = input<string | null>(null);
 
   protected readonly t = t;
-  protected readonly money = moneyLabel;
+  protected readonly unitPrice = unitPriceLabel;
   private readonly selects = viewChildren<ElementRef<HTMLSelectElement>>('select');
 
   private readonly choices = computed(() => {
@@ -123,6 +142,14 @@ export class LinesEditor {
     return this.choices().filter((s) => !others.has(s.id));
   }
 
+  /** Opciones de la línea agrupadas por tipo; sin título si el catálogo tiene un solo tipo. */
+  protected groupsFor(i: number): { kind: string; label: string; items: ServiceItem[] }[] {
+    const items = this.optionsFor(i);
+    const kinds = new Set(this.choices().map((s) => s.kind));
+    if (kinds.size < 2) return [{ kind: 'all', label: '', items }];
+    return ITEM_KINDS.map((k) => ({ kind: k.id, label: k.plural, items: items.filter((s) => s.kind === k.id) })).filter((g) => g.items.length);
+  }
+
   protected unitOf(line: EditLine): string {
     return this.catalog.byId().get(line.serviceId)?.unit ?? '';
   }
@@ -136,7 +163,8 @@ export class LinesEditor {
   }
 
   protected setQuantity(i: number, raw: string): void {
-    const quantity = Math.max(1, Math.floor(Number(raw) || 1));
+    const quantity = parseQuantity(raw);
+    if (quantity === null) return;
     this.lines.update((ls) => ls.map((l, j) => (j === i ? { ...l, quantity } : l)));
   }
 

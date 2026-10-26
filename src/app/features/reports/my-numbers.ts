@@ -9,8 +9,9 @@ import { firestoreErrorMessage } from '../../core/firestore-utils';
 import { FollowUpsService } from '../../core/followups.service';
 import { I18nKey, intlLocale, t } from '../../core/i18n/i18n';
 import { LeadsService } from '../../core/leads.service';
-import { PriceTier, stageMeta, tierLabel } from '../../core/models';
-import { Period, customRange, dayParam, followUpScore, myNumbers, parseDay, periodRange, precedingRange, previousRange, rangeDays } from '../../core/reports';
+import { ITEM_KINDS, PriceTier, stageMeta, tierLabel } from '../../core/models';
+import { CatalogService } from '../../core/catalog.service';
+import { Period, customRange, dayParam, followUpScore, myNumbers, parseDay, salesByKind, wonIn, periodRange, precedingRange, previousRange, rangeDays } from '../../core/reports';
 import { RangePicker } from './range-picker';
 import { ReceivableList } from './receivable-list';
 import { InvoicesService } from '../../core/invoices.service';
@@ -45,6 +46,7 @@ export class MyNumbersView {
   private readonly leads = inject(LeadsService);
   private readonly followUps = inject(FollowUpsService);
   private readonly invoices = inject(InvoicesService);
+  private readonly catalog = inject(CatalogService);
 
   protected readonly t = t;
   protected readonly money = moneyLabel;
@@ -90,6 +92,11 @@ export class MyNumbersView {
   protected readonly error = this.leads.error;
   private readonly mine = computed(() => this.leads.leads().filter((l) => l.assigneeId === this.auth.uid()));
   protected readonly n = computed(() => myNumbers(this.mine(), this.range(), this.prev()));
+  /** Lo vendido por tipo; solo se muestra si vendí más de un tipo. */
+  protected readonly soldByKind = computed(() => {
+    const rows = salesByKind(wonIn(this.mine(), this.range()), (id) => this.catalog.byId().get(id)?.kind);
+    return rows.length > 1 ? rows.map((x) => ({ ...x, label: ITEM_KINDS.find((k) => k.id === x.kind)!.plural })) : [];
+  });
   /** Mis facturas con saldo (el admin escucha todas: aquí solo las suyas). Estado de hoy. */
   protected readonly receivable = computed(() =>
     receivables(this.invoices.issued().filter((i) => i.assigneeId === this.auth.uid()), this.clock.now()),

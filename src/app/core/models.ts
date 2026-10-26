@@ -89,21 +89,39 @@ export interface ContactStats {
 
 export type ContactDraft = Pick<Contact, 'name' | 'company' | 'email' | 'phone' | 'assigneeId' | 'notes'>;
 
-/** Servicio del catálogo. Solo un admin lo crea o edita. */
+/** Qué es lo que se vende: un servicio, un producto o un material (sin control de stock). */
+export type ItemKind = 'service' | 'product' | 'material';
+
+export const ITEM_KINDS: readonly { id: ItemKind; readonly label: string; readonly plural: string }[] = [
+  { id: 'service', get label() { return t('kind.service'); }, get plural() { return t('kind.services'); } },
+  { id: 'product', get label() { return t('kind.product'); }, get plural() { return t('kind.products'); } },
+  { id: 'material', get label() { return t('kind.material'); }, get plural() { return t('kind.materials'); } },
+];
+
+export function kindLabel(kind: ItemKind): string {
+  return ITEM_KINDS.find((k) => k.id === kind)?.label ?? kind;
+}
+
+/**
+ * Elemento del catálogo (servicio, producto o material); en el código y en Firestore sigue
+ * siendo `services`. Solo un admin lo crea o edita.
+ */
 export interface ServiceItem {
   id: string;
+  /** Los anteriores a este campo son servicios. */
+  kind: ItemKind;
   name: string;
   description: string;
   /** Precio oficial por unidad. */
   price: number;
-  /** Unidad de cobro ("persona", "noche"…); vacío = precio único. */
+  /** Unidad de cobro ("hora", "unidad", "metro"…); vacío = precio único. */
   unit: string;
   active: boolean;
   /** ¿Se le suma el impuesto de venta en la factura? (los anteriores a este campo, sí). */
   taxable: boolean;
 }
 
-export type ServiceItemDraft = Pick<ServiceItem, 'name' | 'description' | 'price' | 'unit' | 'active' | 'taxable'>;
+export type ServiceItemDraft = Pick<ServiceItem, 'kind' | 'name' | 'description' | 'price' | 'unit' | 'active' | 'taxable'>;
 
 /** Porcentaje de cada categoría (doc `meta/pricing`). */
 export type TierRates = Record<PriceTier, number>;

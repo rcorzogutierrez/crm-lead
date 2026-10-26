@@ -228,7 +228,9 @@ service cloud.firestore {
         && d.price is number && d.price >= 0
         && isString(d.unit, 50)
         && d.active is bool
-        && d.get('taxable', true) is bool;
+        && d.get('taxable', true) is bool
+        // Servicio, producto o material; los anteriores a este campo son servicios.
+        && d.get('kind', 'service') in ['service', 'product', 'material'];
     }
 
     match /services/{serviceId} {

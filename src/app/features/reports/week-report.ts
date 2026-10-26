@@ -9,8 +9,9 @@ import { FollowUpsService } from '../../core/followups.service';
 import { intlLocale, t } from '../../core/i18n/i18n';
 import { LeadsService } from '../../core/leads.service';
 import { MembersService } from '../../core/members.service';
-import { Lead, channelLabel, sourceLabel, lostReasonLabel, stageMeta, tierLabel, wonDate } from '../../core/models';
-import { STALLED_DAYS, customRange, dayParam, inRange, lostDate, parseDay, weekRange, weekReport } from '../../core/reports';
+import { ITEM_KINDS, Lead, channelLabel, sourceLabel, lostReasonLabel, stageMeta, tierLabel, wonDate } from '../../core/models';
+import { STALLED_DAYS, customRange, dayParam, inRange, lostDate, parseDay, salesByKind, weekRange, weekReport } from '../../core/reports';
+import { CatalogService } from '../../core/catalog.service';
 import { DueChip } from '../../shared/due-chip';
 import { RangePicker } from './range-picker';
 import { ReceivableList } from './receivable-list';
@@ -39,6 +40,7 @@ export class WeekReportView {
   private readonly leads = inject(LeadsService);
   private readonly followUps = inject(FollowUpsService);
   private readonly invoices = inject(InvoicesService);
+  private readonly catalog = inject(CatalogService);
   protected readonly members = inject(MembersService);
 
   protected readonly t = t;
@@ -76,6 +78,11 @@ export class WeekReportView {
   /** Saldo por cobrar de todo el equipo (estado de hoy, como vencidos y quietos). */
   protected readonly receivable = computed(() => receivables(this.invoices.issued(), this.clock.now()));
   protected readonly report = computed(() => weekReport(this.leads.leads(), this.followUps.pending(), this.range(), this.clock.now()));
+  /** Lo ganado por tipo; solo se muestra si se vendió más de un tipo. */
+  protected readonly wonByKind = computed(() => {
+    const rows = salesByKind(this.report().won, (id) => this.catalog.byId().get(id)?.kind);
+    return rows.length > 1 ? rows.map((x) => ({ ...x, label: ITEM_KINDS.find((k) => k.id === x.kind)!.plural })) : [];
+  });
 
   protected readonly title = computed(() => {
     const { start, end } = this.range();

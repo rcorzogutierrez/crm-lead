@@ -38,6 +38,7 @@ interface Formats {
   date: Intl.DateTimeFormat;
   money: Intl.NumberFormat;
   cents: Intl.NumberFormat;
+  qty: Intl.NumberFormat;
 }
 const cache = new Map<Lang, Formats>();
 
@@ -56,6 +57,8 @@ function fmt(): Formats {
       money: new Intl.NumberFormat(loc, { maximumFractionDigits: 0 }),
       // Facturas en dólares de EE. UU.: separadores de allí también en español ("$2,472.00").
       cents: new Intl.NumberFormat(loc === 'es' ? 'es-US' : loc, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+      // Mismos separadores que los importes con centavos, para que "2.5 × $3.50" no los mezcle.
+      qty: new Intl.NumberFormat(loc === 'es' ? 'es-US' : loc, { maximumFractionDigits: 2 }),
     };
     cache.set(current, f);
   }
@@ -128,6 +131,19 @@ export function presetDate(preset: 'tomorrow' | 'in3' | 'nextWeek', now: Date): 
 
 export function moneyLabel(value: number): string {
   return `$${fmt().money.format(value || 0)}`;
+}
+
+/**
+ * Precio por unidad del catálogo: sin centavos si es redondo ("$1,200") y con ellos si no
+ * ("$3.50" el metro), para que un material barato no se vea redondeado.
+ */
+export function unitPriceLabel(value: number): string {
+  return Number.isInteger(value || 0) ? moneyLabel(value) : centsLabel(value);
+}
+
+/** Cantidad con hasta dos decimales ("2.5"). */
+export function qtyLabel(value: number): string {
+  return fmt().qty.format(value || 0);
 }
 
 /** Importe con centavos ("$1,030.00"), para facturas. */
