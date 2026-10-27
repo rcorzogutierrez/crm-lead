@@ -8,6 +8,14 @@
 @theme {
   --font-sans: 'Archivo Variable', ui-sans-serif, system-ui, sans-serif;
 
+  /*
+   * Anchos de página (`max-w-page-*`). Todas las páginas arrancan pegadas al riel con el
+   * mismo margen; el ancho solo cambia con el contenido.
+   */
+  --container-page-wide: 90rem; /* tablas y listas: Contactos, Negocios, Catálogo */
+  --container-page: 78rem; /* agenda, fichas y reportes */
+  --container-page-narrow: 56rem; /* formularios y lectura: Equipo, Empresa, Registro, Factura */
+
   /* Riel */
   --color-rail: oklch(0.38 0.02 262);
   --color-rail-deep: oklch(0.31 0.02 262);
@@ -141,6 +149,10 @@
  * Viven en la capa `components` para que cualquier utilidad del template los pueda ajustar.
  */
 @layer components {
+  /* Contenedor de página: alineado al riel (nunca centrado), con el margen de siempre */
+  .page {
+    @apply w-full px-4 pt-6 pb-10 sm:px-6 lg:px-10 lg:pt-10;
+  }
   .btn,
   .btn-primary,
   .btn-secondary,
