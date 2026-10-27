@@ -74,6 +74,8 @@ const SIGN_IN_KEY = 'crm-lead.recordedSignIn';
 const FRESH_SIGN_IN = 5 * 60_000;
 /** Lo máximo que se espera a anotar la salida antes de cerrar la sesión (sin red no llega). */
 const SIGN_OUT_WAIT = 2_000;
+/** Reintentos del alta si las reglas la rechazan (token aún sin `email_verified`), con su espera. */
+const MEMBERSHIP_RETRIES = [1_000, 2_500];
 
 /**
  * Sesión del usuario y su pertenencia al equipo.
@@ -220,7 +222,6 @@ export class AuthService {
     if (!user.emailVerified || this._user() !== user) return false;
     // Ya estaba dentro (el enlace se abrió otra vez): nada que rehacer.
     if (this._status() !== 'unverified') return true;
-    await user.getIdToken(true);
     await this.checkMembership(user);
     return true;
   }
@@ -307,21 +308,51 @@ export class AuthService {
     if (!user) return;
     this.stopMember?.();
     this.stopMember = null;
+    await user.reload().catch(() => undefined);
+    if (this._user() !== user) return;
+    if (!user.emailVerified) {
+      this.setStatus('unverified');
+      return;
+    }
     await this.checkMembership(user);
   }
 
-  /** Comprueba el alta; si falla, queda en `pending` con el error (nunca en `loading`). */
+  /**
+   * Comprueba el alta; si falla, queda en `pending` con el error (nunca en `loading`).
+   * Si las reglas la rechazan, renueva el token y lo reintenta: con el email recién confirmado
+   * (en otra pestaña o desde el enlace del correo) el token guardado puede no llevar aún `email_verified`.
+   */
   private async checkMembership(user: User): Promise<void> {
     this._error.set(null);
     this.setStatus('loading');
-    try {
-      await this.ensureMembership(user);
-    } catch (err) {
-      console.error(err);
-      if (this._user() !== user) return;
-      this._error.set('auth.err.verify');
-      this.setStatus('pending');
+    for (let attempt = 0; ; attempt++) {
+      try {
+        await this.verifiedToken(user, attempt > 0);
+        await this.ensureMembership(user);
+        return;
+      } catch (err) {
+        if (this._user() !== user) return;
+        const wait = MEMBERSHIP_RETRIES[attempt];
+        if (wait && (err as { code?: string })?.code === 'permission-denied') {
+          await new Promise((r) => setTimeout(r, wait));
+          if (this._user() !== user) return;
+          continue;
+        }
+        console.error(err);
+        this._error.set('auth.err.verify');
+        this.setStatus('pending');
+        return;
+      }
     }
+  }
+
+  /** Renueva el token si aún no dice que el email está confirmado (o si `force`). */
+  private async verifiedToken(user: User, force: boolean): Promise<void> {
+    if (!force) {
+      const { claims } = await user.getIdTokenResult();
+      if (claims['email_verified'] === true) return;
+    }
+    await user.getIdToken(true);
   }
 
   private async ensureMembership(user: User): Promise<void> {
@@ -349,15 +380,20 @@ export class AuthService {
         await batch.commit();
       } else {
         const inviteRef = doc(this.db, 'invites', email);
-        const invite = await getDoc(inviteRef).catch(() => null);
-        if (!invite?.exists()) {
-          if (this._user() === user) this.setStatus('pending');
-          return;
+        // Un fallo al leer no es "sin invitación": que lo reintente checkMembership.
+        const invite = await getDoc(inviteRef);
+        if (!invite.exists()) {
+          // Puede que otra pestaña acabe de darle el alta (y gastar la invitación).
+          if (!(await getDoc(memberRef)).exists()) {
+            if (this._user() === user) this.setStatus('pending');
+            return;
+          }
+        } else {
+          const batch = writeBatch(this.db);
+          batch.set(memberRef, { ...base, role: invite.data()['role'] as MemberRole });
+          await batch.commit();
+          await deleteDoc(inviteRef).catch(() => undefined);
         }
-        const batch = writeBatch(this.db);
-        batch.set(memberRef, { ...base, role: invite.data()['role'] as MemberRole });
-        await batch.commit();
-        await deleteDoc(inviteRef).catch(() => undefined);
       }
     }
 
