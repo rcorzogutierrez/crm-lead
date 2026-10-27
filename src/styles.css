@@ -433,8 +433,185 @@ dialog.drawer[open]::backdrop {
 .login-check {
   color: oklch(0.78 0.12 278);
 }
+/* Marca grande del login (login-brand.ts), "el embudo se llena" */
+.login-brand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.875rem;
+  margin-bottom: 1.75rem;
+}
+.login-brand-mark {
+  width: 6rem;
+  height: 6rem;
+  border-radius: 1.6875rem;
+  box-shadow:
+    0 2px 4px oklch(0.1 0.03 265 / 0.25),
+    0 22px 44px -18px oklch(0.1 0.03 265 / 0.85);
+}
+.login-brand-mark svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.login-brand-mark :is(rect, circle) {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.login-brand-name {
+  font-size: 1.625rem;
+  line-height: 1;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+/* Entrada: la hoja del logo, los renglones de arriba abajo y el lead que cae por el embudo */
+.lb-tile {
+  animation: lb-tile 560ms var(--ease-out-quart) both;
+}
+.lb-bar {
+  animation: lb-bar 460ms var(--ease-out-quart) both;
+}
+.lb-bar:nth-of-type(2) {
+  animation-delay: 200ms;
+}
+.lb-bar:nth-of-type(3) {
+  animation-delay: 290ms;
+}
+.lb-bar:nth-of-type(4) {
+  animation-delay: 380ms;
+}
+.lb-lead {
+  animation: lb-drop 980ms 520ms both;
+}
+.lb-ring {
+  opacity: 0;
+}
+@keyframes lb-tile {
+  from {
+    opacity: 0;
+    transform: scale(0.88) rotate(-6deg);
+  }
+}
+@keyframes lb-bar {
+  from {
+    opacity: 0;
+    transform: scaleX(0.15);
+  }
+}
+/* El lead entra blanco por la boca, baja por el centro y sale convertido en el punto amarillo */
+@keyframes lb-drop {
+  0% {
+    opacity: 0;
+    fill: #fff;
+    transform: translate(-15px, -46px) scale(0.8);
+    animation-timing-function: cubic-bezier(0.55, 0, 0.9, 0.4);
+  }
+  12% {
+    opacity: 1;
+  }
+  52% {
+    fill: #fff;
+    transform: translate(-15px, 0) scale(0.8);
+    animation-timing-function: var(--ease-out-quart);
+  }
+  78% {
+    fill: #ffd25e;
+    transform: translate(1px, -2px) scale(1.12);
+  }
+  100% {
+    fill: #ffd25e;
+    transform: none;
+  }
+}
+/* Latido con cada palabra del titular: el embudo se enciende de arriba abajo y el lead destella.
+   Dos keyframes iguales que se alternan para que cada latido reinicie la animación. */
+.is-beat .lb-bar {
+  animation: lb-flash-a 520ms ease-out both;
+}
+.is-beat .lb-bar:nth-of-type(3) {
+  animation-delay: 90ms;
+}
+.is-beat .lb-bar:nth-of-type(4) {
+  animation-delay: 180ms;
+}
+.is-beat .lb-ring {
+  animation: lb-ring-a 720ms 260ms var(--ease-out-quart) both;
+}
+.is-beat.is-odd .lb-bar {
+  animation-name: lb-flash-b;
+}
+.is-beat.is-odd .lb-ring {
+  animation-name: lb-ring-b;
+}
+@keyframes lb-flash-a {
+  35% {
+    opacity: 1;
+  }
+}
+@keyframes lb-flash-b {
+  35% {
+    opacity: 1;
+  }
+}
+@keyframes lb-ring-a {
+  from {
+    opacity: 0.9;
+  }
+  to {
+    opacity: 0;
+    transform: scale(3.2);
+  }
+}
+@keyframes lb-ring-b {
+  from {
+    opacity: 0.9;
+  }
+  to {
+    opacity: 0;
+    transform: scale(3.2);
+  }
+}
+@media (max-width: 639px) {
+  .login-brand {
+    gap: 0.75rem;
+    margin-bottom: 1.25rem;
+  }
+  .login-brand-mark {
+    width: 4rem;
+    height: 4rem;
+    border-radius: 1.125rem;
+  }
+  .login-brand-name {
+    font-size: 1.375rem;
+  }
+}
+/* Pantalla baja (portátil, móvil pequeño): logo y nombre en línea para que la hoja quepa entera */
+@media (max-height: 820px) and (min-width: 640px), (max-height: 700px) {
+  .login-brand {
+    flex-direction: row;
+    justify-content: center;
+    gap: 0.75rem;
+    margin-bottom: 1.25rem;
+  }
+  .login-brand-mark {
+    width: 3.25rem;
+    height: 3.25rem;
+    border-radius: 0.9rem;
+  }
+  .login-brand-name {
+    font-size: 1.5rem;
+  }
+}
+/* En el portátil sube a la altura del selector de idioma, que tiene libre el lado izquierdo */
+@media (max-height: 820px) and (min-width: 640px) {
+  .login-brand {
+    margin-top: -3.75rem;
+  }
+}
 @media (prefers-reduced-motion: reduce) {
-  .login-glow {
+  .login-glow,
+  .login-brand-mark :is(rect, circle) {
     animation: none;
   }
   .login-glow {

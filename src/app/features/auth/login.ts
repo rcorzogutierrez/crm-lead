@@ -8,17 +8,19 @@ import { IDLE_MINUTES, IdleService } from '../../core/idle.service';
 import { I18nKey, t } from '../../core/i18n/i18n';
 import { AuthBoard } from './auth-board';
 import { LoginSheet } from './login-sheet';
+import { LoginBrand } from './login-brand';
 
 /**
- * Entrar ("Pizarra"), sobre el tablero de acceso (`AuthBoard`):
+ * Entrar ("Pizarra"), sobre el tablero de acceso (`AuthBoard`): la marca en grande (`LoginBrand`),
  * titular con la palabra final rotando (llamada → seguimiento → propuesta; cada cambio trae una cita
  * nueva al fondo) y, debajo, la hoja de entrar (`LoginSheet`: Google o email y contraseña).
  */
 @Component({
   selector: 'app-login',
-  imports: [AuthBoard, LoginSheet, RouterLink, LucideCheck, LucideClock],
+  imports: [LoginBrand, AuthBoard, LoginSheet, RouterLink, LucideCheck, LucideClock],
   template: `
-    <app-auth-board [beat]="word()">
+    <app-auth-board [beat]="word()" brand>
+      <app-login-brand [beat]="word()" />
       <!-- Tras un cierre por inactividad, el motivo va encima del titular -->
       @if (idle.endedByIdle()) {
         <div class="login-in login-notice mx-auto mb-6 flex max-w-md items-start gap-3 rounded-xl px-4 py-3 text-left" style="--d: 60ms" role="status">

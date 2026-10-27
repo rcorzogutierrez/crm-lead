@@ -1,4 +1,4 @@
-import { Component, input } from '@angular/core';
+import { Component, booleanAttribute, input } from '@angular/core';
 import { LangSwitch } from '../../shared/lang-switch';
 import { Logo } from '../../shared/logo';
 import { LoginAgenda } from './login-agenda';
@@ -22,10 +22,14 @@ import { LoginAgenda } from './login-agenda';
         class="login-in flex items-center justify-between gap-3 px-5 py-5 sm:px-8"
         style="--d: 0ms"
       >
-        <div class="flex items-center gap-2.5">
-          <app-logo [size]="36" />
-          <span class="date-face text-lg font-bold tracking-tight">CRM Lead</span>
-        </div>
+        @if (brand()) {
+          <span aria-hidden="true"></span>
+        } @else {
+          <div class="flex items-center gap-2.5">
+            <app-logo [size]="36" />
+            <span class="date-face text-lg font-bold tracking-tight">CRM Lead</span>
+          </div>
+        }
         <app-lang-switch tone="rail" />
       </header>
 
@@ -40,6 +44,8 @@ import { LoginAgenda } from './login-agenda';
 export class AuthBoard {
   /** Cada cambio trae una cita nueva al fondo (en el login, la palabra del titular). */
   readonly beat = input(0);
+  /** La marca va en grande sobre el titular: la cabecera solo lleva el idioma. */
+  readonly brand = input(false, { transform: booleanAttribute });
 
   /** El brillo índigo sigue al puntero con retardo suave (la transición está en CSS). */
   protected follow(event: PointerEvent): void {
