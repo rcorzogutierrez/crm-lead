@@ -61,6 +61,9 @@
         <p class="truncate text-sm font-semibold">{{ me.displayName }}</p>
         <p class="truncate text-xs text-rail-muted">{{ me.role === 'admin' ? t('role.admin') : t('role.member') }}</p>
       </div>
+      <button type="button" class="btn-icon size-8 text-rail-muted hover:bg-rail-ink/10 hover:text-rail-ink" [disabled]="pwSending()" (click)="passwordLink()" [attr.aria-label]="t(pwLabel())" [title]="t(pwLabel())">
+        <svg lucideKeyRound [size]="16"></svg>
+      </button>
       <button type="button" class="btn-icon size-8 text-rail-muted hover:bg-rail-ink/10 hover:text-rail-ink" (click)="signOut()" [attr.aria-label]="t('shell.signOut')" [title]="t('shell.signOut')">
         <svg lucideLogOut [size]="16"></svg>
       </button>
@@ -94,7 +97,11 @@
               <p class="truncate text-xs text-ink-2">{{ me.role === 'admin' ? t('role.admin') : t('role.member') }} · {{ me.email }}</p>
             </div>
           </div>
-          <button type="button" class="flex h-11 w-full items-center gap-3 px-4 text-sm font-semibold hover:bg-sheet-2" (click)="accountOpen.set(false); signOut()">
+          <button type="button" class="flex h-11 w-full items-center gap-3 px-4 text-sm font-semibold hover:bg-sheet-2" [disabled]="pwSending()" (click)="accountOpen.set(false); passwordLink()">
+            <svg lucideKeyRound [size]="18" [strokeWidth]="1.75"></svg>
+            {{ t(pwLabel()) }}
+          </button>
+          <button type="button" class="flex h-11 w-full items-center gap-3 border-t border-rule px-4 text-sm font-semibold hover:bg-sheet-2" (click)="accountOpen.set(false); signOut()">
             <svg lucideLogOut [size]="18" [strokeWidth]="1.75"></svg>
             {{ t('shell.signOut') }}
           </button>

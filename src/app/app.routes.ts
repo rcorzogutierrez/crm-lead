@@ -12,6 +12,17 @@ export const routes: Routes = [
     loadComponent: () => import('./features/auth/login').then((m) => m.Login),
   },
   {
+    path: 'verify',
+    title: 'verify.tab',
+    loadComponent: () => import('./features/auth/verify').then((m) => m.Verify),
+  },
+  {
+    // Enlaces de los correos de acceso (confirmar email, contraseña nueva)
+    path: 'auth/action',
+    title: 'action.tab',
+    loadComponent: () => import('./features/auth/auth-action').then((m) => m.AuthAction),
+  },
+  {
     path: 'pending',
     title: 'pending.tab',
     loadComponent: () => import('./features/auth/pending').then((m) => m.Pending),

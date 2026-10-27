@@ -51,7 +51,8 @@ Estrategia: Restrained. Base neutra gris azulada; el índigo solo para acciones 
 
 - Táctil: los campos van a 16px (si no, iOS amplía la página al enfocarlos); `viewport-fit=cover` con `env(safe-area-inset-*)` en la barra inferior, la barra superior y el pie del panel de captura.
 - Datos largos: en tablas, la primera columna lleva `w-full max-w-0` para que el subtítulo se recorte sin empujar las demás; importes y fechas nunca se recortan (`whitespace-nowrap`). Las rejillas de una columna en móvil usan `grid-cols-1` (minmax(0,1fr)), no la pista implícita.
-- Inactividad: el último minuto, un aviso con el aspecto del toast (tinta, reloj en resaltador) con cuenta atrás y "Seguir conectado"; tras el cierre, el login cambia su insignia por una nota translúcida con el motivo.
+- Inactividad: el último minuto, un aviso con el aspecto del toast (tinta, reloj en resaltador) con cuenta atrás y "Seguir conectado"; tras el cierre, el login muestra encima del titular una nota translúcida con el motivo.
+- Acceso ("Hoja de agenda", elegida por Rafa el 27 oct 2026 entre tres propuestas): sobre el tablero Pizarra (`auth-board.ts`), el titular que rota y debajo una hoja blanca de la agenda (`.login-sheet`: radio 14px, sombra profunda, margen rojo a 22px y cabecera `sheet-2` con el título y la fecha de hoy en semicondensada). Dentro, Google (botón secundario con la G a color) y, tras el renglón "o con tu email", email y contraseña con mostrar/ocultar; "¿La olvidaste?" va en la etiqueta. Botones de 44px. Debajo, sobre el tablero, "¿Primera vez? Crea tu contraseña" (`.login-link`). Las garantías solo con altura ≥ 760px. Crear contraseña marca sus requisitos en verde al escribir (`password-rules.ts`). "Revisa tu correo", la contraseña nueva y los errores de enlace usan la misma hoja; el email largo va en su propio renglón.
 
 ## Movimiento
 

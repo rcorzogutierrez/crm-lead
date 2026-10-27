@@ -178,6 +178,21 @@ describe('Alta en el equipo', () => {
     await assertFails(getDoc(doc(fs, 'contacts/c1')));
   });
 
+  it('con contraseña, la invitación solo vale tras confirmar el email', async () => {
+    const mail = 'nuevo@example.com';
+    await seed({ [`invites/${mail}`]: { email: mail, role: 'member', invitedBy: ANA } });
+    const newbie = { uid: 'nuevo', email: mail, displayName: 'Nuevo', photoURL: null, role: 'member', active: true };
+    const as = (verified: boolean) =>
+      env
+        .authenticatedContext('nuevo', { email: mail, email_verified: verified, firebase: { sign_in_provider: 'password' } })
+        .firestore() as unknown as Firestore;
+    // Quien se registra con el email de otro no lo puede confirmar: no ve la invitación ni se da de alta.
+    await assertFails(getDoc(doc(as(false), `invites/${mail}`)));
+    await assertFails(setDoc(doc(as(false), 'members/nuevo'), newbie));
+    await assertSucceeds(getDoc(doc(as(true), `invites/${mail}`)));
+    await assertSucceeds(setDoc(doc(as(true), 'members/nuevo'), newbie));
+  });
+
   it('quien no es del equipo o está desactivado no lee datos', async () => {
     await assertFails(getDoc(doc(db(STRANGER), 'contacts/c1')));
     await assertFails(getDoc(doc(db(INES), 'contacts/c1')));

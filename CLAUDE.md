@@ -6,14 +6,14 @@ follow-up programado, no del registro.
 
 - Idioma del código de dominio (comentarios): **español**. La interfaz es **bilingüe español/inglés** (español por defecto).
 - **i18n en tiempo de ejecución** (`src/app/core/i18n/`), sin librerías y sin recargar: `t('clave', { param })` lee la signal `lang`, así que plantillas y `computed` se actualizan solas. Ningún texto visible va escrito directo en plantillas o servicios: se añade la clave en `es.ts` **y** en `en.ts` (el tipo de `en.ts` obliga a traducirlas todas). Las etiquetas de `STAGES`/`SOURCES`/`CHANNELS` son getters traducidos; fechas y montos usan `intlLocale()`; los `title` de las rutas son claves (`I18nTitleStrategy`). Selector: `shared/lang-switch.ts` (riel, barra móvil, login); la elección se guarda en `localStorage`. No se usa `@angular/localize` porque compila un bundle por idioma y no permite cambiar en caliente.
-- **URLs en inglés** (`/today`, `/leads`, `/contacts`, `/pipeline`, `/reports`, `/services`, `/team`, `/login`, `/pending`), igual que los parámetros de filtro (`?search=`, `?stage=open`, `?filter=no-action`…). Las rutas y parámetros antiguos en español redirigen desde `core/legacy-urls.ts`; una ruta nueva va en inglés.
+- **URLs en inglés** (`/today`, `/leads`, `/contacts`, `/pipeline`, `/reports`, `/services`, `/team`, `/login`, `/verify`, `/auth/action`, `/pending`), igual que los parámetros de filtro (`?search=`, `?stage=open`, `?filter=no-action`…). Las rutas y parámetros antiguos en español redirigen desde `core/legacy-urls.ts`; una ruta nueva va en inglés.
 - Skills en `.claude/skills/` (ver `.claude/skills/README.md`): oficiales de Angular y Firebase, y tres de Emil Kowalski (`review-animations`, `mobile-native`, `break-ui`); donde difieran, mandan las convenciones de este archivo y la skill impeccable para diseño.
 - Contexto de producto: `PRODUCT.md`. Sistema visual: `DESIGN.md`. Contrato de dirección de diseño: `.impeccable/surfaces/src-app.md`.
 
 ## Stack (fijado, no cambiar sin pedirlo)
 
 - **Angular 22**: standalone, zoneless, signals, Signal Forms (`@angular/forms/signals`), control flow nativo, `@Service()` para servicios singleton. OnPush es el default (no declararlo).
-- **Firebase JS SDK 13** (Auth con Google + Firestore). **No** se usa `@angular/fire` (no soporta Angular 22): Firebase se inyecta con los tokens `AUTH` y `FIRESTORE` de `src/app/core/firebase.ts`.
+- **Firebase JS SDK 13** (Auth con Google o email/contraseña + Firestore). **No** se usa `@angular/fire` (no soporta Angular 22): Firebase se inyecta con los tokens `AUTH` y `FIRESTORE` de `src/app/core/firebase.ts`.
 - **Tailwind CSS v4** (config CSS-first en `src/styles.css` con `@theme`; sin `tailwind.config.js`).
 - **Iconos: `@lucide/angular`**. Importar cada icono como componente (`LucidePhone` → `<svg lucidePhone [size]="16"></svg>`) o `LucideDynamicIcon` con `[lucideIcon]`. Nunca emoji ni glifos unicode como iconos.
 - **Prohibido Angular Material / CDK con estilos Material / cualquier estética Material Design.** Controles nativos estilizados con las clases base de `styles.css`.
@@ -45,14 +45,15 @@ src/app/
   core/            servicios y modelo (sin UI)
     firebase.ts        init de Firebase + tokens DI (emuladores según environment)
     models.ts          tipos, etapas, orígenes, canales (fuente de verdad del dominio)
-    auth.service.ts    sesión + alta en el equipo (fundador / invitación / pendiente)
+    auth.service.ts    sesión (Google o email/contraseña, verificación, enlaces) + alta en el equipo (fundador / invitación / pendiente)
     auth.guards.ts     memberGuard, guestGuard, adminGuard
     team-query.ts      consulta en vivo que solo corre si el usuario es miembro
     leads / contacts / catalog / followups / activities / members .service.ts
     dates.ts           fechas relativas en español, atajos de reprogramación
   shared/          componentes reutilizables (followup-item, schedule-form, pickers, badges…)
   features/
-    auth/          login, acceso pendiente
+    auth/          login (tablero `auth-board` + hoja `login-sheet`: entrar, crear contraseña, recuperar), "Revisa tu correo" (`/verify`),
+                   enlaces de los correos (`/auth/action`), acceso pendiente
     shell/         riel/barra de navegación (Hoy, Contactos, Negocios, Reportes, Ajustes) + panel de captura rápida (tecla N)
     today/         "Hoy": página de agenda (vencidos, horas del día, sin próxima acción)
     contacts/      clientes y prospectos; ficha con negocios abiertos, servicios comprados e historial
@@ -126,7 +127,9 @@ Reglas de dominio:
 - Cierre por inactividad (`core/idle.service.ts`, arrancado por el shell): 10 min sin ratón, teclado, toque o scroll cierran la sesión y llevan a `/login`, que explica el motivo. El último minuto muestra una cuenta atrás con "Seguir conectado". La última actividad se comparte entre pestañas en `localStorage` (`crm-lead.lastActivity`).
 - Última entrada y salida (`sessions/{uid}`): `AuthService` anota la entrada solo si es un inicio nuevo (`metadata.lastSignInTime` de hace < 5 min, sin repetir en recargas) y la salida antes de `signOut` (botón o inactividad, máx. 2 s de espera). Una sesión restaurada ya caducada se cierra sin anotar salida, y cerrar el navegador no deja salida: *Equipo* lo muestra como "Salida sin registrar".
 - Cabeceras de seguridad en `firebase.json` (nosniff, `frame-ancestors`, Referrer/Permissions-Policy, HSTS). Si cambia el dominio de hosting, actualizar `frame-ancestors`.
-- Configuración necesaria en la consola de Firebase: habilitar el proveedor Google en Authentication y añadir el dominio de hosting a *Authorized domains*.
+- Acceso con **Google o email y contraseña**; con el mismo email es la misma cuenta (un solo `members/{uid}`). El invitado crea su contraseña en `/login?mode=signup` con el email de la invitación; la cuenta queda en estado `unverified` (pantalla `/verify`) hasta que abre el enlace del correo, porque las reglas exigen `email_verified` (así nadie se queda con una invitación ajena). `/verify` comprueba sola cada 5 s y al volver a la pestaña. Errores de acceso con `authErrorKey`: nunca dicen si un email tiene cuenta. Contraseña: 8+ caracteres con letras y números (`passwordOk`). "Crear/Cambiar contraseña" del menú de cuenta envía el enlace de restablecer al propio email (sirve también a quien solo usa Google).
+- Los enlaces de los correos abren `/auth/action` (confirmar email, contraseña nueva) solo si en la consola se puso esa URL como *action URL* de las plantillas; si no, usan la página genérica del proveedor. En pantalla nunca se nombra al proveedor de autenticación.
+- Configuración necesaria en la consola de Firebase: habilitar los proveedores Google y Correo electrónico/contraseña en Authentication, poner las plantillas de correo en español con la *action URL* `https://<dominio>/auth/action`, y añadir el dominio de hosting a *Authorized domains*.
 
 ## Convenciones de UI (ver DESIGN.md)
 
