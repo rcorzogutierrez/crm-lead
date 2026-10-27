@@ -17,7 +17,7 @@ type View = 'week' | 'mine';
   selector: 'app-reports',
   imports: [NgTemplateOutlet, WeekReportView, MyNumbersView],
   template: `
-    <div class="page max-w-page">
+    <div class="page">
       @if (view() === 'week') {
         <app-week-report>
           <ng-container toggle>
