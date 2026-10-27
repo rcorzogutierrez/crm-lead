@@ -33,6 +33,7 @@ Estrategia: Restrained. Base neutra gris azulada; el índigo solo para acciones 
 
 ## Componentes
 
+- Página (`.page`): siempre alineada al riel con el mismo margen (`px-4 sm:px-6 lg:px-10`), nunca centrada. Tres anchos con nombre (`@theme --container-page-*`): `max-w-page-wide` 90rem para tablas (Contactos, Negocios, Catálogo), `max-w-page` 78rem para Hoy, fichas y Reportes, `max-w-page-narrow` 56rem para formularios y lectura (Equipo, Empresa, Registro, Factura). El Tablero usa todo el ancho. Una página nueva elige uno de los tres; nada de `max-w-[…rem]` sueltos.
 - Botones: `.btn-primary` (pluma), `.btn-secondary` (hoja con borde), `.btn-ghost`, `.btn-danger`, tamaños `.btn-sm`, `.btn-icon`. Alto 36px (32px sm), radio 8px.
 - Campos: `.input` 40px, borde `rule-strong`, foco anillo pluma 3px/15%.
 - `.sheet`: hoja con borde `rule`, radio 10px, sombra suave con desplazamiento.
