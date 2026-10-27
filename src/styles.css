@@ -341,19 +341,10 @@ dialog.drawer[open]::backdrop {
     filter: blur(6px);
   }
 }
-.login-badge {
-  color: var(--color-highlight);
-  background: oklch(0.92 0.11 92 / 0.1);
-  border: 1px solid oklch(0.92 0.11 92 / 0.25);
-}
 .login-notice {
   background: oklch(0.97 0.004 262 / 0.07);
   border: 1px solid oklch(0.97 0.004 262 / 0.16);
   box-shadow: 0 12px 28px -14px oklch(0.1 0.03 265 / 0.5);
-}
-.login-badge-dot {
-  background: var(--color-highlight);
-  box-shadow: 0 0 0 4px oklch(0.92 0.11 92 / 0.2);
 }
 /* Palabra final del titular: entra desde abajo y sale hacia arriba */
 .login-words {
@@ -380,26 +371,47 @@ dialog.drawer[open]::backdrop {
 .login-words > span.is-off {
   transform: translateY(-70%);
 }
-/* Google: anillo índigo y se eleva al pasar. Sin destello en bucle: el movimiento del login es la agenda del fondo */
-.login-google {
+/* Hoja de entrar (login-sheet.ts): una página de la agenda sobre el tablero, con su margen rojo */
+.login-sheet {
+  position: relative;
+  overflow: hidden;
+  border-radius: 0.875rem;
+  background: var(--color-sheet);
   box-shadow:
-    0 0 0 6px oklch(0.5 0.2 275 / 0.28),
-    0 20px 40px -12px oklch(0.1 0.03 265 / 0.55);
-  transition:
-    transform 200ms var(--ease-out-quart),
-    box-shadow 200ms var(--ease-out-quart);
+    0 2px 4px oklch(0.1 0.03 265 / 0.2),
+    0 28px 60px -20px oklch(0.1 0.03 265 / 0.7);
 }
-/* Solo con ratón: en táctil el :hover se queda pegado tras el toque */
-@media (hover: hover) and (pointer: fine) {
-  .login-google:hover:not(:disabled) {
-    transform: translateY(-2px);
-    box-shadow:
-      0 0 0 8px oklch(0.5 0.2 275 / 0.38),
-      0 24px 48px -12px oklch(0.1 0.03 265 / 0.6);
-  }
+.login-sheet::before {
+  content: '';
+  position: absolute;
+  inset-block: 0;
+  left: 1.375rem;
+  width: 1px;
+  background: oklch(0.55 0.2 25 / 0.45);
+  pointer-events: none;
 }
-.login-google:active:not(:disabled) {
-  transform: translateY(0) scale(0.98);
+/* "o con tu email": renglón a cada lado */
+.login-or {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+}
+.login-or::before,
+.login-or::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--color-rule);
+}
+/* Enlaces sobre el tablero: subrayado índigo claro, más fuerte al pasar */
+.login-link {
+  text-decoration: underline;
+  text-decoration-color: oklch(0.78 0.12 278 / 0.6);
+  text-underline-offset: 3px;
+  transition: text-decoration-color 150ms var(--ease-out-quart);
+}
+.login-link:hover {
+  text-decoration-color: var(--color-rail-ink);
 }
 .login-check {
   color: oklch(0.78 0.12 278);

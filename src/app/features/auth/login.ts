@@ -1,93 +1,63 @@
 import { Component, DestroyRef, effect, inject, signal } from '@angular/core';
-import { Router } from '@angular/router';
+import { toSignal } from '@angular/core/rxjs-interop';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { LucideCheck, LucideClock } from '@lucide/angular';
+import { map } from 'rxjs';
 import { AuthService } from '../../core/auth.service';
 import { IDLE_MINUTES, IdleService } from '../../core/idle.service';
 import { I18nKey, t } from '../../core/i18n/i18n';
-import { LangSwitch } from '../../shared/lang-switch';
-import { Logo } from '../../shared/logo';
-import { LoginAgenda } from './login-agenda';
+import { AuthBoard } from './auth-board';
+import { LoginSheet } from './login-sheet';
 
 /**
- * Entrar ("Pizarra"): fondo de agenda que corre (`LoginAgenda`) y un brillo índigo que sigue al cursor,
+ * Entrar ("Pizarra"), sobre el tablero de acceso (`AuthBoard`):
  * titular con la palabra final rotando (llamada → seguimiento → propuesta; cada cambio trae una cita
- * nueva al fondo), acceso con Google
- * con un destello periódico y garantías que entran escalonadas.
+ * nueva al fondo) y, debajo, la hoja de entrar (`LoginSheet`: Google o email y contraseña).
  */
 @Component({
   selector: 'app-login',
-  imports: [Logo, LangSwitch, LoginAgenda, LucideCheck, LucideClock],
+  imports: [AuthBoard, LoginSheet, RouterLink, LucideCheck, LucideClock],
   template: `
-    <div class="login-board relative isolate flex min-h-dvh flex-col overflow-hidden text-rail-ink" (pointermove)="follow($event)">
-      <span class="login-glow" aria-hidden="true"></span>
-      <app-login-agenda [beat]="word()" />
-
-      <header class="login-in flex items-center justify-between gap-3 px-5 py-5 sm:px-8" style="--d: 0ms">
-        <div class="flex items-center gap-2.5">
-          <app-logo [size]="36" />
-          <span class="date-face text-lg font-bold tracking-tight">CRM Lead</span>
+    <app-auth-board [beat]="word()">
+      <!-- Tras un cierre por inactividad, el motivo va encima del titular -->
+      @if (idle.endedByIdle()) {
+        <div class="login-in login-notice mx-auto mb-6 flex max-w-md items-start gap-3 rounded-xl px-4 py-3 text-left" style="--d: 60ms" role="status">
+          <svg lucideClock [size]="20" class="mt-0.5 shrink-0 text-highlight" aria-hidden="true"></svg>
+          <p class="text-sm leading-snug">
+            <strong class="block font-semibold text-rail-ink">{{ t('idle.notice.title') }}</strong>
+            <span class="text-rail-muted">{{ t('idle.notice.body', { n: idleMinutes }) }}</span>
+          </p>
         </div>
-        <app-lang-switch tone="rail" />
-      </header>
+      }
 
-      <main class="flex flex-1 items-center justify-center px-4 pt-6 pb-16 text-center">
-        <div class="w-full max-w-3xl">
-          <!-- Tras un cierre por inactividad, el motivo ocupa el lugar de la insignia -->
-          @if (idle.endedByIdle()) {
-            <div class="login-in login-notice mx-auto flex max-w-md items-start gap-3 rounded-xl px-4 py-3 text-left" style="--d: 60ms" role="status">
-              <svg lucideClock [size]="20" class="mt-0.5 shrink-0 text-highlight" aria-hidden="true"></svg>
-              <p class="text-sm leading-snug">
-                <strong class="block font-semibold text-rail-ink">{{ t('idle.notice.title') }}</strong>
-                <span class="text-rail-muted">{{ t('idle.notice.body', { n: idleMinutes }) }}</span>
-              </p>
-            </div>
-          } @else {
-            <span class="login-in login-badge inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-[0.8125rem] font-semibold" style="--d: 60ms">
-              <span class="login-badge-dot size-1.5 rounded-full" aria-hidden="true"></span>
-              {{ t('login.badge') }}
-            </span>
+      <h1 class="login-in date-face text-[clamp(2rem,4.6vw,3.375rem)] leading-[1.04] font-bold tracking-tight text-balance" style="--d: 120ms">
+        {{ t('login.headline') }}
+        <span class="sr-only">{{ t(words[1]) }}</span>
+        <span class="login-words" aria-hidden="true">
+          @for (w of words; track w; let i = $index) {
+            <span [class]="i === word() ? 'is-on' : i === prev() ? 'is-off' : ''">{{ t(w) }}</span>
           }
+        </span>
+      </h1>
 
-          <h1 class="login-in date-face mt-6 text-[clamp(2.125rem,6vw,4rem)] leading-[1.04] font-bold tracking-tight text-balance" style="--d: 120ms">
-            {{ t('login.headline') }}
-            <span class="sr-only">{{ t(words[1]) }}</span>
-            <span class="login-words" aria-hidden="true">
-              @for (w of words; track w; let i = $index) {
-                <span [class]="i === word() ? 'is-on' : i === prev() ? 'is-off' : ''">{{ t(w) }}</span>
-              }
-            </span>
-          </h1>
+      <app-login-sheet class="login-in mx-auto mt-7 block w-full max-w-[25.5rem] sm:mt-8" style="--d: 220ms" />
 
-          <p class="login-in mx-auto mt-5 max-w-[46ch] text-base leading-relaxed text-rail-muted sm:text-lg" style="--d: 200ms">{{ t('login.pitch') }}</p>
+      @if (!signup()) {
+        <p class="login-in mt-5 text-[0.875rem] text-rail-muted" style="--d: 320ms">
+          {{ t('login.firstTime') }}
+          <a routerLink="/login" [queryParams]="{ mode: 'signup' }" class="login-link font-semibold text-rail-ink">{{ t('login.createPw') }}</a>
+        </p>
+      }
 
-          <button type="button" class="login-in login-google mt-9 inline-flex h-13 items-center gap-3 rounded-full bg-sheet px-7 text-[0.9375rem] font-bold text-ink" style="--d: 280ms" [disabled]="busy()" (click)="signIn()">
-            @if (busy()) {
-              <span class="size-4 animate-spin rounded-full border-2 border-pen/25 border-t-pen" aria-hidden="true"></span>
-            } @else {
-              <svg width="20" height="20" viewBox="0 0 48 48" aria-hidden="true">
-                <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/>
-                <path fill="#FF3D00" d="m6.3 14.7 6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/>
-                <path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"/>
-                <path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/>
-              </svg>
-            }
-            {{ busy() ? t('login.opening') : t('login.google') }}
-          </button>
-
-          @if (auth.error(); as err) {
-            <p class="mx-auto mt-5 max-w-md rounded-lg bg-ribbon-soft px-3 py-2 text-sm font-medium text-ribbon" role="alert">{{ t(err) }}</p>
-          }
-
-          <ul class="mt-7 flex flex-wrap justify-center gap-x-5 gap-y-2 text-[0.8125rem] text-rail-muted">
-            @for (k of trust; track k; let i = $index) {
-              <li class="login-in inline-flex items-center gap-1.5" [style.--d.ms]="420 + i * 90">
-                <svg lucideCheck [size]="14" [strokeWidth]="2.5" class="login-check"></svg>{{ t(k) }}
-              </li>
-            }
-          </ul>
-        </div>
-      </main>
-    </div>
+      <!-- Las garantías solo caben con altura de sobra: en un portátil bajo mandan la hoja y el enlace -->
+      <ul class="mt-5 hidden flex-wrap justify-center gap-x-5 gap-y-2 text-[0.8125rem] text-rail-muted sm:[@media(min-height:760px)]:flex">
+        @for (k of trust; track k; let i = $index) {
+          <li class="login-in inline-flex items-center gap-1.5" [style.--d.ms]="420 + i * 90">
+            <svg lucideCheck [size]="14" [strokeWidth]="2.5" class="login-check"></svg>{{ t(k) }}
+          </li>
+        }
+      </ul>
+    </app-auth-board>
   `,
 })
 export class Login {
@@ -95,7 +65,10 @@ export class Login {
   protected readonly idle = inject(IdleService);
   protected readonly idleMinutes = IDLE_MINUTES;
   private readonly router = inject(Router);
-  protected readonly busy = signal(false);
+  /** Creando contraseña: el enlace "¿Primera vez?" sobra. */
+  protected readonly signup = toSignal(inject(ActivatedRoute).queryParamMap.pipe(map((p) => p.get('mode') === 'signup')), {
+    initialValue: false,
+  });
   protected readonly t = t;
 
   protected readonly words: readonly I18nKey[] = ['login.word.call', 'login.word.followup', 'login.word.proposal'];
@@ -110,6 +83,7 @@ export class Login {
       const s = this.auth.status();
       if (s === 'member') void this.router.navigateByUrl('/today');
       if (s === 'pending') void this.router.navigateByUrl('/pending');
+      if (s === 'unverified') void this.router.navigateByUrl('/verify');
     });
 
     if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
@@ -119,21 +93,5 @@ export class Login {
       }, 2600);
       inject(DestroyRef).onDestroy(() => clearInterval(id));
     }
-  }
-
-  /** El brillo índigo sigue al puntero con retardo suave (la transición está en CSS). */
-  protected follow(event: PointerEvent): void {
-    if (event.pointerType !== 'mouse') return;
-    // Las variables van en el propio brillo, no en el tablero: así no se recalculan los estilos de toda la página.
-    const glow = (event.currentTarget as HTMLElement).querySelector<HTMLElement>('.login-glow');
-    glow?.style.setProperty('--gx', `${event.clientX}px`);
-    glow?.style.setProperty('--gy', `${event.clientY}px`);
-  }
-
-  protected async signIn(): Promise<void> {
-    this.busy.set(true);
-    this.idle.reset();
-    await this.auth.signInWithGoogle();
-    this.busy.set(false);
   }
 }

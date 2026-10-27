@@ -106,7 +106,7 @@ Fechas y montos se formatean según el idioma.
 | Capa | Tecnología |
 |---|---|
 | Interfaz | Angular 22 standalone y zoneless, signals, Signal Forms, control flow nativo |
-| Datos y acceso | Firebase JS SDK 13: Auth con Google y Firestore con reglas de seguridad (sin backend propio) |
+| Datos y acceso | Firebase JS SDK 13: Auth (Google o email y contraseña) y Firestore con reglas de seguridad (sin backend propio) |
 | Estilos | Tailwind CSS v4 con configuración CSS-first en `src/styles.css`, tipografía Archivo |
 | Iconos | `@lucide/angular` |
 | Calidad | Vitest, ESLint con angular-eslint (incluye accesibilidad) y pruebas de `firestore.rules` en el emulador |
@@ -125,12 +125,17 @@ npm start                # http://localhost:4200 contra Firebase en la nube
 
 En la consola de Firebase, una sola vez:
 
-1. **Authentication → Sign-in method**: habilita **Google**.
-2. **Authentication → Settings → Authorized domains**: añade el dominio donde publiques la app.
-3. **Firestore**: crea la base de datos y publica reglas e índices con `npm run deploy:rules`.
+1. **Authentication → Sign-in method**: habilita **Google** y **Correo electrónico/contraseña**
+   (sin "vínculo de correo"). En *Settings → Password policy* conviene exigir 8 caracteres con letras y números.
+2. **Authentication → Templates**: en cada plantilla (verificación, restablecer contraseña) pon el idioma en
+   español, el nombre "CRM Lead" y, en *Customize action URL*, `https://TU-DOMINIO/auth/action` para que los
+   enlaces abran la página propia de la app.
+3. **Authentication → Settings → Authorized domains**: añade el dominio donde publiques la app.
+4. **Firestore**: crea la base de datos y publica reglas e índices con `npm run deploy:rules`.
 
 La **primera cuenta que entra crea el equipo y queda como admin**. Desde *Equipo* invita al resto por email;
-quien entra sin invitación ve "Acceso pendiente".
+quien entra sin invitación ve "Acceso pendiente". Cada invitado entra con Google o crea su contraseña
+con el email de la invitación (y lo confirma con el enlace que le llega).
 
 ### Sin tocar la nube: emuladores
 
@@ -140,6 +145,8 @@ npm run start:emulator   # terminal 2: la app conectada a los emuladores
 ```
 
 Con los emuladores, `window.__emulatorSignIn(email, nombre)` en la consola del navegador inicia sesión sin el popup de Google.
+Los enlaces de los correos (verificar, nueva contraseña) los guarda el emulador de Auth: se ven en su
+interfaz o en `http://127.0.0.1:9099/emulator/v1/projects/demo-crm-lead/oobCodes`.
 
 ## Pruebas
 

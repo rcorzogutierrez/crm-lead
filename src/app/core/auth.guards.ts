@@ -12,6 +12,8 @@ export const memberGuard: CanActivateFn = async () => {
       return true;
     case 'pending':
       return router.parseUrl('/pending');
+    case 'unverified':
+      return router.parseUrl('/verify');
     default:
       return router.parseUrl('/login');
   }

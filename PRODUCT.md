@@ -33,7 +33,7 @@ _Inferido del brief:_ la unidad central es la **próxima acción**, no el regist
 
 - Etapas del pipeline: Nuevo, Contactado, Calificado, Propuesta, Negociación, Ganado, Perdido.
 - Interfaz en español.
-- Autenticación con Google (Firebase Auth).
+- Autenticación con Google o con email y contraseña (Firebase Auth); el email se confirma antes de entrar.
 - Sin backend propio: Firestore con reglas de seguridad.
 - Indefinido: importación CSV, integraciones (WhatsApp, email), recordatorios push, roles de equipo.
 

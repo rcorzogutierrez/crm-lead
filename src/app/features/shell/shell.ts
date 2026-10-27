@@ -9,6 +9,7 @@ import {
   LucideClock,
   LucideEllipsis,
   LucideHandshake,
+  LucideKeyRound,
   LucideLogOut,
   LucidePlus,
   LucideSettings,
@@ -16,6 +17,7 @@ import {
 import { AuthService } from '../../core/auth.service';
 import { FollowUpsService } from '../../core/followups.service';
 import { IdleService } from '../../core/idle.service';
+import { ToastService } from '../../core/toast.service';
 import { UiService } from '../../core/ui.service';
 import { I18nKey, t } from '../../core/i18n/i18n';
 import { Avatar } from '../../shared/avatar';
@@ -46,6 +48,7 @@ interface NavItem {
     LucideClock,
     LucideEllipsis,
     LucideHandshake,
+    LucideKeyRound,
     LucideLogOut,
     LucidePlus,
     LucideSettings,
@@ -137,6 +140,21 @@ export class Shell {
       // Buscar clientes: el punto de partida para venderle algo más a alguien que ya existe.
       void this.router.navigate(['/contacts']).then(() => document.getElementById('contact-search')?.focus());
     }
+  }
+
+  /** Crear o cambiar la contraseña: se hace con el enlace del correo, que además prueba que el email es suyo. */
+  protected readonly pwLabel = computed<I18nKey>(() => (this.auth.hasPassword() ? 'shell.changePw' : 'shell.addPw'));
+  protected readonly pwSending = signal(false);
+  private readonly toast = inject(ToastService);
+
+  protected async passwordLink(): Promise<void> {
+    const mail = this.auth.member()?.email;
+    if (!mail) return;
+    this.pwSending.set(true);
+    const err = await this.auth.sendPasswordReset(mail);
+    this.pwSending.set(false);
+    if (err) this.toast.error(t(err));
+    else this.toast.show(t('shell.pwSent', { email: mail }));
   }
 
   protected signOut(): void {
