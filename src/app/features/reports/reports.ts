@@ -35,9 +35,9 @@ type View = 'week' | 'mine';
 
     <ng-template #toggle>
       @if (auth.isAdmin()) {
-        <div class="inline-flex rounded-lg border border-rule-strong bg-sheet p-0.5" role="radiogroup" [attr.aria-label]="t('report.view')">
-          <button type="button" role="radio" [attr.aria-checked]="view() === 'week'" (click)="setView('week')" class="h-8 rounded-md px-3 text-sm font-semibold transition-colors" [class]="view() === 'week' ? 'bg-ink text-white' : 'text-ink-2 hover:text-ink'">{{ t('report.view.week') }}</button>
-          <button type="button" role="radio" [attr.aria-checked]="view() === 'mine'" (click)="setView('mine')" class="h-8 rounded-md px-3 text-sm font-semibold transition-colors" [class]="view() === 'mine' ? 'bg-ink text-white' : 'text-ink-2 hover:text-ink'">{{ t('report.mine') }}</button>
+        <div class="segmented" role="radiogroup" [attr.aria-label]="t('report.view')">
+          <button type="button" role="radio" [attr.aria-checked]="view() === 'week'" (click)="setView('week')" class="segment">{{ t('report.view.week') }}</button>
+          <button type="button" role="radio" [attr.aria-checked]="view() === 'mine'" (click)="setView('mine')" class="segment">{{ t('report.mine') }}</button>
         </div>
       }
     </ng-template>

@@ -135,11 +135,11 @@ Reglas de dominio:
 
 ## Convenciones de UI (ver DESIGN.md)
 
-- **Reglas fijas** en `DESIGN.md` → *Reglas fijas*: revisión con impeccable antes del PR, `h1` siempre `.page-title`, anchos solo con `.page` / `.page-narrow`, probar a 2560px y en el móvil, textos con `t()` en los dos idiomas, URLs en inglés. Una regla nueva se añade ahí cuando Rafa la decide.
+- **Reglas fijas** en `DESIGN.md` → *Reglas fijas* (léelas antes de tocar una pantalla): revisión con impeccable antes del PR, `h1` siempre `.page-title`, anchos solo con `.page` / `.page-narrow`, probar a 2560px y en el móvil, textos con `t()` en los dos idiomas, URLs en inglés, cabecera en un solo orden, botones, estados de cada vista, títulos de sección, control segmentado. Una regla nueva se añade ahí cuando Rafa la decide.
 
 - Marca: **CRM Lead**, icono de embudo (`public/favicon.svg`, mismo dibujo en `shared/logo.ts`; si cambia uno, cambiar el otro y regenerar los PNG de `public/`).
 - Mundo visual "agenda" con paleta **Pizarra**: riel gris pizarra claro, papel blanco frío, renglones, acciones en índigo. Usar los tokens de `@theme` (`bg-rail`, `bg-paper`, `bg-sheet`, `text-ink`, `bg-pen`, `bg-ribbon`, `bg-highlight`, `stage-*`), nunca colores sueltos. El token `pen` es el índigo de acción.
-- Clases base en `@layer components`: `.btn-primary`, `.btn-secondary`, `.btn-ghost`, `.btn-danger`, `.btn-sm`, `.btn-icon`, `.input`, `.field-label`, `.field-error`, `.sheet`, `.date-face`, `.tabular`.
+- Clases base en `@layer components`: `.btn-primary`, `.btn-secondary`, `.btn-ghost`, `.btn-danger`, `.btn-ghost-danger`, `.btn-sm`, `.btn-icon`, `.input`, `.field-label`, `.field-error`, `.sheet`, `.date-face`, `.tabular`, `.page`, `.page-narrow`, `.page-title`, `.section-title`, `.segmented` / `.segment`, `.alert-error`.
 - Urgencia: vencido = `ribbon` (rojo), hoy = `highlight` (amarillo), sin próxima acción = borde rojo punteado. Siempre con texto, nunca solo color.
 - Nada de modales para tareas en línea: completar/posponer/programar se abre debajo del elemento. El único diálogo es el panel de captura (tecla **N**), cuyo primer campo "¿Para quién?" busca contactos existentes y que termina con "¿Cómo quedó?" (Le interesa / Vendido); **/** abre la búsqueda de clientes.
 - Cada vista maneja cargando (skeleton), vacío (que enseña qué hacer), error (`firestoreErrorMessage`).

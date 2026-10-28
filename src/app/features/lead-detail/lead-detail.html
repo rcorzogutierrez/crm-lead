@@ -85,7 +85,7 @@
       <div class="min-w-0 space-y-8">
         <!-- Servicio y precio -->
         <section aria-labelledby="price-title">
-          <h2 id="price-title" class="text-sm font-bold">{{ t('pricing.title') }}</h2>
+          <h2 id="price-title" class="section-title">{{ t('pricing.title') }}</h2>
           <div class="sheet mt-2 space-y-4 p-4">
             @if (priceChanges(); as pcs) {
               @if (pcs.length) {
@@ -173,7 +173,7 @@
         <!-- Próxima acción -->
         <section aria-labelledby="next-title">
           <div class="flex items-baseline justify-between">
-            <h2 id="next-title" class="text-sm font-bold">{{ t('next.title') }}</h2>
+            <h2 id="next-title" class="section-title">{{ t('next.title') }}</h2>
             @if (pending().length && !addingNext()) {
               <button type="button" class="btn-ghost btn-sm text-pen" (click)="addingNext.set(true)">{{ t('detail.addAnother') }}</button>
             }
@@ -204,7 +204,7 @@
 
         <!-- Historial: página de diario -->
         <section aria-labelledby="log-title">
-          <h2 id="log-title" class="text-sm font-bold">{{ t('detail.history') }}</h2>
+          <h2 id="log-title" class="section-title">{{ t('detail.history') }}</h2>
           <div class="sheet mt-2 overflow-hidden">
             <form class="border-b border-rule-strong bg-paper p-4" (submit)="log($event)">
               <div class="flex flex-wrap gap-1.5" role="radiogroup" [attr.aria-label]="t('detail.logType')">
@@ -302,7 +302,7 @@
 
       <!-- Datos -->
       <aside aria-labelledby="data-title">
-        <h2 id="data-title" class="text-sm font-bold">{{ t('detail.data') }}</h2>
+        <h2 id="data-title" class="section-title">{{ t('detail.data') }}</h2>
         <form class="sheet mt-2 space-y-4 p-4" novalidate (submit)="saveDetails($event)">
           @if (contact(); as c) {
             <div class="rounded-lg border border-rule bg-paper px-3 py-2.5 text-sm">
@@ -381,7 +381,7 @@
         @if (canDelete()) {
           <div class="mt-6 border-t border-rule pt-4">
             @if (!confirmDelete()) {
-              <button type="button" class="btn-ghost btn-sm text-ribbon hover:bg-ribbon-soft hover:text-ribbon" (click)="confirmDelete.set(true)">
+              <button type="button" class="btn-ghost btn-ghost-danger btn-sm" (click)="confirmDelete.set(true)">
                 <svg lucideTrash2 [size]="14"></svg>
                 {{ t('detail.delete') }}
               </button>

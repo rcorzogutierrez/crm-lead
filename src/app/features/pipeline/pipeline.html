@@ -7,23 +7,23 @@
       <app-section-tabs class="mt-3 block" [tabs]="dealTabs" label="deals.views" />
     </div>
     <div class="flex flex-wrap gap-2">
-    <div class="inline-flex rounded-lg border border-rule-strong bg-sheet p-0.5" role="radiogroup" [attr.aria-label]="t('pipe.kind')">
-      <button type="button" role="radio" [attr.aria-checked]="kind() === 'all'" (click)="kind.set('all')" class="h-8 rounded-md px-3 text-sm font-semibold transition-colors" [class]="kind() === 'all' ? 'bg-ink text-white' : 'text-ink-2 hover:text-ink'">{{ t('pipe.kindAll') }}</button>
-      <button type="button" role="radio" [attr.aria-checked]="kind() === 'new'" (click)="kind.set('new')" class="h-8 rounded-md px-3 text-sm font-semibold transition-colors" [class]="kind() === 'new' ? 'bg-ink text-white' : 'text-ink-2 hover:text-ink'">{{ t('pipe.kindNew') }}</button>
-      <button type="button" role="radio" [attr.aria-checked]="kind() === 'repeat'" (click)="kind.set('repeat')" class="h-8 rounded-md px-3 text-sm font-semibold transition-colors" [class]="kind() === 'repeat' ? 'bg-ink text-white' : 'text-ink-2 hover:text-ink'">{{ t('pipe.kindRepeat') }}</button>
+    <div class="segmented" role="radiogroup" [attr.aria-label]="t('pipe.kind')">
+      <button type="button" role="radio" [attr.aria-checked]="kind() === 'all'" (click)="kind.set('all')" class="segment">{{ t('pipe.kindAll') }}</button>
+      <button type="button" role="radio" [attr.aria-checked]="kind() === 'new'" (click)="kind.set('new')" class="segment">{{ t('pipe.kindNew') }}</button>
+      <button type="button" role="radio" [attr.aria-checked]="kind() === 'repeat'" (click)="kind.set('repeat')" class="segment">{{ t('pipe.kindRepeat') }}</button>
     </div>
     <!-- Un vendedor solo tiene sus leads: el selector es para el admin. -->
     @if (auth.isAdmin()) {
-      <div class="inline-flex rounded-lg border border-rule-strong bg-sheet p-0.5" role="radiogroup" [attr.aria-label]="t('today.scope')">
-        <button type="button" role="radio" [attr.aria-checked]="scope() === 'mine'" (click)="scope.set('mine')" class="h-8 rounded-md px-3 text-sm font-semibold transition-colors" [class]="scope() === 'mine' ? 'bg-ink text-white' : 'text-ink-2 hover:text-ink'">{{ t('today.mine') }}</button>
-        <button type="button" role="radio" [attr.aria-checked]="scope() === 'team'" (click)="scope.set('team')" class="h-8 rounded-md px-3 text-sm font-semibold transition-colors" [class]="scope() === 'team' ? 'bg-ink text-white' : 'text-ink-2 hover:text-ink'">{{ t('today.team') }}</button>
+      <div class="segmented" role="radiogroup" [attr.aria-label]="t('today.scope')">
+        <button type="button" role="radio" [attr.aria-checked]="scope() === 'mine'" (click)="scope.set('mine')" class="segment">{{ t('today.mine') }}</button>
+        <button type="button" role="radio" [attr.aria-checked]="scope() === 'team'" (click)="scope.set('team')" class="segment">{{ t('today.team') }}</button>
       </div>
     }
     </div>
   </header>
 
   @if (leadsService.error(); as err) {
-    <p class="mx-4 mt-4 rounded-lg bg-ribbon-soft px-4 py-3 text-sm font-medium text-ribbon sm:mx-6 lg:mx-10" role="alert">{{ err }}</p>
+    <p class="alert-error mx-4 mt-4 sm:mx-6 lg:mx-10" role="alert">{{ err }}</p>
   }
 
   @if (closing(); as c) {

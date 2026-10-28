@@ -8,13 +8,13 @@
       </a>
       <div class="flex flex-wrap items-center gap-2">
         @if (auth.isAdmin() && inv.status === 'issued' && !voiding()) {
-          <button type="button" class="btn-ghost btn-sm text-ribbon hover:bg-ribbon-soft hover:text-ribbon" [attr.aria-expanded]="false" (click)="voiding.set(true)">
+          <button type="button" class="btn-ghost btn-ghost-danger btn-sm" [attr.aria-expanded]="false" (click)="voiding.set(true)">
             <svg lucideBan [size]="14"></svg>
             {{ t('invoice.void') }}
           </button>
         }
         @if (auth.isAdmin() && inv.status === 'void' && !removing()) {
-          <button id="inv-delete" type="button" class="btn-ghost btn-sm text-ribbon hover:bg-ribbon-soft hover:text-ribbon" [attr.aria-expanded]="false" (click)="askRemove()">
+          <button id="inv-delete" type="button" class="btn-ghost btn-ghost-danger btn-sm" [attr.aria-expanded]="false" (click)="askRemove()">
             <svg lucideTrash2 [size]="14"></svg>
             {{ t('invoice.delete') }}
           </button>
@@ -182,7 +182,7 @@
     <!-- Cobro: solo en pantalla (lo pagado y el saldo ya salen en los totales impresos) -->
     @if (inv.status === 'issued' || inv.paid > 0) {
       <section class="sheet mt-4 p-4 sm:p-6 print:hidden" aria-labelledby="inv-payments">
-        <h2 id="inv-payments" class="mb-3 text-sm font-bold">{{ t('pay.section') }}</h2>
+        <h2 id="inv-payments" class="section-title mb-3">{{ t('pay.section') }}</h2>
         <app-invoice-payments [invoice]="inv" />
       </section>
     }

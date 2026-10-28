@@ -5,15 +5,14 @@
   </div>
   <div class="flex flex-wrap items-center gap-2">
     <ng-content select="[toggle]" />
-    <div class="inline-flex rounded-lg border border-rule-strong bg-sheet p-0.5" role="radiogroup" [attr.aria-label]="t('report.period')">
+    <div class="segmented" role="radiogroup" [attr.aria-label]="t('report.period')">
       @for (p of periods; track p.id) {
         <button
           type="button"
           role="radio"
           [attr.aria-checked]="period() === p.id"
           (click)="setPeriod(p.id)"
-          class="h-8 rounded-md px-3 text-sm font-semibold transition-colors"
-          [class]="period() === p.id ? 'bg-ink text-white' : 'text-ink-2 hover:text-ink'"
+          class="segment"
         >
           {{ t(p.label) }}
         </button>
@@ -23,8 +22,7 @@
         role="radio"
         [attr.aria-checked]="period() === 'custom'"
         (click)="setPeriod('custom')"
-        class="h-8 rounded-md px-3 text-sm font-semibold transition-colors"
-        [class]="period() === 'custom' ? 'bg-ink text-white' : 'text-ink-2 hover:text-ink'"
+        class="segment"
       >
         {{ t('report.period.custom') }}
       </button>
@@ -37,7 +35,7 @@
 }
 
 @if (error(); as err) {
-  <p class="mt-6 rounded-lg bg-ribbon-soft px-4 py-3 text-sm font-medium text-ribbon" role="alert">{{ err }}</p>
+  <p class="alert-error mt-6" role="alert">{{ err }}</p>
 }
 
 @if (loading()) {
