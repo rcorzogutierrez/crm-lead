@@ -97,6 +97,28 @@ export class FollowUpsService {
     return snap.docs.map((d) => mapFollowUp(d.id, d.data()));
   }
 
+  /**
+   * Follow-ups hechos cuya fecha cae en el rango, en vivo (la agenda de un día o de un mes); sin rango no consulta.
+   * Llamar en un contexto de inyección. Usa los índices (status, dueAt) y (assigneeId, status, dueAt).
+   */
+  doneIn(range: () => { start: Date; end: Date } | null) {
+    return teamQuery(
+      () => {
+        const r = range()!;
+        const filters = [
+          where('status', '==', 'done'),
+          where('dueAt', '>=', Timestamp.fromDate(r.start)),
+          where('dueAt', '<', Timestamp.fromDate(r.end)),
+          orderBy('dueAt', 'asc'),
+        ] as const;
+        const col = collection(this.db, 'followups');
+        return this.auth.isAdmin() ? query(col, ...filters) : query(col, where('assigneeId', '==', this.auth.uid()), ...filters);
+      },
+      mapFollowUp,
+      () => !!range(),
+    );
+  }
+
   forLead(leadId: string): FollowUp[] {
     return this.pending().filter((f) => f.leadId === leadId);
   }

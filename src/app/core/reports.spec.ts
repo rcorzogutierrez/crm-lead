@@ -1,5 +1,5 @@
 import { FollowUp, Lead } from './models';
-import { customRange, dayParam, followUpScore, myNumbers, salesByKind, parseDay, periodRange, precedingRange, previousRange, weekRange, weekReport } from './reports';
+import { customRange, dayParam, monthParam, parseMonth, followUpScore, myNumbers, salesByKind, parseDay, periodRange, precedingRange, previousRange, weekRange, weekReport } from './reports';
 
 function lead(p: Partial<Lead>): Lead {
   return {
@@ -73,6 +73,9 @@ describe('rango personalizado', () => {
     expect(parseDay('2026-02-31')).toBeNull();
     expect(parseDay('5/10/2026')).toBeNull();
     expect(dayParam(new Date(2026, 0, 7))).toBe('2026-01-07');
+    expect(parseMonth('2026-11')).toEqual(new Date(2026, 10, 1));
+    expect(parseMonth('2026-13')).toBeNull();
+    expect(monthParam(new Date(2026, 0, 31))).toBe('2026-01');
   });
 });
 
