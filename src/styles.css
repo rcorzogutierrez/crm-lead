@@ -216,6 +216,13 @@
     letter-spacing: -0.015em;
   }
 
+  /* Título de página (h1): el mismo en todas las pantallas, sea una fecha o una sección */
+  .page-title {
+    @apply text-[2rem] leading-tight font-bold;
+    font-variation-settings: 'wdth' 82;
+    letter-spacing: -0.015em;
+  }
+
   .tabular {
     font-variant-numeric: tabular-nums;
   }

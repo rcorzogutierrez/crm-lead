@@ -2,7 +2,7 @@
   <header class="flex flex-wrap items-end justify-between gap-4">
     <div class="min-w-0">
       <p class="text-sm font-semibold text-ink-3 tabular">{{ year() }}</p>
-      <h1 class="date-face text-[2rem] leading-tight font-bold first-letter:uppercase sm:text-[2.5rem]">{{ dateTitle() }}</h1>
+      <h1 class="page-title first-letter:uppercase">{{ dateTitle() }}</h1>
       @if (view() === 'day') {
         <p class="mt-1 text-ink-2" aria-live="polite">{{ loading() ? t('today.loading') : summary() }}</p>
       }
