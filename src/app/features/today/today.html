@@ -52,7 +52,7 @@
       <!-- Un vendedor solo tiene sus leads: el selector es para el admin. -->
       @if (auth.isAdmin()) {
         <div class="inline-flex rounded-lg border border-rule-strong bg-sheet p-0.5" role="radiogroup" [attr.aria-label]="t('today.scope')">
-          <button type="button" role="radio" [attr.aria-checked]="scope() === 'mine'" (click)="scope.set('mine')" class="h-8 rounded-md px-3 text-sm font-semibold transition-colors" [class]="scope() === 'mine' ? 'bg-ink text-white' : 'text-ink-2 hover:text-ink'">{{ t('today.mine') }}</button>
+          <button type="button" role="radio" [attr.aria-checked]="scope() === 'mine'" (click)="scope.set('mine'); seller.set(null)" class="h-8 rounded-md px-3 text-sm font-semibold transition-colors" [class]="scope() === 'mine' ? 'bg-ink text-white' : 'text-ink-2 hover:text-ink'">{{ t('today.mine') }}</button>
           <button type="button" role="radio" [attr.aria-checked]="scope() === 'team'" (click)="scope.set('team')" class="h-8 rounded-md px-3 text-sm font-semibold transition-colors" [class]="scope() === 'team' ? 'bg-ink text-white' : 'text-ink-2 hover:text-ink'">{{ t('today.team') }}</button>
         </div>
       }
@@ -77,10 +77,14 @@
   }
 
   @if (view() === 'month') {
-    <app-agenda-month class="mt-6 block" [month]="month()" [team]="scope() === 'team'" />
+    <app-agenda-month class="mt-6 block" [month]="month()" [team]="scope() === 'team'" [seller]="seller()" />
   } @else {
     <div class="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_21rem]">
       <div class="min-w-0 space-y-6">
+        @if (auth.isAdmin() && scope() === 'team' && isToday()) {
+          <app-team-day-table [done]="doneAll()" [(seller)]="seller" />
+        }
+
         <!-- Arrastrado de días anteriores -->
         @if (isToday() && overdue().length) {
           <section class="sheet overflow-hidden" aria-labelledby="overdue-title">

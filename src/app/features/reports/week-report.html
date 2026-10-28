@@ -59,12 +59,18 @@
     <!-- Lo que entró -->
     <app-report-row [figure]="'' + r.created.length" [caption]="t(r.created.length === 1 ? 'report.newLead1' : 'report.newLeadN')" [heading]="t('report.in')">
       @if (sources().length) {
-        <ul class="grid max-w-xl grid-cols-[6.5rem_minmax(0,1fr)_2rem] items-center gap-x-3 gap-y-1.5 text-sm">
+        <p class="mb-2 text-sm text-ink-2">{{ t('report.in.wonHint') }}</p>
+        <ul class="grid max-w-2xl grid-cols-[6.5rem_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1.5 text-sm sm:grid-cols-[8rem_minmax(0,1fr)_auto]">
           @for (s of sources(); track s.label) {
             <li class="contents">
               <span class="truncate">{{ s.label }}</span>
-              <span class="h-3.5 rounded-r-[4px] rounded-l-[2px] bg-ink-3/70" [style.width.%]="s.pct" aria-hidden="true"></span>
-              <span class="text-right font-semibold tabular">{{ s.count }}</span>
+              <span class="relative h-3.5 overflow-hidden rounded-r-[4px] rounded-l-[2px] bg-ink-3/45" [style.width.%]="s.pct" aria-hidden="true">
+                <span class="absolute inset-y-0 left-0 bg-ok" [style.width.%]="s.wonPct"></span>
+              </span>
+              <span class="text-right whitespace-nowrap text-ink-2 tabular">
+                <span class="font-semibold text-ink">{{ s.won }}</span>
+                {{ s.rate === null ? t('report.in.wonOf', { n: s.count }) : t('report.in.wonOfPct', { n: s.count, pct: s.rate }) }}
+              </span>
             </li>
           }
         </ul>

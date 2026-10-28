@@ -27,6 +27,8 @@ export class AgendaMonth {
   readonly month = input.required<Date>();
   /** Un admin con "Todo el equipo": todo; si no, solo lo suyo. */
   readonly team = input(false);
+  /** Con "Todo el equipo", un solo vendedor elegido en la tabla del equipo. */
+  readonly seller = input<string | null>(null);
 
   protected readonly t = t;
   protected readonly channels = CHANNELS;
@@ -37,7 +39,8 @@ export class AgendaMonth {
   private readonly doneLive = this.followUps.doneIn(() => this.range());
 
   private readonly mine = (f: FollowUp) =>
-    this.team() || !this.auth.isAdmin() || f.assigneeId === this.auth.uid();
+    !this.auth.isAdmin() ||
+    (this.team() ? !this.seller() || f.assigneeId === this.seller() : f.assigneeId === this.auth.uid());
 
   protected readonly agenda = computed(() =>
     monthAgenda(
