@@ -75,6 +75,18 @@ export function dayParam(d: Date): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
+/** "AAAA-MM" de la URL: el día 1 de ese mes, o null si no es un mes válido. */
+export function parseMonth(value: string | null | undefined): Date | null {
+  const m = value?.match(/^(\d{4})-(\d{2})$/);
+  if (!m || Number(m[2]) < 1 || Number(m[2]) > 12) return null;
+  return new Date(Number(m[1]), Number(m[2]) - 1, 1);
+}
+
+/** Mes local como "AAAA-MM". */
+export function monthParam(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
 export function inRange(d: Date | null, r: Range): boolean {
   return !!d && d >= r.start && d < r.end;
 }

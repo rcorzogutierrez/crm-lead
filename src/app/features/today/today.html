@@ -1,20 +1,65 @@
 <div class="page">
   <header class="flex flex-wrap items-end justify-between gap-4">
-    <div>
+    <div class="min-w-0">
       <p class="text-sm font-semibold text-ink-3 tabular">{{ year() }}</p>
       <h1 class="date-face text-[2rem] leading-tight font-bold first-letter:uppercase sm:text-[2.5rem]">{{ dateTitle() }}</h1>
-      <p class="mt-1 text-ink-2" aria-live="polite">{{ loading() ? t('today.loading') : summary() }}</p>
+      @if (view() === 'day') {
+        <p class="mt-1 text-ink-2" aria-live="polite">{{ loading() ? t('today.loading') : summary() }}</p>
+      }
     </div>
-    <!-- Un vendedor solo tiene sus leads: el selector es para el admin. -->
-    @if (auth.isAdmin()) {
-      <div class="inline-flex rounded-lg border border-rule-strong bg-sheet p-0.5" role="radiogroup" [attr.aria-label]="t('today.scope')">
-        <button type="button" role="radio" [attr.aria-checked]="scope() === 'mine'" (click)="scope.set('mine')" class="h-8 rounded-md px-3 text-sm font-semibold transition-colors" [class]="scope() === 'mine' ? 'bg-ink text-white' : 'text-ink-2 hover:text-ink'">{{ t('today.mine') }}</button>
-        <button type="button" role="radio" [attr.aria-checked]="scope() === 'team'" (click)="scope.set('team')" class="h-8 rounded-md px-3 text-sm font-semibold transition-colors" [class]="scope() === 'team' ? 'bg-ink text-white' : 'text-ink-2 hover:text-ink'">{{ t('today.team') }}</button>
+    <div class="flex flex-wrap items-center gap-2">
+      <nav class="inline-flex rounded-lg border border-rule-strong bg-sheet p-0.5" [attr.aria-label]="t('today.view')">
+        <a
+          routerLink="/today"
+          [queryParams]="{ date: dayLink(0) }"
+          [attr.aria-current]="view() === 'day' ? 'page' : null"
+          class="inline-flex h-8 items-center rounded-md px-3 text-sm font-semibold transition-colors"
+          [class]="view() === 'day' ? 'bg-ink text-white' : 'text-ink-2 hover:text-ink'"
+          >{{ t('today.day') }}</a
+        >
+        <a
+          routerLink="/today"
+          [queryParams]="{ view: 'month', month: monthKey() }"
+          [attr.aria-current]="view() === 'month' ? 'page' : null"
+          class="inline-flex h-8 items-center rounded-md px-3 text-sm font-semibold transition-colors"
+          [class]="view() === 'month' ? 'bg-ink text-white' : 'text-ink-2 hover:text-ink'"
+          >{{ t('today.month') }}</a
+        >
+      </nav>
+      <div class="flex items-center gap-1">
+        @if (view() === 'day') {
+          <a routerLink="/today" [queryParams]="{ date: dayLink(-1) }" class="btn-secondary btn-icon" [attr.aria-label]="t('today.prevDay')" [title]="t('today.prevDay')">
+            <svg lucideChevronLeft [size]="18"></svg>
+          </a>
+          @if (!isToday()) {
+            <a routerLink="/today" class="btn-secondary">{{ t('due.today') }}</a>
+          }
+          <a routerLink="/today" [queryParams]="{ date: dayLink(1) }" class="btn-secondary btn-icon" [attr.aria-label]="t('today.nextDay')" [title]="t('today.nextDay')">
+            <svg lucideChevronRight [size]="18"></svg>
+          </a>
+        } @else {
+          <a routerLink="/today" [queryParams]="{ view: 'month', month: monthLink(-1) }" class="btn-secondary btn-icon" [attr.aria-label]="t('today.prevMonth')" [title]="t('today.prevMonth')">
+            <svg lucideChevronLeft [size]="18"></svg>
+          </a>
+          @if (!isThisMonth()) {
+            <a routerLink="/today" [queryParams]="{ view: 'month' }" class="btn-secondary">{{ t('today.thisMonth') }}</a>
+          }
+          <a routerLink="/today" [queryParams]="{ view: 'month', month: monthLink(1) }" class="btn-secondary btn-icon" [attr.aria-label]="t('today.nextMonth')" [title]="t('today.nextMonth')">
+            <svg lucideChevronRight [size]="18"></svg>
+          </a>
+        }
       </div>
-    }
+      <!-- Un vendedor solo tiene sus leads: el selector es para el admin. -->
+      @if (auth.isAdmin()) {
+        <div class="inline-flex rounded-lg border border-rule-strong bg-sheet p-0.5" role="radiogroup" [attr.aria-label]="t('today.scope')">
+          <button type="button" role="radio" [attr.aria-checked]="scope() === 'mine'" (click)="scope.set('mine')" class="h-8 rounded-md px-3 text-sm font-semibold transition-colors" [class]="scope() === 'mine' ? 'bg-ink text-white' : 'text-ink-2 hover:text-ink'">{{ t('today.mine') }}</button>
+          <button type="button" role="radio" [attr.aria-checked]="scope() === 'team'" (click)="scope.set('team')" class="h-8 rounded-md px-3 text-sm font-semibold transition-colors" [class]="scope() === 'team' ? 'bg-ink text-white' : 'text-ink-2 hover:text-ink'">{{ t('today.team') }}</button>
+        </div>
+      }
+    </div>
   </header>
 
-  @if (followUps.error() || leads.error(); as err) {
+  @if (error(); as err) {
     <p class="mt-6 rounded-lg bg-ribbon-soft px-4 py-3 text-sm font-medium text-ribbon" role="alert">{{ err }}</p>
   }
 
@@ -31,149 +76,172 @@
     </div>
   }
 
-  <div class="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_21rem]">
-    <div class="min-w-0 space-y-6">
-      <!-- Arrastrado de días anteriores -->
-      @if (overdue().length) {
-        <section class="sheet overflow-hidden" aria-labelledby="overdue-title">
-          <header class="flex items-center gap-2 border-b border-rule bg-ribbon-soft px-4 py-2.5">
-            <span class="size-2 rounded-full bg-ribbon" aria-hidden="true"></span>
-            <h2 id="overdue-title" class="text-sm font-bold text-ribbon">{{ t('today.overdue') }}</h2>
-            <span class="ml-auto text-sm font-semibold text-ribbon tabular">{{ overdue().length }}</span>
-          </header>
-          <ul class="divide-y divide-rule px-4">
-            @for (fu of overdue(); track fu.id) {
-              <li><app-followup-item [fu]="fu" [showAssignee]="scope() === 'team'" /></li>
-            }
-          </ul>
-        </section>
-      }
-
-      <!-- Página de hoy -->
-      <section class="sheet relative overflow-hidden" aria-labelledby="today-title">
-        <header class="flex items-center justify-between border-b border-rule-strong px-4 py-2.5">
-          <h2 id="today-title" class="text-sm font-bold">{{ t('due.today') }}</h2>
-          <button type="button" class="btn-ghost btn-sm text-pen hover:text-pen-strong" (click)="ui.openCapture()">{{ t('today.addDeal') }}</button>
-        </header>
-
-        @if (loading()) {
-          <div class="space-y-px p-4" aria-hidden="true">
-            @for (i of [1, 2, 3, 4, 5]; track i) {
-              <div class="h-10 animate-pulse rounded bg-sheet-2"></div>
-            }
-          </div>
-        } @else {
-          <ol class="agenda-page relative" [attr.aria-label]="t('today.hours')">
-            @for (row of hours(); track row.hour) {
-              <li class="agenda-row relative flex min-h-13 border-b border-rule last:border-b-0">
-                <span
-                  class="w-13 shrink-0 pt-3 pr-2.5 text-right text-xs font-semibold tabular sm:w-20 sm:pr-3"
-                  [class]="isPast(row) ? 'text-ink-3/70' : 'text-ink-3'"
-                  >{{ row.label }}</span
-                >
-                <div class="relative z-[1] min-w-0 flex-1 border-l border-margin/70 pr-3 pl-3 sm:pl-4">
-                  @for (fu of row.items; track fu.id) {
-                    <app-followup-item [fu]="fu" [showAssignee]="scope() === 'team'" />
-                  }
-                </div>
-                @if (row.hour === nowHour()) {
-                  <span class="pointer-events-none absolute inset-x-0 z-0 flex items-center" [style.top.%]="nowPercent()" aria-hidden="true">
-                    <span class="w-13 pr-1.5 text-right text-[0.6875rem] font-bold text-ribbon tabular sm:w-20">{{ nowLabel() }}</span>
-                    <span class="relative h-px flex-1 bg-ribbon/70"><span class="absolute -top-[3.5px] -left-1 size-2 rounded-full bg-ribbon"></span></span>
-                  </span>
-                }
-              </li>
-            }
-          </ol>
-          @if (!today().length) {
-            <p class="border-t border-rule px-4 py-3 text-sm text-ink-2">
-              {{ t('today.free') }}
-            </p>
-          }
+  @if (view() === 'month') {
+    <app-agenda-month class="mt-6 block" [month]="month()" [team]="scope() === 'team'" />
+  } @else {
+    <div class="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_21rem]">
+      <div class="min-w-0 space-y-6">
+        <!-- Arrastrado de días anteriores -->
+        @if (isToday() && overdue().length) {
+          <section class="sheet overflow-hidden" aria-labelledby="overdue-title">
+            <header class="flex items-center gap-2 border-b border-rule bg-ribbon-soft px-4 py-2.5">
+              <span class="size-2 rounded-full bg-ribbon" aria-hidden="true"></span>
+              <h2 id="overdue-title" class="text-sm font-bold text-ribbon">{{ t('today.overdue') }}</h2>
+              <span class="ml-auto text-sm font-semibold text-ribbon tabular">{{ overdue().length }}</span>
+            </header>
+            <ul class="divide-y divide-rule px-4">
+              @for (fu of overdue(); track fu.id) {
+                <li><app-followup-item [fu]="fu" [showAssignee]="scope() === 'team'" /></li>
+              }
+            </ul>
+          </section>
         }
-      </section>
-    </div>
 
-    <aside class="min-w-0 space-y-6" [attr.aria-label]="t('today.upcoming')">
-      <section aria-labelledby="orphans-title">
-        <div class="flex items-baseline justify-between">
-          <h2 id="orphans-title" class="text-sm font-bold">{{ t('today.orphans') }}</h2>
-          <span class="text-sm font-semibold tabular" [class]="orphans().length ? 'text-ribbon' : 'text-ink-3'">{{ orphans().length }}</span>
-        </div>
-        <div class="sheet mt-2 overflow-hidden">
-          @if (orphans().length) {
-            <ul class="divide-y divide-rule">
-              @for (lead of orphans().slice(0, 8); track lead.id) {
-                <li class="px-4 py-3">
-                  <div class="flex items-start gap-3">
-                    <div class="min-w-0 flex-1">
-                      <a [routerLink]="['/leads', lead.id]" class="block truncate font-semibold hover:text-pen hover:underline">{{ lead.name }}</a>
-                      <p class="mt-0.5 flex items-center gap-2 text-xs text-ink-3">
-                        <app-stage-badge [stage]="lead.stage" class="h-5! px-1.5! text-[0.6875rem]!" />
-                        <span class="truncate">{{ ago(lead) }}</span>
+        <!-- Página del día -->
+        <section class="sheet relative overflow-hidden" aria-labelledby="today-title">
+          <header class="flex items-center justify-between border-b border-rule-strong px-4 py-2.5">
+            <h2 id="today-title" class="text-sm font-bold first-letter:uppercase">{{ isToday() ? t('due.today') : dayHeading() }}</h2>
+            <button type="button" class="btn-ghost btn-sm text-pen hover:text-pen-strong" (click)="ui.openCapture()">{{ t('today.addDeal') }}</button>
+          </header>
+
+          @if (loading()) {
+            <div class="space-y-px p-4" aria-hidden="true">
+              @for (i of [1, 2, 3, 4, 5]; track i) {
+                <div class="h-10 animate-pulse rounded bg-sheet-2"></div>
+              }
+            </div>
+          } @else {
+            <ol class="agenda-page relative" [attr.aria-label]="isToday() ? t('today.hours') : t('today.hoursDay')">
+              @for (row of hours(); track row.hour) {
+                <li class="agenda-row relative flex min-h-13 border-b border-rule last:border-b-0">
+                  <span
+                    class="w-13 shrink-0 pt-3 pr-2.5 text-right text-xs font-semibold tabular sm:w-20 sm:pr-3"
+                    [class]="isPast(row) ? 'text-ink-3/70' : 'text-ink-3'"
+                    >{{ row.label }}</span
+                  >
+                  <div class="relative z-[1] min-w-0 flex-1 border-l border-margin/70 pr-3 pl-3 sm:pl-4">
+                    @for (fu of row.items; track fu.id) {
+                      <app-followup-item [fu]="fu" [showAssignee]="scope() === 'team'" />
+                    }
+                    @for (fu of row.done; track fu.id) {
+                      <p class="flex items-center gap-3 py-2.5 text-[0.8125rem] text-ink-3">
+                        <span class="grid size-8 shrink-0 place-items-center rounded-md bg-ok-soft text-ok" [attr.title]="channelName(fu)">
+                          <app-channel-icon [type]="fu.channel" />
+                        </span>
+                        <span class="min-w-0 flex-1 truncate">
+                          <a [routerLink]="['/leads', fu.leadId]" class="font-semibold text-ink-2 hover:text-pen hover:underline">{{ fu.leadName }}</a>
+                          · <span class="tabular">{{ timeOf(fu) }}</span> · {{ channelName(fu) }}
+                        </span>
+                        <span class="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-ok">
+                          <svg lucideCheck [size]="14"></svg>{{ t('fu.doneBtn') }}
+                        </span>
                       </p>
-                    </div>
-                    @if (schedulingFor() !== lead.id) {
-                      <button type="button" class="btn-secondary btn-sm shrink-0" (click)="schedulingFor.set(lead.id)">{{ t('common.schedule') }}</button>
                     }
                   </div>
-                  @if (schedulingFor() === lead.id) {
-                    <div class="mt-3">
-                      <app-schedule-form [lead]="lead" (saved)="schedulingFor.set(null)" (cancelled)="schedulingFor.set(null)" />
-                    </div>
+                  @if (isToday() && row.hour === nowHour()) {
+                    <span class="pointer-events-none absolute inset-x-0 z-0 flex items-center" [style.top.%]="nowPercent()" aria-hidden="true">
+                      <span class="w-13 pr-1.5 text-right text-[0.6875rem] font-bold text-ribbon tabular sm:w-20">{{ nowLabel() }}</span>
+                      <span class="relative h-px flex-1 bg-ribbon/70"><span class="absolute -top-[3.5px] -left-1 size-2 rounded-full bg-ribbon"></span></span>
+                    </span>
                   }
                 </li>
               }
-            </ul>
-            @if (orphans().length > 8) {
-              <a routerLink="/leads" [queryParams]="{ filter: 'no-action' }" class="block border-t border-rule px-4 py-2.5 text-sm font-semibold text-pen hover:bg-sheet-2">{{ t('today.seeAll', { n: orphans().length }) }}</a>
+            </ol>
+            @if (!today().length && !done().length) {
+              <p class="border-t border-rule px-4 py-3 text-sm text-ink-2">
+                {{ isToday() ? t('today.free') : isPastDay() ? t('today.dayPastFree') : t('today.dayFree') }}
+              </p>
             }
-          } @else {
-            <app-empty-state [title]="t('today.allSet')">{{ t('today.allSetBody') }}</app-empty-state>
           }
-        </div>
-      </section>
+        </section>
+      </div>
 
-      <section aria-labelledby="next-title">
-        <h2 id="next-title" class="text-sm font-bold">{{ t('today.next7') }}</h2>
-        <div class="sheet mt-2 overflow-hidden">
-          @if (nextDays().length) {
-            @for (day of nextDays(); track day.date.getTime()) {
-              <div class="border-b border-rule last:border-b-0">
-                <p class="bg-sheet-2 px-4 py-1.5 text-xs font-bold text-ink-2 first-letter:uppercase">{{ day.label }}</p>
-                <ul class="divide-y divide-rule px-4">
-                  @for (fu of day.items; track fu.id) {
-                    <li class="flex items-center gap-3 py-2 text-sm">
-                      <span class="w-11 shrink-0 text-xs font-semibold text-ink-3 tabular">{{ fu.dueAt.getHours().toString().padStart(2, '0') }}:{{ fu.dueAt.getMinutes().toString().padStart(2, '0') }}</span>
-                      <a [routerLink]="['/leads', fu.leadId]" class="min-w-0 flex-1 truncate font-medium hover:text-pen hover:underline">{{ fu.leadName }}</a>
-                    </li>
-                  }
-                </ul>
-              </div>
+      <aside class="min-w-0 space-y-6" [attr.aria-label]="t('today.upcoming')">
+        <section aria-labelledby="orphans-title">
+          <div class="flex items-baseline justify-between">
+            <h2 id="orphans-title" class="text-sm font-bold">{{ t('today.orphans') }}</h2>
+            <span class="text-sm font-semibold tabular" [class]="orphans().length ? 'text-ribbon' : 'text-ink-3'">{{ orphans().length }}</span>
+          </div>
+          <div class="sheet mt-2 overflow-hidden">
+            @if (orphans().length) {
+              <ul class="divide-y divide-rule">
+                @for (lead of orphans().slice(0, 8); track lead.id) {
+                  <li class="px-4 py-3">
+                    <div class="flex items-start gap-3">
+                      <div class="min-w-0 flex-1">
+                        <a [routerLink]="['/leads', lead.id]" class="block truncate font-semibold hover:text-pen hover:underline">{{ lead.name }}</a>
+                        <p class="mt-0.5 flex items-center gap-2 text-xs text-ink-3">
+                          <app-stage-badge [stage]="lead.stage" class="h-5! px-1.5! text-[0.6875rem]!" />
+                          <span class="truncate">{{ ago(lead) }}</span>
+                        </p>
+                      </div>
+                      @if (schedulingFor() !== lead.id) {
+                        <button type="button" class="btn-secondary btn-sm shrink-0" (click)="schedulingFor.set(lead.id)">{{ t('common.schedule') }}</button>
+                      }
+                    </div>
+                    @if (schedulingFor() === lead.id) {
+                      <div class="mt-3">
+                        <app-schedule-form [lead]="lead" (saved)="schedulingFor.set(null)" (cancelled)="schedulingFor.set(null)" />
+                      </div>
+                    }
+                  </li>
+                }
+              </ul>
+              @if (orphans().length > 8) {
+                <a routerLink="/leads" [queryParams]="{ filter: 'no-action' }" class="block border-t border-rule px-4 py-2.5 text-sm font-semibold text-pen hover:bg-sheet-2">{{ t('today.seeAll', { n: orphans().length }) }}</a>
+              }
+            } @else {
+              <app-empty-state [title]="t('today.allSet')">{{ t('today.allSetBody') }}</app-empty-state>
             }
-          } @else {
-            <app-empty-state [title]="t('today.clearWeek')">{{ t('today.clearWeekBody') }}</app-empty-state>
-          }
-        </div>
-      </section>
+          </div>
+        </section>
 
-      <section aria-labelledby="pulse-title" class="border-t border-rule-strong pt-4">
-        <h2 id="pulse-title" class="sr-only">{{ t('today.pulse') }}</h2>
-        <dl class="grid grid-cols-[repeat(2,minmax(0,1fr))_auto] gap-3 text-sm">
-          <div>
-            <dt class="text-xs text-ink-3">{{ t('today.active') }}</dt>
-            <dd class="text-lg font-bold tabular">{{ openCount() }}</dd>
+        <section aria-labelledby="next-title">
+          <h2 id="next-title" class="text-sm font-bold">{{ t('today.next7') }}</h2>
+          <div class="sheet mt-2 overflow-hidden">
+            @if (nextDays().length) {
+              @for (day of nextDays(); track day.date.getTime()) {
+                <div class="border-b border-rule last:border-b-0">
+                  <a
+                    routerLink="/today"
+                    [queryParams]="{ date: dayKey(day.date) }"
+                    class="block bg-sheet-2 px-4 py-1.5 text-xs font-bold text-ink-2 first-letter:uppercase hover:text-pen hover:underline"
+                    >{{ day.label }}</a
+                  >
+                  <ul class="divide-y divide-rule px-4">
+                    @for (fu of day.items; track fu.id) {
+                      <li class="flex items-center gap-3 py-2 text-sm">
+                        <span class="w-11 shrink-0 text-xs font-semibold text-ink-3 tabular">{{ fu.dueAt.getHours().toString().padStart(2, '0') }}:{{ fu.dueAt.getMinutes().toString().padStart(2, '0') }}</span>
+                        <a [routerLink]="['/leads', fu.leadId]" class="min-w-0 flex-1 truncate font-medium hover:text-pen hover:underline">{{ fu.leadName }}</a>
+                      </li>
+                    }
+                  </ul>
+                </div>
+              }
+            } @else {
+              <app-empty-state [title]="t('today.clearWeek')">{{ t('today.clearWeekBody') }}</app-empty-state>
+            }
           </div>
-          <div>
-            <dt class="text-xs text-ink-3">{{ t('today.new7') }}</dt>
-            <dd class="text-lg font-bold tabular">{{ newThisWeek() }}</dd>
-          </div>
-          <div>
-            <dt class="text-xs text-ink-3">{{ t('today.atStake') }}</dt>
-            <dd class="text-lg font-bold tabular">{{ pipelineValue() }}</dd>
-          </div>
-        </dl>
-      </section>
-    </aside>
-  </div>
+        </section>
+
+        <section aria-labelledby="pulse-title" class="border-t border-rule-strong pt-4">
+          <h2 id="pulse-title" class="sr-only">{{ t('today.pulse') }}</h2>
+          <dl class="grid grid-cols-[repeat(2,minmax(0,1fr))_auto] gap-3 text-sm">
+            <div>
+              <dt class="text-xs text-ink-3">{{ t('today.active') }}</dt>
+              <dd class="text-lg font-bold tabular">{{ openCount() }}</dd>
+            </div>
+            <div>
+              <dt class="text-xs text-ink-3">{{ t('today.new7') }}</dt>
+              <dd class="text-lg font-bold tabular">{{ newThisWeek() }}</dd>
+            </div>
+            <div>
+              <dt class="text-xs text-ink-3">{{ t('today.atStake') }}</dt>
+              <dd class="text-lg font-bold tabular">{{ pipelineValue() }}</dd>
+            </div>
+          </dl>
+        </section>
+      </aside>
+    </div>
+  }
 </div>

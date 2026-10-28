@@ -1,0 +1,131 @@
+<p class="mb-3 min-h-6 text-ink-2" aria-live="polite">
+  {{ loading() ? t('today.loading') : summary() || t('month.empty') }}
+</p>
+
+<div class="sheet overflow-hidden">
+  <div class="grid grid-cols-7 border-b border-rule-strong bg-sheet-2" aria-hidden="true">
+    @for (w of weekdays(); track $index) {
+      <span class="px-1.5 py-2 text-xs font-bold text-ink-3 first-letter:uppercase sm:px-3">{{
+        w.short
+      }}</span>
+    }
+  </div>
+
+  @if (loading()) {
+    <div class="grid grid-cols-7" aria-hidden="true">
+      @for (
+        i of [
+          0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24,
+          25, 26, 27, 28, 29, 30, 31, 32, 33, 34,
+        ];
+        track i
+      ) {
+        <div class="h-14 border-r border-b border-rule p-2 sm:h-28 [&:nth-child(7n)]:border-r-0">
+          <div class="h-3 w-5 animate-pulse rounded bg-sheet-2"></div>
+        </div>
+      }
+    </div>
+  } @else {
+    <ol class="-mb-px grid grid-cols-7" [attr.aria-label]="t('month.days')">
+      @for (d of agenda().days; track d.key) {
+        <li
+          class="min-w-0 border-r border-b border-rule [&:nth-child(7n)]:border-r-0"
+          [class.bg-sheet-2]="!d.inMonth"
+        >
+          <a
+            routerLink="/today"
+            [queryParams]="{ date: d.isToday ? null : d.key }"
+            [attr.aria-label]="label(d)"
+            [attr.aria-current]="d.isToday ? 'date' : null"
+            class="flex h-full min-h-14 flex-col gap-1 p-1.5 transition-colors hover:bg-pen-soft/60 focus-visible:relative focus-visible:z-[1] sm:min-h-28 sm:p-2"
+            [class]="d.isToday ? 'shadow-[inset_0_3px_0_var(--color-ribbon)]' : ''"
+          >
+            <span class="flex items-center justify-between gap-1">
+              <span
+                class="text-sm font-bold tabular"
+                [class]="
+                  d.isToday
+                    ? 'rounded bg-ribbon px-1.5 text-white'
+                    : !d.inMonth || d.isPast
+                      ? 'text-ink-3'
+                      : 'text-ink'
+                "
+                >{{ d.date.getDate() }}</span
+              >
+              <!-- Avisos con texto en escritorio; en el móvil cambia la forma del número: las vencidas en cinta roja, el total de un día cargado en resaltador -->
+              @if (d.late) {
+                <span
+                  class="hidden truncate rounded bg-ribbon px-1 text-[0.6875rem] font-bold text-white sm:inline"
+                  >{{
+                    t(d.late === 1 ? 'month.sum.late1' : 'month.sum.lateN', { n: d.late })
+                  }}</span
+                >
+              } @else if (d.heavy && !d.isPast) {
+                <span
+                  class="hidden truncate rounded bg-highlight px-1 text-[0.6875rem] font-bold text-ink sm:inline"
+                  >{{ t('month.heavy') }}</span
+                >
+              }
+            </span>
+
+            @if (d.total) {
+              <span
+                class="hidden min-w-0 flex-col gap-0.5 sm:flex"
+                [class]="d.isPast || !d.inMonth ? 'text-ink-3' : 'text-ink-2'"
+              >
+                @for (c of d.counts; track c.channel) {
+                  <span class="flex items-center gap-1.5 text-xs font-medium tabular">
+                    <app-channel-icon [type]="c.channel" [size]="13" />
+                    {{ c.n }}
+                  </span>
+                }
+              </span>
+              <span
+                class="w-fit text-[0.6875rem] leading-4 font-bold tabular sm:hidden"
+                [class]="
+                  d.late
+                    ? 'rounded bg-ribbon px-1 text-white'
+                    : d.heavy && !d.isPast
+                      ? 'rounded bg-highlight px-1 text-ink'
+                      : 'text-ink-3'
+                "
+                >{{ d.late || d.total }}</span
+              >
+              <span
+                class="mt-auto hidden h-1 overflow-hidden rounded-full bg-rule"
+                [class.sm:block]="d.inMonth"
+                aria-hidden="true"
+              >
+                <span
+                  class="block h-full rounded-full"
+                  [class]="d.heavy && !d.isPast ? 'bg-warn' : 'bg-ink-3/60'"
+                  [style.width.%]="d.load"
+                ></span>
+              </span>
+            }
+          </a>
+        </li>
+      }
+    </ol>
+  }
+</div>
+
+<div class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-ink-2">
+  @for (c of channels; track c.id) {
+    <span class="inline-flex items-center gap-1.5"
+      ><app-channel-icon [type]="c.id" [size]="13" />{{ c.label }}</span
+    >
+  }
+  <span class="inline-flex items-center gap-1.5">
+    <span class="rounded bg-ribbon px-1 text-[0.6875rem] font-bold text-white">{{
+      t('month.sum.late1', { n: 1 })
+    }}</span
+    >{{ t('month.legend.late') }}
+  </span>
+  <span class="inline-flex items-center gap-1.5">
+    <span class="rounded bg-highlight px-1 text-[0.6875rem] font-bold text-ink">{{
+      t('month.heavy')
+    }}</span
+    >{{ t('month.legend.heavy') }}
+  </span>
+</div>

@@ -55,7 +55,8 @@ src/app/
     auth/          login (tablero `auth-board` + hoja `login-sheet`: entrar, crear contraseña, recuperar), "Revisa tu correo" (`/verify`),
                    enlaces de los correos (`/auth/action`), acceso pendiente
     shell/         riel/barra de navegación (Hoy, Contactos, Negocios, Reportes, Ajustes) + panel de captura rápida (tecla N)
-    today/         "Hoy": página de agenda (vencidos, horas del día, sin próxima acción)
+    today/         "Hoy": la agenda en vista Día (vencidos, horas, sin próxima acción; cualquier día con `?date=AAAA-MM-DD`)
+                   o Mes (`?view=month&month=AAAA-MM`, acciones por canal de cada día, `core/month-agenda.ts`)
     contacts/      clientes y prospectos; ficha con negocios abiertos, servicios comprados e historial
     services/      catálogo (servicios, productos y materiales) y % de categorías (solo admin edita); con team/ y company/, la entrada "Ajustes"
     company/       datos de la empresa que factura (logo, EIN, dirección, % de impuesto, numeración)
