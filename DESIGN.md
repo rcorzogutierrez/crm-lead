@@ -2,6 +2,18 @@
 
 Mundo visual: **agenda**, con la paleta **Pizarra** (elegida por Rafa el 24 oct 2026 entre cinco opciones, con el riel aclarado). Superficie de trabajo (modo Operate): la estructura es la de un CRM estándar; el mundo aporta tipografía, paleta, densidad y un gesto propio.
 
+## Reglas fijas
+
+Decididas con Rafa a medida que crece el proyecto. Una pantalla nueva o cambiada las cumple antes de abrir el PR; cambiar una regla es una decisión, no un detalle de un PR.
+
+1. **Revisión con impeccable.** Todo cambio de interfaz (pantallas, componentes, textos de UI) se diseña y se revisa con la skill impeccable antes del PR, y el PR lo dice.
+2. **Un solo título de página.** El `h1` de cada pantalla usa `.page-title` (2rem), sea una sección o una fecha. Nada de tamaños propios para el título.
+3. **Anchos con el marco.** Toda página va en `.page` (100rem, centrado); formularios y lectura añaden `.page-narrow` (56rem). Nunca `max-w-[…rem]` sueltos en una página; si hace falta otro ancho, se añade un token en `@theme`.
+4. **Probar en grande y en el móvil.** Antes del PR se mira a 2560px (Rafa trabaja en un monitor de 32") y en el móvil (≈390px), además del portátil.
+5. **Bilingüe.** Todo texto visible sale de `t('clave')` con la clave en `es.ts` y en `en.ts`; fechas y montos con `intlLocale()`. Nunca texto escrito en la plantilla.
+6. **URLs en inglés.** Rutas y parámetros de filtro en inglés; si una ruta antigua en español existía, redirige desde `core/legacy-urls.ts`.
+7. **Tokens y clases base.** Colores solo con los tokens de `@theme`; botones, campos y hojas con las clases base (`.btn-*`, `.input`, `.sheet`…). Iconos de `@lucide/angular`, nunca emoji. Nada de Material.
+
 ## Gesto firma
 
 La vista **Hoy** es una página de agenda: columna de horas a la izquierda, **línea de margen roja**, renglones de 1px por hora y una **cinta roja de "ahora"** que cruza la hora actual. Lo vencido se "arrastra" arriba en un bloque propio. El historial del lead repite el mismo formato (fecha en el margen, línea roja, entradas a la derecha). La sección activa del riel se marca con una cinta roja.
