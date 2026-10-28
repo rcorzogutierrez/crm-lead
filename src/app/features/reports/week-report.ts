@@ -21,6 +21,8 @@ import { ReportRow } from './report-row';
 
 /** Cuántas filas se muestran por sección antes de mandar a la lista completa. */
 const LIMIT = 8;
+/** Negocios de un origen a partir de los cuales se muestra qué porcentaje se ganó. */
+const MIN_FOR_RATE = 5;
 /** Ganados y perdidos: un rango largo puede traer muchos; se resume el resto. */
 const LIST_LIMIT = 15;
 
@@ -110,7 +112,15 @@ export class WeekReportView {
   protected readonly sources = computed(() => {
     const rows = this.report().bySource;
     const max = Math.max(1, ...rows.map((s) => s.count));
-    return rows.map((s) => ({ label: sourceLabel(s.source), count: s.count, pct: (s.count / max) * 100 }));
+    return rows.map((s) => ({
+      label: sourceLabel(s.source),
+      count: s.count,
+      won: s.won,
+      pct: (s.count / max) * 100,
+      wonPct: (s.won / s.count) * 100,
+      // Con pocos negocios el porcentaje engaña: solo los números.
+      rate: s.count >= MIN_FOR_RATE ? Math.round((s.won / s.count) * 100) : null,
+    }));
   });
 
   protected readonly upcoming = computed(() => {

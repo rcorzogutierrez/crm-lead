@@ -56,7 +56,8 @@ src/app/
                    enlaces de los correos (`/auth/action`), acceso pendiente
     shell/         riel/barra de navegación (Hoy, Contactos, Negocios, Reportes, Ajustes) + panel de captura rápida (tecla N)
     today/         "Hoy": la agenda en vista Día (vencidos, horas, sin próxima acción; cualquier día con `?date=AAAA-MM-DD`)
-                   o Mes (`?view=month&month=AAAA-MM`, acciones por canal de cada día, `core/month-agenda.ts`)
+                   o Mes (`?view=month&month=AAAA-MM`, acciones por canal de cada día, `core/month-agenda.ts`); el admin con "Todo el equipo" ve
+                   la tabla del equipo de hoy (`core/team-day.ts`) y puede filtrar la agenda por vendedor
     contacts/      clientes y prospectos; ficha con negocios abiertos, servicios comprados e historial
     services/      catálogo (servicios, productos y materiales) y % de categorías (solo admin edita); con team/ y company/, la entrada "Ajustes"
     company/       datos de la empresa que factura (logo, EIN, dirección, % de impuesto, numeración)

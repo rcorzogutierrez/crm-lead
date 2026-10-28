@@ -104,6 +104,8 @@ export function lastTouch(l: Lead): Date | null {
 export interface SourceCount {
   source: LeadSource;
   count: number;
+  /** De los que entraron por ese origen, cuántos están ganados hoy. */
+  won: number;
 }
 
 export interface DayCount {
@@ -132,9 +134,14 @@ export interface WeekReport {
 
 export function weekReport(leads: Lead[], pending: FollowUp[], range: Range, now: Date): WeekReport {
   const created = leads.filter((l) => inRange(l.createdAt, range));
-  const counts = new Map<LeadSource, number>();
-  for (const l of created) counts.set(l.source, (counts.get(l.source) ?? 0) + 1);
-  const bySource = [...counts].map(([source, count]) => ({ source, count })).sort((a, b) => b.count - a.count);
+  const counts = new Map<LeadSource, SourceCount>();
+  for (const l of created) {
+    const c = counts.get(l.source) ?? { source: l.source, count: 0, won: 0 };
+    c.count++;
+    if (l.stage === 'won') c.won++;
+    counts.set(l.source, c);
+  }
+  const bySource = [...counts.values()].sort((a, b) => b.count - a.count);
 
   const won = wonIn(leads, range).sort((a, b) => wonDate(a)!.getTime() - wonDate(b)!.getTime());
   const lost = leads

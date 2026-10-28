@@ -85,7 +85,7 @@ describe('informe de la semana', () => {
   it('cuenta lo que entró por origen y lo ganado y perdido en la semana', () => {
     const leads = [
       lead({ createdAt: new Date(2026, 9, 20), source: 'whatsapp' }),
-      lead({ createdAt: new Date(2026, 9, 21), source: 'whatsapp' }),
+      lead({ createdAt: new Date(2026, 9, 21), source: 'whatsapp', stage: 'won', wonAt: new Date(2026, 9, 26) }),
       lead({ createdAt: new Date(2026, 9, 22), source: 'referral' }),
       lead({ createdAt: new Date(2026, 9, 12), source: 'web' }),
       lead({ stage: 'won', value: 1000, wonAt: new Date(2026, 9, 23), createdAt: new Date(2026, 8, 1) }),
@@ -97,8 +97,8 @@ describe('informe de la semana', () => {
     const r = weekReport(leads, [], week, now);
     expect(r.created.length).toBe(3);
     expect(r.bySource).toEqual([
-      { source: 'whatsapp', count: 2 },
-      { source: 'referral', count: 1 },
+      { source: 'whatsapp', count: 2, won: 1 },
+      { source: 'referral', count: 1, won: 0 },
     ]);
     expect(r.won.length).toBe(1);
     expect(r.wonTotal).toBe(1000);

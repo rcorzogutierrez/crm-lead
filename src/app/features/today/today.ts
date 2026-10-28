@@ -18,6 +18,7 @@ import { ScheduleForm } from '../../shared/schedule-form';
 import { StageBadge } from '../../shared/stage-badge';
 import { ChannelIcon } from '../../shared/channel-icon';
 import { AgendaMonth } from './agenda-month';
+import { TeamDayTable } from './team-day-table';
 
 interface HourRow {
   hour: number;
@@ -33,7 +34,7 @@ interface HourRow {
  */
 @Component({
   selector: 'app-today',
-  imports: [RouterLink, FollowUpItem, ScheduleForm, StageBadge, EmptyState, ChannelIcon, AgendaMonth, LucideCheck, LucideChevronLeft, LucideChevronRight],
+  imports: [RouterLink, FollowUpItem, ScheduleForm, StageBadge, EmptyState, ChannelIcon, AgendaMonth, TeamDayTable, LucideCheck, LucideChevronLeft, LucideChevronRight],
   templateUrl: './today.html',
 })
 export class Today {
@@ -50,8 +51,12 @@ export class Today {
   protected readonly scope = signal<'mine' | 'team'>('mine');
   protected readonly schedulingFor = signal<string | null>(null);
 
+  /** Con "Todo el equipo", el admin puede mirar la agenda de un solo vendedor (tabla del equipo). */
+  protected readonly seller = signal<string | null>(null);
+
   private readonly mineOnly = (f: { assigneeId: string }) =>
-    !this.auth.isAdmin() || this.scope() === 'team' || f.assigneeId === this.auth.uid();
+    !this.auth.isAdmin() ||
+    (this.scope() === 'team' ? !this.seller() || f.assigneeId === this.seller() : f.assigneeId === this.auth.uid());
 
   private readonly params = toSignal(this.route.queryParamMap, { requireSync: true });
   protected readonly view = computed(() => (this.params().get('view') === 'month' ? 'month' : 'day'));
@@ -92,6 +97,8 @@ export class Today {
     this.view() === 'day' ? { start: this.day(), end: addDays(this.day(), 1) } : null,
   );
   protected readonly done = computed(() => this.doneLive.data().filter(this.mineOnly));
+  /** Hechos del día de todo el equipo, para la tabla del admin. */
+  protected readonly doneAll = computed(() => this.doneLive.data());
   /** Propuestas abiertas cuyo precio oficial cambió. */
   protected readonly priceAlerts = computed(() =>
     this.leads.open().filter((l) => this.mineOnly(l) && this.catalog.hasPriceChange(l)),
