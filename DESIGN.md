@@ -28,7 +28,7 @@ Estrategia: Restrained. Base neutra gris azulada; el índigo solo para acciones 
 ## Tipografía
 
 - Una familia: **Archivo** variable (autoalojada), eje de ancho.
-- Títulos y fechas: `.date-face` → `wdth 82`, tracking −0.015em, bold. H1 2–2.5rem.
+- Títulos y fechas: `.date-face` → `wdth 82`, tracking −0.015em, bold. H1 de página: `.page-title` (2rem, igual en todas; las fechas no van más grandes).
 - UI: 15px/24px base, 13px etiquetas, 12px meta. Números siempre `.tabular`.
 
 ## Componentes

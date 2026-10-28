@@ -7,7 +7,7 @@
   @if (lead(); as lead) {
     <header class="mt-4 flex flex-wrap items-start justify-between gap-4">
       <div class="min-w-0">
-        <h1 class="date-face text-[2rem] leading-tight font-bold break-words">{{ title() || lead.name }}</h1>
+        <h1 class="page-title break-words">{{ title() || lead.name }}</h1>
         <p class="mt-1 text-ink-2">
           @if (lead.serviceName) {
             @if (contact(); as c) {
