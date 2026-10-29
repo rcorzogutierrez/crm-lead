@@ -12,7 +12,7 @@ follow-up programado, no del registro.
 
 ## Stack (fijado, no cambiar sin pedirlo)
 
-- **Angular 22**: standalone, zoneless, signals, Signal Forms (`@angular/forms/signals`), control flow nativo, `@Service()` para servicios singleton. OnPush es el default (no declararlo).
+- **Angular 22**: standalone, zoneless, signals, Signal Forms (`@angular/forms/signals`), control flow nativo, `@Service()` para servicios singleton. OnPush y standalone son el default (no declararlos); bindings en `host`, no `@HostBinding`/`@HostListener`. El resto de convenciones de Angular, en la skill `angular-developer`.
 - **Firebase JS SDK 13** (Auth con Google o email/contraseña + Firestore). **No** se usa `@angular/fire` (no soporta Angular 22): Firebase se inyecta con los tokens `AUTH` y `FIRESTORE` de `src/app/core/firebase.ts`.
 - **Tailwind CSS v4** (config CSS-first en `src/styles.css` con `@theme`; sin `tailwind.config.js`).
 - **Iconos: `@lucide/angular`**. Importar cada icono como componente (`LucidePhone` → `<svg lucidePhone [size]="16"></svg>`) o `LucideDynamicIcon` con `[lucideIcon]`. Nunca emoji ni glifos unicode como iconos.
@@ -133,78 +133,10 @@ Reglas de dominio:
 - Los enlaces de los correos abren `/auth/action` (confirmar email, contraseña nueva) solo si en la consola se puso esa URL como *action URL* de las plantillas; si no, usan la página genérica del proveedor. En pantalla nunca se nombra al proveedor de autenticación.
 - Configuración necesaria en la consola de Firebase: habilitar los proveedores Google y Correo electrónico/contraseña en Authentication, poner las plantillas de correo en español con la *action URL* `https://<dominio>/auth/action`, y añadir el dominio de hosting a *Authorized domains*.
 
-## Convenciones de UI (ver DESIGN.md)
+## Convenciones de UI
 
-- **Reglas fijas** en `DESIGN.md` → *Reglas fijas* (léelas antes de tocar una pantalla): revisión con impeccable antes del PR, `h1` siempre `.page-title`, anchos solo con `.page` / `.page-narrow`, probar a 2560px y en el móvil, textos con `t()` en los dos idiomas, URLs en inglés, cabecera en un solo orden, botones, estados de cada vista, títulos de sección, control segmentado. Una regla nueva se añade ahí cuando Rafa la decide.
-
+- Las **Reglas fijas** de `DESIGN.md` (13, decididas con Rafa) se cumplen en toda pantalla nueva o cambiada, empezando por la revisión con la skill impeccable antes del PR. Una regla nueva se añade ahí cuando Rafa la decide.
 - Marca: **CRM Lead**, icono de embudo (`public/favicon.svg`, mismo dibujo en `shared/logo.ts`; si cambia uno, cambiar el otro y regenerar los PNG de `public/`).
-- Mundo visual "agenda" con paleta **Pizarra**: riel gris pizarra claro, papel blanco frío, renglones, acciones en índigo. Usar los tokens de `@theme` (`bg-rail`, `bg-paper`, `bg-sheet`, `text-ink`, `bg-pen`, `bg-ribbon`, `bg-highlight`, `stage-*`), nunca colores sueltos. El token `pen` es el índigo de acción.
-- Clases base en `@layer components`: `.btn-primary`, `.btn-secondary`, `.btn-ghost`, `.btn-danger`, `.btn-ghost-danger`, `.btn-sm`, `.btn-icon`, `.input`, `.field-label`, `.field-error`, `.sheet`, `.date-face`, `.tabular`, `.page`, `.page-narrow`, `.page-title`, `.section-title`, `.segmented` / `.segment`, `.alert-error`.
-- Urgencia: vencido = `ribbon` (rojo), hoy = `highlight` (amarillo), sin próxima acción = borde rojo punteado. Siempre con texto, nunca solo color.
 - Nada de modales para tareas en línea: completar/posponer/programar se abre debajo del elemento. El único diálogo es el panel de captura (tecla **N**), cuyo primer campo "¿Para quién?" busca contactos existentes y que termina con "¿Cómo quedó?" (Le interesa / Vendido); **/** abre la búsqueda de clientes.
-- Cada vista maneja cargando (skeleton), vacío (que enseña qué hacer), error (`firestoreErrorMessage`).
-- Accesibilidad AA: foco visible, `aria-*` en toggles, objetivos ≥ 32px (44px en la barra móvil), sin depender del color.
-- No usar kickers/eyebrows sobre títulos, ni tarjetas de métricas gigantes, ni gradientes de texto.
-
-
----
-
-## Guía general de Angular y TypeScript
-
-## TypeScript Best Practices
-
-- Use strict type checking
-- Prefer type inference when the type is obvious
-- Avoid the `any` type; use `unknown` when type is uncertain
-
-## Angular Best Practices
-
-- Always use standalone components over NgModules
-- Must NOT set `standalone: true` inside Angular decorators. It's the default in Angular v20+.
-- Do NOT set `changeDetection: ChangeDetectionStrategy.OnPush` explicitly. `OnPush` is the default in Angular v22+.
-- Use signals for state management
-- Implement lazy loading for feature routes
-- Do NOT use the `@HostBinding` and `@HostListener` decorators. Put host bindings inside the `host` object of the `@Component` or `@Directive` decorator instead
-- Use `NgOptimizedImage` for all static images.
-  - `NgOptimizedImage` does not work for inline base64 images.
-
-## Accessibility Requirements
-
-- It MUST pass all AXE checks.
-- It MUST follow all WCAG AA minimums, including focus management, color contrast, and ARIA attributes.
-
-## Components
-
-- Keep components small and focused on a single responsibility
-- Use `input()` and `output()` functions instead of decorators
-- Use `model()` for two-way bound properties with `[(prop)]` syntax instead of pairing `input()` with `output()`
-- Use `computed()` for derived state
-- Use `linkedSignal()` for state derived from multiple reactive sources that must stay synchronized
-- Prefer inline templates for small components
-- Prefer Signal Forms (`@angular/forms/signals`) for new forms. They are stable in Angular v22+ and provide signal-based state, type-safe field access, and schema-based validation
-- When not using Signal Forms, prefer Reactive forms instead of Template-driven ones
-- Do NOT use `ngClass`, use `class` bindings instead
-- Do NOT use `ngStyle`, use `style` bindings instead
-- Do NOT import `CommonModule`, import only the directives and pipes the template uses, such as `AsyncPipe` or `DatePipe`
-- When using external templates/styles, use paths relative to the component TS file.
-
-## State Management
-
-- Use signals for local component state
-- Use `computed()` for derived state
-- Keep state transformations pure and predictable
-- Do NOT use `mutate` on signals, use `update` or `set` instead
-
-## Templates
-
-- Keep templates simple and avoid complex logic
-- Use native control flow (`@if`, `@for`, `@switch`) instead of `*ngIf`, `*ngFor`, `*ngSwitch`
-- Use the async pipe to handle observables
-- Do not assume globals like (`new Date()`) are available.
-
-## Services
-
-- Design services around a single responsibility
-- Use the `providedIn: 'root'` option for singleton services
-- Prefer the `@Service` decorator over `@Injectable({providedIn: 'root'})` for new singleton services (Angular v22+)
-- Use the `inject()` function instead of constructor injection
+- Accesibilidad AA (debe pasar AXE): objetivos ≥ 32px (44px en la barra móvil), urgencia siempre con texto y no solo con color.
+- Sin tarjetas de métricas gigantes ni gradientes de texto.
