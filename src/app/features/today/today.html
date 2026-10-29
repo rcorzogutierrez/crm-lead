@@ -8,21 +8,19 @@
       }
     </div>
     <div class="flex flex-wrap items-center gap-2">
-      <nav class="inline-flex rounded-lg border border-rule-strong bg-sheet p-0.5" [attr.aria-label]="t('today.view')">
+      <nav class="segmented" [attr.aria-label]="t('today.view')">
         <a
           routerLink="/today"
           [queryParams]="{ date: dayLink(0) }"
           [attr.aria-current]="view() === 'day' ? 'page' : null"
-          class="inline-flex h-8 items-center rounded-md px-3 text-sm font-semibold transition-colors"
-          [class]="view() === 'day' ? 'bg-ink text-white' : 'text-ink-2 hover:text-ink'"
+          class="segment"
           >{{ t('today.day') }}</a
         >
         <a
           routerLink="/today"
           [queryParams]="{ view: 'month', month: monthKey() }"
           [attr.aria-current]="view() === 'month' ? 'page' : null"
-          class="inline-flex h-8 items-center rounded-md px-3 text-sm font-semibold transition-colors"
-          [class]="view() === 'month' ? 'bg-ink text-white' : 'text-ink-2 hover:text-ink'"
+          class="segment"
           >{{ t('today.month') }}</a
         >
       </nav>
@@ -51,16 +49,16 @@
       </div>
       <!-- Un vendedor solo tiene sus leads: el selector es para el admin. -->
       @if (auth.isAdmin()) {
-        <div class="inline-flex rounded-lg border border-rule-strong bg-sheet p-0.5" role="radiogroup" [attr.aria-label]="t('today.scope')">
-          <button type="button" role="radio" [attr.aria-checked]="scope() === 'mine'" (click)="scope.set('mine'); seller.set(null)" class="h-8 rounded-md px-3 text-sm font-semibold transition-colors" [class]="scope() === 'mine' ? 'bg-ink text-white' : 'text-ink-2 hover:text-ink'">{{ t('today.mine') }}</button>
-          <button type="button" role="radio" [attr.aria-checked]="scope() === 'team'" (click)="scope.set('team')" class="h-8 rounded-md px-3 text-sm font-semibold transition-colors" [class]="scope() === 'team' ? 'bg-ink text-white' : 'text-ink-2 hover:text-ink'">{{ t('today.team') }}</button>
+        <div class="segmented" role="radiogroup" [attr.aria-label]="t('today.scope')">
+          <button type="button" role="radio" [attr.aria-checked]="scope() === 'mine'" (click)="scope.set('mine'); seller.set(null)" class="segment">{{ t('today.mine') }}</button>
+          <button type="button" role="radio" [attr.aria-checked]="scope() === 'team'" (click)="scope.set('team')" class="segment">{{ t('today.team') }}</button>
         </div>
       }
     </div>
   </header>
 
   @if (error(); as err) {
-    <p class="mt-6 rounded-lg bg-ribbon-soft px-4 py-3 text-sm font-medium text-ribbon" role="alert">{{ err }}</p>
+    <p class="alert-error mt-6" role="alert">{{ err }}</p>
   }
 
   @if (priceAlerts().length) {
@@ -90,7 +88,7 @@
           <section class="sheet overflow-hidden" aria-labelledby="overdue-title">
             <header class="flex items-center gap-2 border-b border-rule bg-ribbon-soft px-4 py-2.5">
               <span class="size-2 rounded-full bg-ribbon" aria-hidden="true"></span>
-              <h2 id="overdue-title" class="text-sm font-bold text-ribbon">{{ t('today.overdue') }}</h2>
+              <h2 id="overdue-title" class="section-title text-ribbon">{{ t('today.overdue') }}</h2>
               <span class="ml-auto text-sm font-semibold text-ribbon tabular">{{ overdue().length }}</span>
             </header>
             <ul class="divide-y divide-rule px-4">
@@ -104,7 +102,7 @@
         <!-- Página del día -->
         <section class="sheet relative overflow-hidden" aria-labelledby="today-title">
           <header class="flex items-center justify-between border-b border-rule-strong px-4 py-2.5">
-            <h2 id="today-title" class="text-sm font-bold first-letter:uppercase">{{ isToday() ? t('due.today') : dayHeading() }}</h2>
+            <h2 id="today-title" class="section-title first-letter:uppercase">{{ isToday() ? t('due.today') : dayHeading() }}</h2>
             <button type="button" class="btn-ghost btn-sm text-pen hover:text-pen-strong" (click)="ui.openCapture()">{{ t('today.addDeal') }}</button>
           </header>
 
@@ -163,7 +161,7 @@
       <aside class="min-w-0 space-y-6" [attr.aria-label]="t('today.upcoming')">
         <section aria-labelledby="orphans-title">
           <div class="flex items-baseline justify-between">
-            <h2 id="orphans-title" class="text-sm font-bold">{{ t('today.orphans') }}</h2>
+            <h2 id="orphans-title" class="section-title">{{ t('today.orphans') }}</h2>
             <span class="text-sm font-semibold tabular" [class]="orphans().length ? 'text-ribbon' : 'text-ink-3'">{{ orphans().length }}</span>
           </div>
           <div class="sheet mt-2 overflow-hidden">
@@ -201,7 +199,7 @@
         </section>
 
         <section aria-labelledby="next-title">
-          <h2 id="next-title" class="text-sm font-bold">{{ t('today.next7') }}</h2>
+          <h2 id="next-title" class="section-title">{{ t('today.next7') }}</h2>
           <div class="sheet mt-2 overflow-hidden">
             @if (nextDays().length) {
               @for (day of nextDays(); track day.date.getTime()) {

@@ -36,15 +36,14 @@
       />
     </div>
     <!-- En móvil los filtros van en una sola fila que se desliza, en lugar de partirse en dos. -->
-    <div class="flex max-w-full overflow-x-auto rounded-lg border border-rule-strong bg-sheet p-0.5 [scrollbar-width:none]" role="radiogroup" [attr.aria-label]="t('contacts.kind')">
+    <div class="segmented flex max-w-full overflow-x-auto [scrollbar-width:none]" role="radiogroup" [attr.aria-label]="t('contacts.kind')">
       @for (k of kinds(); track k.id) {
         <button
           type="button"
           role="radio"
           [attr.aria-checked]="kind() === k.id"
           (click)="setParam('type', k.id === 'all' ? null : k.id)"
-          class="h-8 shrink-0 rounded-md px-3 text-sm font-semibold whitespace-nowrap transition-colors"
-          [class]="kind() === k.id ? 'bg-ink text-white' : 'text-ink-2 hover:text-ink'"
+          class="segment shrink-0"
         >
           {{ t(k.label) }}
         </button>
@@ -53,7 +52,7 @@
   </div>
 
   @if (contacts.error(); as err) {
-    <p class="mt-6 rounded-lg bg-ribbon-soft px-4 py-3 text-sm font-medium text-ribbon" role="alert">{{ err }}</p>
+    <p class="alert-error mt-6" role="alert">{{ err }}</p>
   }
 
   <div class="sheet mt-4 overflow-hidden">

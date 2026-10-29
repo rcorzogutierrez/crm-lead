@@ -21,7 +21,7 @@ import { Avatar } from '../../shared/avatar';
   template: `
     <section class="sheet overflow-hidden" aria-labelledby="team-day-title">
       <header class="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-rule px-4 py-2.5">
-        <h2 id="team-day-title" class="text-sm font-bold">{{ t('today.team.title') }}</h2>
+        <h2 id="team-day-title" class="section-title">{{ t('today.team.title') }}</h2>
         @if (selectedName(); as name) {
           <p class="text-sm text-ink-2" aria-live="polite">{{ t('today.team.showing', { name }) }}</p>
           <button type="button" class="ml-auto btn-ghost btn-sm text-pen hover:text-pen-strong" (click)="seller.set(null)">

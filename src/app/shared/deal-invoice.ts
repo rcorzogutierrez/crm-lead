@@ -22,7 +22,7 @@ import { InvoicePayments } from './invoice-payments';
   imports: [RouterLink, LucideFileText, InvoicePayments],
   template: `
     <section aria-labelledby="inv-title">
-      <h2 id="inv-title" class="text-sm font-bold">{{ t('invoice.section') }}</h2>
+      <h2 id="inv-title" class="section-title">{{ t('invoice.section') }}</h2>
       <div class="sheet mt-2 p-4">
         @if (lead().invoiceId) {
           @if (invoice(); as inv) {

@@ -61,7 +61,7 @@
         <!-- Oportunidades abiertas -->
         <section aria-labelledby="open-title">
           <div class="flex items-baseline justify-between gap-3">
-            <h2 id="open-title" class="text-sm font-bold">
+            <h2 id="open-title" class="section-title">
               {{ t('contact.openTitle') }} <span class="font-medium text-ink-3 tabular">{{ summary().open.length }}</span>
             </h2>
             @if (openValue()) {
@@ -118,7 +118,7 @@
         <!-- Servicios comprados -->
         <section aria-labelledby="won-title">
           <div class="flex items-baseline justify-between gap-3">
-            <h2 id="won-title" class="text-sm font-bold">
+            <h2 id="won-title" class="section-title">
               {{ t('contact.boughtTitle') }} <span class="font-medium text-ink-3 tabular">{{ summary().wonCount }}</span>
             </h2>
             @if (summary().totalWon) {
@@ -197,7 +197,7 @@
         <!-- Datos -->
         <section aria-labelledby="data-title">
           <div class="flex items-baseline justify-between">
-            <h2 id="data-title" class="text-sm font-bold">{{ t('contact.data') }}</h2>
+            <h2 id="data-title" class="section-title">{{ t('contact.data') }}</h2>
             @if (!editing()) {
               <button type="button" class="btn-ghost btn-sm text-pen" (click)="startEdit()">{{ t('svc.editShort') }}</button>
             }
@@ -261,7 +261,7 @@
 
         <!-- Historial unificado -->
         <section aria-labelledby="hist-title">
-          <h2 id="hist-title" class="text-sm font-bold">{{ t('detail.history') }}</h2>
+          <h2 id="hist-title" class="section-title">{{ t('detail.history') }}</h2>
           <div class="sheet mt-2 overflow-hidden">
             @if (historyLoading() && !history().length) {
               <div class="space-y-2 p-4" aria-hidden="true">
@@ -364,7 +364,7 @@
                       {{ t('contact.archive') }}
                     </button>
                   }
-                  <button id="manage-delete" type="button" class="btn-ghost btn-sm text-ribbon hover:bg-ribbon-soft hover:text-ribbon" (click)="openConfirm('delete')">
+                  <button id="manage-delete" type="button" class="btn-ghost btn-ghost-danger btn-sm" (click)="openConfirm('delete')">
                     <svg lucideTrash2 [size]="14"></svg>
                     {{ t('contact.delete') }}
                   </button>

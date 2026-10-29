@@ -15,15 +15,14 @@ export interface SectionTab {
   selector: 'app-section-tabs',
   imports: [RouterLink, RouterLinkActive],
   template: `
-    <nav class="inline-flex rounded-lg border border-rule-strong bg-sheet p-0.5" [attr.aria-label]="t(label())">
+    <nav class="segmented" [attr.aria-label]="t(label())">
       @for (tab of visible(); track tab.path) {
         <a
           [routerLink]="tab.path"
           routerLinkActive=""
           #rla="routerLinkActive"
           [attr.aria-current]="rla.isActive ? 'page' : null"
-          class="inline-flex h-8 items-center rounded-md px-3 text-sm font-semibold transition-colors"
-          [class]="rla.isActive ? 'bg-ink text-white' : 'text-ink-2 hover:text-ink'"
+          class="segment"
           >{{ t(tab.label) }}</a
         >
       }

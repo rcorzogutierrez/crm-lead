@@ -178,8 +178,34 @@
   .btn-danger {
     @apply border border-ribbon/30 bg-sheet text-ribbon hover:bg-ribbon-soft;
   }
+  /* Borrar o anular desde una fila o cabecera: discreto hasta que se señala */
+  .btn-ghost-danger {
+    @apply text-ribbon hover:bg-ribbon-soft hover:text-ribbon;
+  }
   .btn-sm {
     @apply h-8 px-2.5 text-[0.8125rem];
+  }
+
+  /* Control segmentado (filtros, Lo mío / Todo el equipo, pestañas de sección).
+     El activo lo marca su estado accesible, no una clase: aria-pressed, aria-checked o aria-current. */
+  .segmented {
+    @apply inline-flex rounded-lg border border-rule-strong bg-sheet p-0.5;
+  }
+  .segment {
+    @apply inline-flex h-8 items-center rounded-md px-3 text-sm font-semibold whitespace-nowrap text-ink-2 transition-colors hover:text-ink;
+  }
+  .segment:is([aria-pressed='true'], [aria-checked='true'], [aria-current='page']) {
+    @apply bg-ink text-white hover:text-white;
+  }
+
+  /* Aviso de error de una vista (carga fallida, sin permiso) */
+  .alert-error {
+    @apply rounded-lg bg-ribbon-soft px-4 py-3 text-sm font-medium text-ribbon;
+  }
+
+  /* Título de sección (h2) dentro de una página */
+  .section-title {
+    @apply text-sm font-bold;
   }
   .btn-icon {
     @apply size-9 px-0;

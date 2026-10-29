@@ -1,7 +1,7 @@
 <div class="page page-narrow">
   <h1 class="page-title">{{ t('nav.settings') }}</h1>
+  <p class="mt-1 text-ink-2">{{ t('company.intro') }}</p>
   <app-section-tabs class="mt-3 block" [tabs]="settingsTabs" label="settings.views" />
-  <p class="mt-3 text-ink-2">{{ t('company.intro') }}</p>
 
   @if (!auth.isAdmin()) {
     <p class="mt-3 flex items-center gap-1.5 text-sm text-ink-2">
@@ -20,7 +20,7 @@
       <fieldset class="min-w-0 space-y-8" [disabled]="!auth.isAdmin()">
         <!-- Empresa -->
         <section aria-labelledby="co-who">
-          <h2 id="co-who" class="text-sm font-bold">{{ t('company.who') }}</h2>
+          <h2 id="co-who" class="section-title">{{ t('company.who') }}</h2>
           <div class="sheet mt-2 grid gap-4 p-4 sm:grid-cols-2">
             <div class="sm:col-span-2">
               <p class="field-label" id="co-logo-label">{{ t('company.logo') }}</p>
@@ -80,7 +80,7 @@
 
         <!-- Dirección y contacto -->
         <section aria-labelledby="co-where">
-          <h2 id="co-where" class="text-sm font-bold">{{ t('company.where') }}</h2>
+          <h2 id="co-where" class="section-title">{{ t('company.where') }}</h2>
           <div class="sheet mt-2 grid gap-4 p-4 sm:grid-cols-6">
             <div class="sm:col-span-6">
               <label class="field-label" for="co-a1">{{ t('company.address1') }}</label>
@@ -127,7 +127,7 @@
 
         <!-- Facturación -->
         <section aria-labelledby="co-billing">
-          <h2 id="co-billing" class="text-sm font-bold">{{ t('company.billing') }}</h2>
+          <h2 id="co-billing" class="section-title">{{ t('company.billing') }}</h2>
           <div class="sheet mt-2 grid gap-4 p-4 sm:grid-cols-2">
             <div>
               <label class="field-label" for="co-tax">{{ t('company.taxRate') }}</label>

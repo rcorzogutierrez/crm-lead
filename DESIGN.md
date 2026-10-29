@@ -2,6 +2,24 @@
 
 Mundo visual: **agenda**, con la paleta **Pizarra** (elegida por Rafa el 24 oct 2026 entre cinco opciones, con el riel aclarado). Superficie de trabajo (modo Operate): la estructura es la de un CRM estándar; el mundo aporta tipografía, paleta, densidad y un gesto propio.
 
+## Reglas fijas
+
+Decididas con Rafa a medida que crece el proyecto. Una pantalla nueva o cambiada las cumple antes de abrir el PR; cambiar una regla es una decisión, no un detalle de un PR.
+
+1. **Revisión con impeccable.** Todo cambio de interfaz (pantallas, componentes, textos de UI) se diseña y se revisa con la skill impeccable antes del PR, y el PR lo dice.
+2. **Un solo título de página.** El `h1` de cada pantalla usa `.page-title` (2rem), sea una sección o una fecha. Nada de tamaños propios para el título.
+3. **Anchos con el marco.** Toda página va en `.page` (100rem, centrado); formularios y lectura añaden `.page-narrow` (56rem). Nunca `max-w-[…rem]` sueltos en una página; si hace falta otro ancho, se añade un token en `@theme`.
+4. **Probar en grande y en el móvil.** Antes del PR se mira a 2560px (Rafa trabaja en un monitor de 32") y en el móvil (≈390px), además del portátil.
+5. **Bilingüe.** Todo texto visible sale de `t('clave')` con la clave en `es.ts` y en `en.ts`; fechas y montos con `intlLocale()`. Nunca texto escrito en la plantilla.
+6. **URLs en inglés.** Rutas y parámetros de filtro en inglés; si una ruta antigua en español existía, redirige desde `core/legacy-urls.ts`.
+7. **Tokens y clases base.** Colores solo con los tokens de `@theme`; botones, campos y hojas con las clases base (`.btn-*`, `.input`, `.sheet`…). Iconos de `@lucide/angular`, nunca emoji. Nada de Material. Si un mismo grupo de utilidades se copia en tres sitios, pasa a ser una clase base de `styles.css`.
+8. **Cabecera de página en un solo orden.** `h1.page-title` → línea de resumen (`mt-1 text-ink-2`: cuántos hay, qué es esta vista; `aria-live` si cambia) → pestañas de sección (`app-section-tabs`, `mt-3`) si la sección tiene varias vistas. Con acciones, todo va en `<header class="flex flex-wrap items-end justify-between gap-4">` y las acciones a la derecha, alineadas con la última fila (las pestañas). Sin kickers ni texto encima del título.
+9. **Botones.** Una sola `.btn-primary` por bloque (la acción que se espera). En cabecera, tamaño normal; en filas, hojas y paneles en línea, `.btn-sm`. Borrar o anular desde una fila: `.btn-ghost .btn-ghost-danger .btn-sm`; la confirmación final de algo irreversible: `.btn-danger`. Iconos solos con `.btn-icon` y `aria-label`.
+10. **Estados de cada vista.** Cargando: esqueleto con la forma del contenido (`animate-pulse rounded bg-sheet-2`, `aria-hidden`), nunca un spinner a pantalla. Vacío: `app-empty-state`, que dice qué falta y ofrece la acción para empezar; si lo vacía un filtro, lo dice y no ofrece crear. Error de la vista: `.alert-error` con `role="alert"` y el mensaje de `firestoreErrorMessage`; dentro de una hoja o un panel, una línea `text-sm text-ribbon`.
+11. **Títulos de sección.** Los `h2` de una página usan `.section-title` (14px negrita). Excepciones con su propio tamaño: el título del panel de captura, los rótulos de la factura impresa y los informes de Reportes, que se leen como documento.
+12. **Control segmentado.** Filtros de una opción, "Lo mío / Todo el equipo" y pestañas de sección usan `.segmented` con `.segment` dentro. El activo lo marca su estado accesible (`aria-pressed`, `aria-checked` o `aria-current="page"`), no una clase, así que el estado y el aspecto no se pueden separar.
+13. **Anchos fuera del marco.** Solo tres: la medida de lectura de un texto largo (`max-w-prose` o en `ch`, como el `46ch` de `app-empty-state`), la hoja del login (25.5rem) y el panel de captura (34rem). Ninguno se usa para encoger una página.
+
 ## Gesto firma
 
 La vista **Hoy** es una página de agenda: columna de horas a la izquierda, **línea de margen roja**, renglones de 1px por hora y una **cinta roja de "ahora"** que cruza la hora actual. Lo vencido se "arrastra" arriba en un bloque propio. El historial del lead repite el mismo formato (fecha en el margen, línea roja, entradas a la derecha). La sección activa del riel se marca con una cinta roja.
@@ -38,7 +56,7 @@ Estrategia: Restrained. Base neutra gris azulada; el índigo solo para acciones 
 - Campos: `.input` 40px, borde `rule-strong`, foco anillo pluma 3px/15%.
 - `.sheet`: hoja con borde `rule`, radio 10px, sombra suave con desplazamiento.
 - Chips de fecha (`app-due-chip`): vencido sólido rojo con texto blanco, hoy resaltador, sin próxima acción borde rojo punteado.
-- Toggles segmentados para "Lo mío / Todo el equipo".
+- Toggles segmentados (`.segmented` / `.segment`, regla 12) para "Lo mío / Todo el equipo": activo en tinta sólida con texto blanco.
 - Agenda Día / Mes (Hoy): pestañas segmentadas (enlaces) y flechas ‹ › para ir de un día o un mes a otro; fuera de hoy aparece el botón "Hoy" / "Este mes". Un día que no es hoy no lleva vencidos arriba ni cinta de "ahora", y los follow-ups hechos se ven atenuados en su hora con "Hecho" en `ok`. El mes (`features/today/agenda-month.ts`) es una hoja con una celda por día: número (hoy en cinta roja con la raya roja arriba), un renglón por canal con su icono y su número, y una barra fina de carga (en `warn` si el día va cargado). Avisos con texto: "N vencidas" en cinta roja y "Cargado" en resaltador; en el móvil la celda solo muestra el número, que cambia de forma (pastilla) con el aviso. Leyenda debajo con iconos y nombres. Tocar un día abre su página.
 - El equipo hoy (Hoy, admin con "Todo el equipo", solo en el día de hoy; `features/today/team-day-table.ts`): una hoja encima de los vencidos con una fila por vendedor: hechos de hoy ("3 de 6" con barra fina en `ok`), vencidos en cinta roja, sin próxima acción con borde rojo punteado, ventas de hoy; los ceros en `ink-3`. Tocar un nombre deja la agenda (y el mes) solo con lo suyo, con la fila en `pen-soft` y "Ver todo el equipo" en la cabecera. En el móvil, filas apiladas con los mismos chips.
 - Reportes → Lo que entró: cada barra de origen pinta en `ok` la parte ya ganada y a la derecha dice "3 de 5 · 60 %" (el porcentaje solo con 5 o más negocios).

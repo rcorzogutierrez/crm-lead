@@ -32,7 +32,7 @@
 }
 
 @if (error(); as err) {
-  <p class="mt-6 rounded-lg bg-ribbon-soft px-4 py-3 text-sm font-medium text-ribbon" role="alert">{{ err }}</p>
+  <p class="alert-error mt-6" role="alert">{{ err }}</p>
 }
 
 <article class="sheet mt-6 overflow-hidden" [attr.aria-busy]="loading()">
