@@ -9,9 +9,26 @@
   class="rail-surface fixed inset-y-0 left-0 z-30 hidden w-60 flex-col text-rail-ink lg:flex print:hidden"
   [attr.aria-label]="t('shell.mainNav')"
 >
-  <div class="flex items-center gap-2.5 px-5 pt-6 pb-5">
+  <div class="flex items-center gap-2.5 px-5 pt-6 pb-4">
     <app-logo [size]="32" />
-    <span class="date-face text-[1.0625rem] font-bold tracking-tight">CRM Lead</span>
+    <div class="min-w-0 flex-1">
+      <span class="date-face block text-[1.0625rem] leading-tight font-bold tracking-tight">CRM Lead</span>
+      @if (tenant.name(); as company) {
+        @if (auth.tenants().length > 1) {
+          <a
+            routerLink="/select-company"
+            class="-mx-1.5 flex min-h-8 items-center gap-1 rounded-md px-1.5 text-[0.8125rem] font-medium text-rail-muted hover:bg-rail-ink/8 hover:text-rail-ink"
+            [attr.aria-label]="t('shell.switchCompany', { name: company })"
+            [title]="t('shell.switchCompany', { name: company })"
+          >
+            <span class="truncate">{{ company }}</span>
+            <svg lucideChevronsUpDown [size]="14" class="shrink-0" aria-hidden="true"></svg>
+          </a>
+        } @else {
+          <span class="block truncate text-[0.8125rem] font-medium text-rail-muted" [title]="company">{{ company }}</span>
+        }
+      }
+    </div>
   </div>
 
   <div class="px-3">
@@ -79,8 +96,13 @@
 <!-- Barra superior (móvil) -->
 <header class="rail-surface sticky top-0 z-30 flex h-14 print:hidden items-center gap-2.5 pr-[max(1rem,env(safe-area-inset-right))] pl-[max(1rem,env(safe-area-inset-left))] text-rail-ink lg:hidden">
   <app-logo [size]="28" />
-  <span class="date-face text-base font-bold">CRM Lead</span>
-  <app-lang-switch tone="rail" class="ml-auto" />
+  <div class="min-w-0">
+    <span class="date-face block text-base leading-tight font-bold">CRM Lead</span>
+    @if (tenant.name(); as company) {
+      <span class="block truncate text-xs leading-tight text-rail-muted">{{ company }}</span>
+    }
+  </div>
+  <app-lang-switch tone="rail" class="ml-auto shrink-0" />
   @if (auth.member(); as me) {
     <div class="relative -mr-2">
       <button
@@ -106,6 +128,12 @@
             <svg lucideKeyRound [size]="18" [strokeWidth]="1.75"></svg>
             {{ t(pwLabel()) }}
           </button>
+          @if (auth.tenants().length > 1) {
+            <a routerLink="/select-company" class="flex h-11 w-full items-center gap-3 border-t border-rule px-4 text-sm font-semibold hover:bg-sheet-2" (click)="accountOpen.set(false)">
+              <svg lucideChevronsUpDown [size]="18" [strokeWidth]="1.75"></svg>
+              {{ t('shell.changeCompany') }}
+            </a>
+          }
           @if (auth.platformAdmin()) {
             <a routerLink="/platform" class="flex h-11 w-full items-center gap-3 border-t border-rule px-4 text-sm font-semibold hover:bg-sheet-2" (click)="accountOpen.set(false)">
               <svg lucideBuilding2 [size]="18" [strokeWidth]="1.75"></svg>

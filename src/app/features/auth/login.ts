@@ -3,6 +3,7 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { LucideCheck, LucideClock } from '@lucide/angular';
 import { map } from 'rxjs';
+import { statusHome } from '../../core/auth.guards';
 import { AuthService } from '../../core/auth.service';
 import { IDLE_MINUTES, IdleService } from '../../core/idle.service';
 import { I18nKey, t } from '../../core/i18n/i18n';
@@ -82,10 +83,8 @@ export class Login {
 
   constructor() {
     effect(() => {
-      const s = this.auth.status();
-      if (s === 'member') void this.router.navigateByUrl('/today');
-      if (s === 'pending') void this.router.navigateByUrl('/pending');
-      if (s === 'unverified') void this.router.navigateByUrl('/verify');
+      const home = statusHome(this.auth.status());
+      if (home && home !== '/login') void this.router.navigateByUrl(home);
     });
 
     if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {

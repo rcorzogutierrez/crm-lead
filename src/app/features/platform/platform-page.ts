@@ -6,6 +6,7 @@ import { AuthService } from '../../core/auth.service';
 import { firestoreErrorMessage } from '../../core/firestore-utils';
 import { I18nKey, intlLocale, t } from '../../core/i18n/i18n';
 import { PlatformService, Tenant } from '../../core/platform.service';
+import { TenantService } from '../../core/tenant.service';
 import { ToastService } from '../../core/toast.service';
 import { EmptyState } from '../../shared/empty-state';
 import { LangSwitch } from '../../shared/lang-switch';
@@ -26,6 +27,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 export class PlatformPage {
   protected readonly auth = inject(AuthService);
   protected readonly platform = inject(PlatformService);
+  private readonly tenant = inject(TenantService);
   private readonly toast = inject(ToastService);
   private readonly router = inject(Router);
   private readonly injector = inject(Injector);
@@ -52,6 +54,29 @@ export class PlatformPage {
     });
   }
 
+  /** La empresa en la que está trabajando ahora (si es miembro de ella). */
+  protected isCurrent(c: Tenant): boolean {
+    return this.auth.status() === 'member' && this.tenant.id() === c.id;
+  }
+
+  /** Es miembro de esa empresa (activa) y no está dentro: puede pasar a ella. */
+  protected canEnter(c: Tenant): boolean {
+    return c.active && !this.isCurrent(c) && this.auth.tenants().some((m) => m.id === c.id);
+  }
+
+  protected async enter(c: Tenant): Promise<void> {
+    this.auth.enterTenant(c.id);
+    await this.auth.settled();
+    if (this.auth.status() === 'member') void this.router.navigateByUrl('/today');
+  }
+
+  /** Si se invitó a sí mismo, entra ya en la empresa (sin esperar a cerrar sesión y volver). */
+  private async joinIfMe(mail: string, tenantId: string): Promise<void> {
+    if (mail !== (this.auth.user()?.email ?? '').toLowerCase()) return;
+    await this.auth.recheck();
+    await this.platform.loadAdmins(tenantId);
+  }
+
   protected dateLabel(d: Date): string {
     return d.toLocaleDateString(intlLocale(), { day: 'numeric', month: 'short', year: 'numeric' });
   }
@@ -65,10 +90,16 @@ export class PlatformPage {
     await submit(this.createForm, async () => {
       const { name, email: mail } = this.createModel();
       try {
-        await this.platform.create(name, mail);
-        this.toast.show(t('platform.created', { name: name.trim(), email: mail.trim().toLowerCase() }));
+        const id = await this.platform.create(name, mail);
+        const me = mail.trim().toLowerCase() === (this.auth.user()?.email ?? '').toLowerCase();
+        this.toast.show(
+          me
+            ? t('platform.createdSelf', { name: name.trim() })
+            : t('platform.created', { name: name.trim(), email: mail.trim().toLowerCase() }),
+        );
         this.createModel.set({ name: '', email: '' });
         this.createForm().reset();
+        await this.joinIfMe(mail.trim().toLowerCase(), id);
       } catch (err) {
         this.toast.error(firestoreErrorMessage(err));
       }
@@ -133,6 +164,7 @@ export class PlatformPage {
       await this.platform.inviteAdmin(c.id, mail);
       this.toast.show(t('platform.invited', { email: mail, name: c.name }));
       this.cancelInvite(c);
+      await this.joinIfMe(mail, c.id);
     } catch (err) {
       this.toast.error(firestoreErrorMessage(err));
     } finally {

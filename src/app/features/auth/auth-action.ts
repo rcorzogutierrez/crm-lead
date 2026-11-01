@@ -2,6 +2,7 @@ import { Component, effect, inject, signal } from '@angular/core';
 import { FormField, form, submit, validate } from '@angular/forms/signals';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { LucideEye, LucideEyeOff, LucideMailCheck } from '@lucide/angular';
+import { statusHome } from '../../core/auth.guards';
 import { AuthService, authErrorKey, passwordOk } from '../../core/auth.service';
 import { I18nKey, t } from '../../core/i18n/i18n';
 import { AuthBoard } from './auth-board';
@@ -181,9 +182,8 @@ export class AuthAction {
     effect(() => {
       if (!this.done()) return;
       const s = this.auth.status();
-      if (s === 'member') void this.router.navigateByUrl('/today');
-      if (s === 'pending') void this.router.navigateByUrl('/pending');
-      if (s === 'unverified') void this.router.navigateByUrl('/verify');
+      const home = statusHome(s);
+      if (home && s !== 'signedOut') void this.router.navigateByUrl(home);
     });
 
     if (!this.code) {

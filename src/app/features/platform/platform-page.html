@@ -54,6 +54,9 @@
                 @if (!c.active) {
                   <span class="inline-flex h-5 items-center rounded bg-ribbon-soft px-1.5 text-xs font-semibold text-ribbon">{{ t('platform.suspendedTag') }}</span>
                 }
+                @if (isCurrent(c)) {
+                  <span class="inline-flex h-5 items-center rounded bg-pen-soft px-1.5 text-xs font-semibold text-pen">{{ t('platform.youAreHere') }}</span>
+                }
               </p>
               <p class="text-xs text-ink-2">
                 @if (c.createdAt) {
@@ -82,6 +85,9 @@
             <!-- En móvil los botones bajan a su propio renglón para que el nombre se lea entero. -->
             @if (confirmId() !== c.id && inviting()?.id !== c.id) {
               <div class="flex w-full flex-wrap items-center gap-2 pl-12 sm:w-auto sm:pl-0">
+                @if (canEnter(c)) {
+                  <button type="button" class="btn-secondary btn-sm" (click)="enter(c)">{{ t('platform.enter') }}</button>
+                }
                 <button type="button" class="btn-ghost btn-sm" [id]="'invite-' + c.id" (click)="askInvite(c)">{{ t('platform.inviteAdmin') }}</button>
                 @if (c.active) {
                   <button type="button" class="btn-ghost btn-sm" [id]="'suspend-' + c.id" (click)="askSuspend(c)">{{ t('platform.suspend') }}</button>

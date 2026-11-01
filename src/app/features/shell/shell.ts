@@ -7,6 +7,7 @@ import {
   LucideBuilding2,
   LucideCalendarDays,
   LucideChartColumn,
+  LucideChevronsUpDown,
   LucideClock,
   LucideEllipsis,
   LucideHandshake,
@@ -16,6 +17,7 @@ import {
   LucideSettings,
 } from '@lucide/angular';
 import { AuthService } from '../../core/auth.service';
+import { TenantService } from '../../core/tenant.service';
 import { FollowUpsService } from '../../core/followups.service';
 import { IdleService } from '../../core/idle.service';
 import { ToastService } from '../../core/toast.service';
@@ -47,6 +49,7 @@ interface NavItem {
     LucideBuilding2,
     LucideCalendarDays,
     LucideChartColumn,
+    LucideChevronsUpDown,
     LucideClock,
     LucideEllipsis,
     LucideHandshake,
@@ -63,6 +66,7 @@ interface NavItem {
 })
 export class Shell {
   protected readonly auth = inject(AuthService);
+  protected readonly tenant = inject(TenantService);
   protected readonly ui = inject(UiService);
   protected readonly idle = inject(IdleService);
   private readonly followUps = inject(FollowUpsService);
