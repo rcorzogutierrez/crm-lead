@@ -3,8 +3,6 @@ import { Service, computed, effect, inject, signal } from '@angular/core';
 import {
   DocumentData,
   addDoc,
-  collection,
-  doc,
   onSnapshot,
   orderBy,
   query,
@@ -16,6 +14,7 @@ import {
 import { AuthService } from './auth.service';
 import { DeletionsService } from './deletions.service';
 import { FIRESTORE } from './firebase';
+import { TenantService } from './tenant.service';
 import { DEFAULT_TIER_RATES, Lead, PriceTier, ServiceItem, ServiceItemDraft, TierRates, isClosed } from './models';
 import { teamQuery } from './team-query';
 
@@ -39,9 +38,10 @@ function mapService(id: string, d: DocumentData): ServiceItem {
 @Service()
 export class CatalogService {
   private readonly db = inject(FIRESTORE);
+  private readonly tenant = inject(TenantService);
   private readonly auth = inject(AuthService);
   private readonly deletions = inject(DeletionsService);
-  private readonly live = teamQuery(() => query(collection(this.db, 'services'), orderBy('name')), mapService);
+  private readonly live = teamQuery(() => query(this.tenant.col('services'), orderBy('name')), mapService);
 
   readonly services = this.live.data;
   readonly loading = this.live.loading;
@@ -57,7 +57,7 @@ export class CatalogService {
     effect((onCleanup) => {
       if (this.auth.status() !== 'member') return;
       const stop = onSnapshot(
-        doc(this.db, 'meta', 'pricing'),
+        this.tenant.doc('meta', 'pricing'),
         (snap) => {
           const d = snap.data() ?? {};
           this._rates.set({
@@ -83,7 +83,7 @@ export class CatalogService {
   }
 
   async create(draft: ServiceItemDraft): Promise<string> {
-    const ref = await addDoc(collection(this.db, 'services'), {
+    const ref = await addDoc(this.tenant.col('services'), {
       ...clean(draft),
       createdBy: this.auth.uid(),
       createdAt: serverTimestamp(),
@@ -93,7 +93,7 @@ export class CatalogService {
   }
 
   update(id: string, patch: Partial<ServiceItemDraft>): Promise<void> {
-    return updateDoc(doc(this.db, 'services', id), { ...clean(patch), updatedAt: serverTimestamp() });
+    return updateDoc(this.tenant.doc('services', id), { ...clean(patch), updatedAt: serverTimestamp() });
   }
 
   /**
@@ -102,13 +102,13 @@ export class CatalogService {
    */
   remove(service: ServiceItem): Promise<void> {
     const batch = writeBatch(this.db);
-    batch.delete(doc(this.db, 'services', service.id));
+    batch.delete(this.tenant.doc('services', service.id));
     this.deletions.record(batch, { kind: 'service', refId: service.id, label: service.name, snapshot: service });
     return batch.commit();
   }
 
   saveRates(rates: TierRates): Promise<void> {
-    return setDoc(doc(this.db, 'meta', 'pricing'), { ...rates, updatedAt: serverTimestamp() });
+    return setDoc(this.tenant.doc('meta', 'pricing'), { ...rates, updatedAt: serverTimestamp() });
   }
 }
 

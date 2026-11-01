@@ -2,7 +2,6 @@ import { Service, computed, effect, inject } from '@angular/core';
 import {
   DocumentData,
   Timestamp,
-  collection,
   doc,
   orderBy,
   query,
@@ -14,6 +13,7 @@ import { AuthService } from './auth.service';
 import { STATS_VERSION } from './contact-stats';
 import { CascadeCounts, DeletionsService, addCounts, cascadeDetail } from './deletions.service';
 import { FIRESTORE } from './firebase';
+import { TenantService } from './tenant.service';
 import { toDate } from './firestore-utils';
 import { FollowUpsService } from './followups.service';
 import { t } from './i18n/i18n';
@@ -107,11 +107,12 @@ export function samePhone(a: string, b: string): boolean {
 @Service()
 export class ContactsService {
   private readonly db = inject(FIRESTORE);
+  private readonly tenant = inject(TenantService);
   private readonly auth = inject(AuthService);
   private readonly leadsService = inject(LeadsService);
   private readonly followUps = inject(FollowUpsService);
   private readonly deletions = inject(DeletionsService);
-  private readonly live = teamQuery(() => query(collection(this.db, 'contacts'), orderBy('name')), mapContact);
+  private readonly live = teamQuery(() => query(this.tenant.col('contacts'), orderBy('name')), mapContact);
 
   readonly contacts = this.live.data;
   readonly loading = computed(() => this.live.loading() || this.leadsService.loading());
@@ -224,7 +225,7 @@ export class ContactsService {
     }
     for (let i = 0; i < writes.length; i += 400) {
       const batch = writeBatch(this.db);
-      for (const w of writes.slice(i, i + 400)) batch.update(doc(this.db, 'contacts', w.id), w.data);
+      for (const w of writes.slice(i, i + 400)) batch.update(this.tenant.doc('contacts', w.id), w.data);
       await batch.commit();
     }
   }
@@ -272,10 +273,10 @@ export class ContactsService {
       notes: patch.notes.trim(),
     };
     const batch = writeBatch(this.db);
-    batch.update(doc(this.db, 'contacts', contact.id), { ...data, updatedAt: serverTimestamp() });
+    batch.update(this.tenant.doc('contacts', contact.id), { ...data, updatedAt: serverTimestamp() });
     const leads = this.leadsService.leads().filter((l) => l.contactId === contact.id);
     for (const l of leads) {
-      batch.update(doc(this.db, 'leads', l.id), {
+      batch.update(this.tenant.doc('leads', l.id), {
         name: data.name,
         company: data.company,
         email: data.email,
@@ -283,7 +284,7 @@ export class ContactsService {
         updatedAt: serverTimestamp(),
       });
       for (const fu of this.followUps.forLead(l.id)) {
-        batch.update(doc(this.db, 'followups', fu.id), { leadName: data.name, company: data.company });
+        batch.update(this.tenant.doc('followups', fu.id), { leadName: data.name, company: data.company });
       }
     }
     await batch.commit();
@@ -299,7 +300,7 @@ export class ContactsService {
     const open = this.leadsService.leads().filter((l) => l.contactId === contact.id && !isClosed(l.stage));
     const batch = writeBatch(this.db);
     for (const l of open) {
-      batch.update(doc(this.db, 'leads', l.id), {
+      batch.update(this.tenant.doc('leads', l.id), {
         stage: 'lost',
         lostReason: reason,
         wonAt: null,
@@ -307,7 +308,7 @@ export class ContactsService {
         nextFollowUpAt: null,
         updatedAt: serverTimestamp(),
       });
-      batch.set(doc(collection(this.db, 'leads', l.id, 'activities')), {
+      batch.set(doc(this.tenant.col('leads', l.id, 'activities')), {
         type: 'stage',
         from: l.stage,
         to: 'lost',
@@ -315,10 +316,10 @@ export class ContactsService {
         createdBy: uid,
         createdAt: serverTimestamp(),
       });
-      for (const fu of this.followUps.forLead(l.id)) batch.update(doc(this.db, 'followups', fu.id), { status: 'cancelled' });
+      for (const fu of this.followUps.forLead(l.id)) batch.update(this.tenant.doc('followups', fu.id), { status: 'cancelled' });
     }
     // Un admin ve todos los leads: si había abiertos, ya no queda ninguno.
-    batch.update(doc(this.db, 'contacts', contact.id), {
+    batch.update(this.tenant.doc('contacts', contact.id), {
       archived: true,
       archivedAt: serverTimestamp(),
       ...(open.length ? { openBy: {} } : {}),
@@ -329,7 +330,7 @@ export class ContactsService {
 
   /** Vuelve a mostrar el contacto. Sus negocios perdidos siguen perdidos. */
   unarchive(contact: Contact): Promise<void> {
-    return updateDoc(doc(this.db, 'contacts', contact.id), { archived: false, archivedAt: null, updatedAt: serverTimestamp() });
+    return updateDoc(this.tenant.doc('contacts', contact.id), { archived: false, archivedAt: null, updatedAt: serverTimestamp() });
   }
 
   /**
@@ -343,7 +344,7 @@ export class ContactsService {
     let counts: CascadeCounts = { deals: leads.length };
     for (const l of leads) counts = addCounts(counts, await this.leadsService.remove(l, true));
     const batch = writeBatch(this.db);
-    batch.delete(doc(this.db, 'contacts', contact.id));
+    batch.delete(this.tenant.doc('contacts', contact.id));
     this.deletions.record(batch, {
       kind: 'contact',
       refId: contact.id,
@@ -373,7 +374,7 @@ export class ContactsService {
       const e = normEmail(l.email);
       let match = known.find((c) => (e && normEmail(c.email) === e) || (l.phone && c.phone && samePhone(c.phone, l.phone)));
       if (!match) {
-        const ref = doc(collection(this.db, 'contacts'));
+        const ref = doc(this.tenant.col('contacts'));
         match = {
           id: ref.id,
           name: l.name,
@@ -421,11 +422,11 @@ export class ContactsService {
     for (const link of links) {
       if (!created.has(link.contactId)) {
         const op = ops.find((o) => o.id === link.contactId);
-        if (op) batch.set(doc(this.db, 'contacts', op.id), op.data);
+        if (op) batch.set(this.tenant.doc('contacts', op.id), op.data);
         created.add(link.contactId);
         count++;
       }
-      batch.update(doc(this.db, 'leads', link.leadId), { contactId: link.contactId, updatedAt: serverTimestamp() });
+      batch.update(this.tenant.doc('leads', link.leadId), { contactId: link.contactId, updatedAt: serverTimestamp() });
       count++;
       if (count >= 400) await flush();
     }

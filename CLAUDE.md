@@ -69,14 +69,23 @@ src/app/
     reports/       informe semanal del equipo (admin) y "Mis números" (cada vendedor)
     team/          miembros, roles, invitaciones
     deletions/     registro de borrados (`/deletions`, solo admin; pestaña "Registro" de Ajustes)
+    platform/      panel del super-admin (`/platform`, fuera del riel): empresas, crear e invitar a su admin, suspender
 ```
 
 ## Modelo de datos (Firestore)
 
+**Multiempresa:** cada empresa (tenant) guarda todo en `tenants/{tenantId}/…`; las rutas de la tabla de abajo son relativas a esa empresa. Los servicios nunca escriben `collection(db, 'leads')`: usan `TenantService` (`core/tenant.service.ts`) → `this.tenant.col('leads')`, `this.tenant.doc('meta', 'company')`, que leen la signal de la empresa activa (así `teamQuery` y los `effect` se rehacen al cambiarla). Fuera de las empresas solo hay:
+
 | Colección | Doc | Campos clave |
 |---|---|---|
-| `meta/team` | único | `ownerUid`, `name` — existe desde que entra el primer usuario |
-| `members/{uid}` | miembro | `email`, `displayName`, `photoURL`, `role: admin\|member`, `active` |
+| `tenants/{tenantId}` | empresa | `name`, `active` (suspendida = `false`: nadie de ella lee ni escribe), `createdAt`, `createdBy` — la crea y suspende solo el super-admin |
+| `platformAdmins/{uid}` | super-admin de la plataforma | marca creada **a mano en la consola**; la app solo la lee (la propia). Ve empresas y sus equipos, nunca sus datos |
+
+Dentro de cada empresa:
+
+| Colección | Doc | Campos clave |
+|---|---|---|
+| `members/{uid}` | miembro | `uid`, `email`, `displayName`, `photoURL`, `role: admin\|member`, `active` |
 | `sessions/{uid}` | última entrada/salida | `signInAt`, `signOutAt`, `signOutReason: manual\|idle` — cada uno escribe solo el suyo con `serverTimestamp()`; solo el admin lee (se muestra en *Equipo*) |
 | `invites/{emailEnMinúsculas}` | invitación | `email`, `role`, `invitedBy` — se consume al entrar |
 | `contacts/{id}` | persona/empresa | `name`, `company`, `email` (minúsculas), `phone`, `assigneeId`, `notes`, `createdBy` + resumen `statsV`, `wonCount`, `wonTotal`, `firstWonAt`, `openBy` (uid → nº abiertos), `archived`, `archivedAt` — "cliente" si `wonCount > 0` |
@@ -110,13 +119,14 @@ Reglas de dominio:
 - Resumen del contacto: un vendedor no ve los leads de otros, así que el contacto guarda sus compras y quién tiene negocios abiertos. Toda escritura de leads que cambie etapa, responsable o existencia actualiza el contacto en el **mismo batch** (`statsPatch` en `core/contact-stats.ts`, usado por `LeadsService`). La app de un admin lo recalcula desde todos los leads si no coincide (`ContactsService.syncStats`); solo se confía en él si `statsV` coincide. Las reglas solo dejan a un vendedor moverlo lo que mueve un lead suyo (±1 venta, ±1 en su propio `openBy`, sin tocar `statsV`).
 - Facturas (EE. UU.): se emiten desde una venta ganada (su responsable o un admin; `InvoicesService.issue`, cálculos puros en `core/invoice-math.ts`). Cada línea lleva su precio con la categoría aplicada (no se muestra el desglose) y suma el valor del negocio; el impuesto de venta va **aparte**, al `taxRate` de la empresa y solo sobre servicios `taxable`. Sin descuentos por ahora. Las reglas exigen el número siguiente, subtotal = `value`, el % vigente y que la venta no tenga ya factura. No se editan: el admin anula (con motivo) y la venta se puede volver a facturar; una factura anulada la puede borrar el admin (una vigente, nunca), con sus pagos.
 - Cobro de facturas (`InvoicesService.addPayment` / `undoPayment`, cálculos en `core/invoice-math.ts`): se guardan solo `issued`/`void`; el estado que se muestra se calcula (`payState`): Emitida → Pagada en parte → Pagada, Vencida si pasó `dueAt` con saldo, Anulada. Registra pagos el responsable o un admin, nunca más que el saldo; solo el admin deshace uno (queda tachado con motivo). Pago, `paid` de la factura (con `lastPaymentId`) y actividad `payment` van en el mismo lote; las reglas cuadran `paid` con el pago. Con pagos vigentes la factura no se anula. Reportes muestran *Por cobrar* (`receivables`) desde las facturas vigentes escuchadas en vivo. Con factura vigente la venta no se reabre ni se borra (`LeadsService.locked`). Las reglas de leads van justas del tope de 1000 expresiones (4 servicios): medir antes de añadir más comprobaciones.
-- Índices compuestos requeridos (`firestore.indexes.json`): `followups (status, dueAt)` y `(assigneeId, status, dueAt)`; `leads (assigneeId, createdAt desc)`.
+- Índices compuestos requeridos (`firestore.indexes.json`): `followups (status, dueAt)` y `(assigneeId, status, dueAt)`; `leads (assigneeId, createdAt desc)` (valen en cualquier empresa: van por nombre de colección). Y de campo con alcance de grupo: `members.uid`, `invites.email`.
 
 ## Acceso y seguridad
 
 - La config web de Firebase en `core/firebase.config.ts` es pública; la seguridad está en `firestore.rules`.
-- El **primer** usuario que entra crea `meta/team` y queda como admin. Los demás necesitan `invites/{email}` creado por un admin desde *Equipo*; si no, ven "Acceso pendiente".
-- Solo miembros `active` leen/escriben. Contactos y catálogo: todo el equipo.
+- Empresas: solo el super-admin (`platformAdmins/{uid}`) las crea en `/platform`, junto con la invitación de su primer admin. No hay "primer usuario que se queda de admin".
+- Entrar (`AuthService.ensureMembership`): consultas de grupo de colecciones sobre `members` (`uid` = yo) e `invites` (`email` = mi email, minúsculas) en todas las empresas; las reglas solo devuelven lo propio (índices de campo de grupo en `firestore.indexes.json`). Sin ficha activa, consume una invitación; sin nada, "Acceso pendiente". Con varias empresas entra en la última elegida (`localStorage` `crm-lead.tenant`); el selector llega en la fase 2. Una persona = una cuenta, con un rol distinto en cada empresa.
+- Solo miembros `active` de una empresa `active` leen/escriben (las reglas leen `tenants/{t}` en `isMember()`). Contactos y catálogo: toda la empresa. Los datos de la raíz (anteriores a la multiempresa) ya no se leen.
 - **Leads, su historial y sus follow-ups: un vendedor (`member`) solo ve y toca los suyos** (`assigneeId`); el admin ve todo. Las consultas de un vendedor deben filtrar `where('assigneeId', '==', uid)` o las reglas las rechazan (`LeadsService`, `FollowUpsService`).
 - Roles (`admin` / `member` = vendedor): solo un admin cambia el rol o el acceso de **otro** miembro, con confirmación en línea en *Equipo*, y el de una invitación pendiente. Nadie cambia su propio rol ni acceso: así el equipo nunca se queda sin admin activo.
 - Solo un admin reasigna (`LeadsService.reassign`, que arrastra los follow-ups pendientes) o cambia el responsable de un contacto. Un vendedor crea leads siempre a su nombre.

@@ -4,6 +4,7 @@ import { NavigationEnd, Router, RouterLink, RouterOutlet } from '@angular/router
 import { filter, map } from 'rxjs';
 import {
   LucideBookUser,
+  LucideBuilding2,
   LucideCalendarDays,
   LucideChartColumn,
   LucideClock,
@@ -43,6 +44,7 @@ interface NavItem {
     Logo,
     LangSwitch,
     LucideBookUser,
+    LucideBuilding2,
     LucideCalendarDays,
     LucideChartColumn,
     LucideClock,
