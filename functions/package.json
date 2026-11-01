@@ -1,0 +1,22 @@
+{
+  "name": "crm-lead-functions",
+  "private": true,
+  "description": "Cloud Functions de CRM Lead: entrada de leads desde sitios web (/api/intake).",
+  "main": "lib/index.js",
+  "engines": {
+    "node": "22"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "test:emulator": "npx -y firebase-tools@latest emulators:exec --only firestore --project demo-crm-lead --config ../firebase.json \"vitest run\""
+  },
+  "dependencies": {
+    "firebase-admin": "^14.5.0",
+    "firebase-functions": "^7.4.0"
+  },
+  "devDependencies": {
+    "typescript": "~6.0.2",
+    "vitest": "^5.0.0"
+  }
+}

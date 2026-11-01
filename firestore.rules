@@ -633,6 +633,38 @@ service cloud.firestore {
           && request.resource.data.at == request.time;
         allow update, delete: if false;
       }
+
+      // ---- Sitios web (entrada de leads) ----
+      // Una clave por sitio. El admin la crea con el hash SHA-256 del secreto (el secreto nunca se
+      // guarda) y cambia nombre, dominio, responsable o la desactiva. La función `intake` (Admin
+      // SDK, sin reglas) es la única que escribe sus contadores y las entradas. Nada se borra.
+      function intakeKeyOk(d) {
+        return isString(d.name, 80) && d.name.size() > 0
+          && isString(d.domain, 200)
+          && isString(d.assigneeId, 128)
+          && (d.assigneeId == '' || exists(memberPath(d.assigneeId)))
+          && d.active is bool;
+      }
+      match /intakeKeys/{keyId} {
+        allow read: if isAdmin();
+        allow create: if isAdmin()
+          && request.resource.data.keys().hasOnly(['name', 'domain', 'assigneeId', 'active', 'secretHash', 'createdBy', 'createdAt'])
+          && intakeKeyOk(request.resource.data)
+          && request.resource.data.active == true
+          && request.resource.data.secretHash is string
+          && request.resource.data.secretHash.matches('^[0-9a-f]{64}$')
+          && request.resource.data.createdBy == request.auth.uid
+          && request.resource.data.createdAt == request.time;
+        allow update: if isAdmin()
+          && changedOnly(['name', 'domain', 'assigneeId', 'active', 'updatedAt'])
+          && intakeKeyOk(request.resource.data);
+        allow delete: if false;
+      }
+      // Lo que llegó de cada formulario (con el negocio que creó). Solo lo lee el admin.
+      match /intake/{entryId} {
+        allow read: if isAdmin();
+        allow write: if false;
+      }
       // ---- Pagos de una factura ----
       // Abonos hasta completar el total. Registra el responsable de la factura o un admin; solo
       // un admin deshace uno (queda tachado). Cada cambio mueve lo pagado de la factura en el

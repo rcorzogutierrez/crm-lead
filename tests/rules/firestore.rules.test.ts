@@ -1063,6 +1063,48 @@ describe('Registro de borrados', () => {
   });
 });
 
+describe('Sitios web (claves de entrada de leads)', () => {
+  const key = (by: string, extra: Record<string, unknown> = {}) => ({
+    name: 'Web Acme',
+    domain: 'acme.com',
+    assigneeId: LUIS,
+    active: true,
+    secretHash: 'a'.repeat(64),
+    createdBy: by,
+    createdAt: serverTimestamp(),
+    ...extra,
+  });
+
+  it('solo el admin crea una clave, con hash y responsable del equipo', async () => {
+    await assertSucceeds(setDoc(doc(db(ANA), 'intakeKeys/k1'), key(ANA)));
+    await assertSucceeds(setDoc(doc(db(ANA), 'intakeKeys/k2'), key(ANA, { assigneeId: '' })));
+    await assertFails(setDoc(doc(db(LUIS), 'intakeKeys/k3'), key(LUIS)));
+    await assertFails(setDoc(doc(db(ANA), 'intakeKeys/k3'), key(ANA, { secretHash: 'secreto-en-claro' })));
+    await assertFails(setDoc(doc(db(ANA), 'intakeKeys/k3'), key(ANA, { assigneeId: STRANGER })));
+    await assertFails(setDoc(doc(db(ANA), 'intakeKeys/k3'), key(ANA, { secret: 'x' })));
+    await assertFails(setDoc(doc(db(ANA), 'intakeKeys/k3'), key(ANA, { active: false })));
+  });
+
+  it('el admin la edita o desactiva, pero no cambia el hash ni la borra; el vendedor no la ve', async () => {
+    await seed({ 'intakeKeys/k1': { ...key(ANA), createdAt: Timestamp.now() } });
+    await assertSucceeds(updateDoc(doc(db(ANA), 'intakeKeys/k1'), { active: false, name: 'Web', updatedAt: serverTimestamp() }));
+    await assertFails(updateDoc(doc(db(ANA), 'intakeKeys/k1'), { secretHash: 'b'.repeat(64) }));
+    await assertFails(updateDoc(doc(db(ANA), 'intakeKeys/k1'), { receivedCount: 0 }));
+    await assertFails(deleteDoc(doc(db(ANA), 'intakeKeys/k1')));
+    await assertFails(getDoc(doc(db(LUIS), 'intakeKeys/k1')));
+    await assertFails(updateDoc(doc(db(LUIS), 'intakeKeys/k1'), { active: false }));
+  });
+
+  it('las entradas recibidas solo las lee el admin y nadie las escribe desde la app', async () => {
+    await seed({ 'intake/k1_s1': { name: 'María', status: 'processed', leadId: 'luis-1' } });
+    await assertSucceeds(getDoc(doc(db(ANA), 'intake/k1_s1')));
+    await assertFails(getDoc(doc(db(LUIS), 'intake/k1_s1')));
+    await assertFails(setDoc(doc(db(ANA), 'intake/k1_s2'), { name: 'Falso' }));
+    await assertFails(setDoc(rawDoc(env.unauthenticatedContext().firestore() as unknown as Firestore, `${TENANT}/intake/x`), { name: 'Spam' }));
+    await assertFails(getDoc(rawDoc(db(BERTA), `${TENANT}/intake/k1_s1`)));
+  });
+});
+
 describe('Aislamiento entre empresas', () => {
   it('un miembro de una empresa no lee ni escribe en otra', async () => {
     await assertFails(getDoc(rawDoc(db(ANA), `${OTHER}/contacts/b1`)));

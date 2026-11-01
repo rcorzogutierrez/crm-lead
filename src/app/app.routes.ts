@@ -100,6 +100,12 @@ export const routes: Routes = [
         loadComponent: () => import('./features/company/company-page').then((m) => m.CompanyPage),
       },
       {
+        path: 'sites',
+        title: 'nav.sites',
+        canActivate: [adminGuard],
+        loadComponent: () => import('./features/sites/sites-page').then((m) => m.SitesPage),
+      },
+      {
         path: 'deletions',
         title: 'nav.deletions',
         canActivate: [adminGuard],

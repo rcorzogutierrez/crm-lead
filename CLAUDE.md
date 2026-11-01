@@ -13,7 +13,7 @@ follow-up programado, no del registro.
 ## Stack (fijado, no cambiar sin pedirlo)
 
 - **Angular 22**: standalone, zoneless, signals, Signal Forms (`@angular/forms/signals`), control flow nativo, `@Service()` para servicios singleton. OnPush y standalone son el default (no declararlos); bindings en `host`, no `@HostBinding`/`@HostListener`. El resto de convenciones de Angular, en la skill `angular-developer`.
-- **Firebase JS SDK 13** (Auth con Google o email/contraseña + Firestore). **No** se usa `@angular/fire` (no soporta Angular 22): Firebase se inyecta con los tokens `AUTH` y `FIRESTORE` de `src/app/core/firebase.ts`.
+- **Firebase JS SDK 13** (Auth con Google o email/contraseña + Firestore). Plan **Blaze** desde el 1 nov 2026, solo para la Cloud Function de entrada de leads (`functions/`, Node 22, `firebase-functions` v2 + `firebase-admin`). **No** se usa `@angular/fire` (no soporta Angular 22): Firebase se inyecta con los tokens `AUTH` y `FIRESTORE` de `src/app/core/firebase.ts`.
 - **Tailwind CSS v4** (config CSS-first en `src/styles.css` con `@theme`; sin `tailwind.config.js`).
 - **Iconos: `@lucide/angular`**. Importar cada icono como componente (`LucidePhone` → `<svg lucidePhone [size]="16"></svg>`) o `LucideDynamicIcon` con `[lucideIcon]`. Nunca emoji ni glifos unicode como iconos.
 - **Prohibido Angular Material / CDK con estilos Material / cualquier estética Material Design.** Controles nativos estilizados con las clases base de `styles.css`.
@@ -31,10 +31,12 @@ npm test                  # Vitest
 npm run lint              # ESLint (angular-eslint), también plantillas y accesibilidad
 npm run test:rules        # pruebas de firestore.rules contra el emulador (necesita Java)
 npm run deploy:rules      # publica firestore.rules + firestore.indexes.json
+npm --prefix functions test               # lógica pura de /api/intake (Vitest)
+npm --prefix functions run test:emulator  # la transacción de /api/intake contra el emulador (necesita Java)
 npm run deploy            # build + Firebase Hosting + reglas
 ```
 
-CI/CD: `.github/workflows/deploy.yml` publica en cada push a `main` que no sea solo documentación (`paths-ignore`: `*.md`, `docs/`, `LICENSE`, `.claude/`, `.impeccable/`, `.vscode/`) (lint + tests + pruebas de reglas + build, y luego `firebase deploy --only hosting,firestore`) con el secreto `FIREBASE_SERVICE_ACCOUNT`; en los PR hace lo mismo sin publicar. Las pruebas de reglas viven en `tests/rules/`: un cambio en `firestore.rules` va con su caso.
+CI/CD: `.github/workflows/deploy.yml` publica en cada push a `main` que no sea solo documentación (`paths-ignore`: `*.md`, `docs/`, `LICENSE`, `.claude/`, `.impeccable/`, `.vscode/`) (lint + tests + pruebas de reglas y de la función + build, y luego `firebase deploy --only hosting,firestore,functions --force`; `--force` deja puesta la limpieza de imágenes viejas de las funciones) con el secreto `FIREBASE_SERVICE_ACCOUNT`; en los PR hace lo mismo sin publicar. Las pruebas de reglas viven en `tests/rules/`: un cambio en `firestore.rules` va con su caso.
 
 Con emuladores, `window.__emulatorSignIn(email, nombre)` hace login sin popup (solo existe en la configuración `emulator`).
 
@@ -60,6 +62,7 @@ src/app/
                    la tabla del equipo de hoy (`core/team-day.ts`) y puede filtrar la agenda por vendedor
     contacts/      clientes y prospectos; ficha con negocios abiertos, servicios comprados e historial
     services/      catálogo (servicios, productos y materiales) y % de categorías (solo admin edita); con team/ y company/, la entrada "Ajustes"
+    sites/         Ajustes → Sitios web (solo admin): una clave por sitio que manda formularios a `/api/intake`
     company/       datos de la empresa que factura (logo, EIN, dirección, % de impuesto, numeración)
     invoices/      factura imprimible (`/invoices/:id`, imprimir o guardar PDF; el admin la anula)
     leads/         Negocios en lista, con búsqueda/filtros en la URL
@@ -98,6 +101,8 @@ Dentro de cada empresa:
 | `meta/pricing` | único | `bronze`, `silver`, `gold` (% sobre el precio oficial; por defecto 3/5/7) — solo admin |
 | `leads/{id}/activities/{id}` | historial | `type` (call, whatsapp, email, meeting, note, stage, created, followup), `body`, `from`/`to`, `createdBy`, `createdAt` |
 | `deletions/{id}` | registro de borrados | `kind` (contact, lead, activity, service, member, invoice), `refId`, `label`, `detail` (lo que arrastró), `snapshot` (copia de los datos), `by`, `byName`, `at` — se escribe en el mismo lote que el borrado (`DeletionsService.record`); solo el admin lo lee y nadie lo edita ni lo borra |
+| `intakeKeys/{id}` | sitio web (clave de entrada) | `name`, `domain`, `assigneeId` (vacío = un admin), `active`, `secretHash` (SHA-256; el secreto no se guarda), `createdBy/At`; contadores que escribe la función: `receivedCount`, `lastReceivedAt`, `windowStart/Count` — solo admin lee y edita; no se borra |
+| `intake/{claveId_envío}` | formulario recibido | los campos del formulario + `keyId`, `site`, `status: processed`, `leadId`, `contactId`, `assigneeId`, `merged`, `receivedAt` — lo escribe solo la función; solo admin lee |
 | `followups/{id}` | próxima acción | `leadId`, `leadName`, `company`, `assigneeId`, `dueAt`, `channel`, `note`, `status: pending\|done\|cancelled`, `completedAt`/`outcome` al hacerlo |
 
 Reglas de dominio:
@@ -119,6 +124,7 @@ Reglas de dominio:
 - Resumen del contacto: un vendedor no ve los leads de otros, así que el contacto guarda sus compras y quién tiene negocios abiertos. Toda escritura de leads que cambie etapa, responsable o existencia actualiza el contacto en el **mismo batch** (`statsPatch` en `core/contact-stats.ts`, usado por `LeadsService`). La app de un admin lo recalcula desde todos los leads si no coincide (`ContactsService.syncStats`); solo se confía en él si `statsV` coincide. Las reglas solo dejan a un vendedor moverlo lo que mueve un lead suyo (±1 venta, ±1 en su propio `openBy`, sin tocar `statsV`).
 - Facturas (EE. UU.): se emiten desde una venta ganada (su responsable o un admin; `InvoicesService.issue`, cálculos puros en `core/invoice-math.ts`). Cada línea lleva su precio con la categoría aplicada (no se muestra el desglose) y suma el valor del negocio; el impuesto de venta va **aparte**, al `taxRate` de la empresa y solo sobre servicios `taxable`. Sin descuentos por ahora. Las reglas exigen el número siguiente, subtotal = `value`, el % vigente y que la venta no tenga ya factura. No se editan: el admin anula (con motivo) y la venta se puede volver a facturar; una factura anulada la puede borrar el admin (una vigente, nunca), con sus pagos.
 - Cobro de facturas (`InvoicesService.addPayment` / `undoPayment`, cálculos en `core/invoice-math.ts`): se guardan solo `issued`/`void`; el estado que se muestra se calcula (`payState`): Emitida → Pagada en parte → Pagada, Vencida si pasó `dueAt` con saldo, Anulada. Registra pagos el responsable o un admin, nunca más que el saldo; solo el admin deshace uno (queda tachado con motivo). Pago, `paid` de la factura (con `lastPaymentId`) y actividad `payment` van en el mismo lote; las reglas cuadran `paid` con el pago. Con pagos vigentes la factura no se anula. Reportes muestran *Por cobrar* (`receivables`) desde las facturas vigentes escuchadas en vivo. Con factura vigente la venta no se reabre ni se borra (`LeadsService.locked`). Las reglas de leads van justas del tope de 1000 expresiones (4 servicios): medir antes de añadir más comprobaciones.
+- Entrada de leads desde sitios web (`functions/src/`, guía para Astro en `docs/astro-intake.md`): `POST /api/intake` (rewrite de Hosting a la función `intake`, us-central1) con `Authorization: Bearer <empresa>.<clave>.<secreto>`. La función valida (`intake-core.ts`, puro y probado), limita a 30 envíos/min por clave y, en una transacción (`process.ts`), guarda la entrada y crea contacto + negocio (`source: web`, `origin` con sitio y UTM) + actividad + follow-up "Llamar" para ahora, con el resumen del contacto. Contacto existente (email, si no teléfono): va a su dueño si sigue activo; si ya tiene un negocio abierto con él, nota + llamada en ese negocio. Si no, al responsable de la clave, y si no, a un admin activo. Usa Admin SDK (sin reglas): un cambio en cómo la app crea negocios o en el resumen del contacto debe repetirse ahí.
 - Índices compuestos requeridos (`firestore.indexes.json`): `followups (status, dueAt)` y `(assigneeId, status, dueAt)`; `leads (assigneeId, createdAt desc)` (valen en cualquier empresa: van por nombre de colección). Y de campo con alcance de grupo: `members.uid`, `invites.email`.
 
 ## Acceso y seguridad
