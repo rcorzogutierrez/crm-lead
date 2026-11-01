@@ -1,5 +1,6 @@
 import { Component, effect, inject, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
+import { statusHome } from '../../core/auth.guards';
 import { AuthService } from '../../core/auth.service';
 import { t } from '../../core/i18n/i18n';
 import { LangSwitch } from '../../shared/lang-switch';
@@ -42,10 +43,8 @@ export class Pending {
 
   constructor() {
     effect(() => {
-      const s = this.auth.status();
-      if (s === 'member') void this.router.navigateByUrl('/today');
-      if (s === 'signedOut') void this.router.navigateByUrl('/login');
-      if (s === 'unverified') void this.router.navigateByUrl('/verify');
+      const home = statusHome(this.auth.status());
+      if (home && home !== '/pending') void this.router.navigateByUrl(home);
     });
   }
 

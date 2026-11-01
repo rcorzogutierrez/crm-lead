@@ -33,7 +33,14 @@ import { I18nKey } from './i18n/i18n';
 import { Member, MemberRole, SignOutReason } from './models';
 import { TENANT_KEY, TenantService } from './tenant.service';
 
-export type AuthStatus = 'loading' | 'signedOut' | 'unverified' | 'pending' | 'member';
+/** `choose`: está en varias empresas y en este navegador aún no eligió en cuál entrar. */
+export type AuthStatus = 'loading' | 'signedOut' | 'unverified' | 'pending' | 'choose' | 'member';
+
+/** Empresa a la que pertenece el usuario (con acceso), para el selector. */
+export interface MyTenant {
+  id: string;
+  name: string;
+}
 
 /** Error de Auth (código `auth/...`) → texto para el usuario. */
 export function authErrorKey(err: unknown): I18nKey {
@@ -106,6 +113,7 @@ export class AuthService {
   private readonly _error = signal<I18nKey | null>(null);
   private readonly _suspended = signal(false);
   private readonly _platformAdmin = signal(false);
+  private readonly _tenants = signal<MyTenant[]>([]);
   private stopMember: (() => void) | null = null;
 
   readonly user = this._user.asReadonly();
@@ -116,6 +124,8 @@ export class AuthService {
   readonly suspended = this._suspended.asReadonly();
   /** Super-admin de la plataforma (`platformAdmins/{uid}`, creado a mano en la consola). */
   readonly platformAdmin = this._platformAdmin.asReadonly();
+  /** Empresas activas en las que tiene acceso, por nombre. Con más de una aparece el selector. */
+  readonly tenants = this._tenants.asReadonly();
   readonly uid = computed(() => this._user()?.uid ?? '');
   readonly isAdmin = computed(() => this._member()?.role === 'admin');
   /** Si la cuenta tiene contraseña (además o en lugar de Google). */
@@ -133,6 +143,7 @@ export class AuthService {
       this._member.set(null);
       this.tenant.set(null);
       this._platformAdmin.set(false);
+      this._tenants.set([]);
       if (!user) {
         this.setStatus('signedOut');
         return;
@@ -305,9 +316,11 @@ export class AuthService {
     const at = user.metadata.lastSignInTime ?? '';
     const time = Date.parse(at);
     if (!time || Date.now() - time > FRESH_SIGN_IN) return;
+    // Cada empresa anota su entrada: cambiar de empresa en la misma sesión cuenta como entrar en ella.
+    const key = `${user.uid}|${this.tenant.id()}|${at}`;
     try {
-      if (localStorage.getItem(SIGN_IN_KEY) === user.uid + '|' + at) return;
-      localStorage.setItem(SIGN_IN_KEY, user.uid + '|' + at);
+      if (localStorage.getItem(SIGN_IN_KEY) === key) return;
+      localStorage.setItem(SIGN_IN_KEY, key);
     } catch {
       // Sin localStorage: puede anotarse dos veces el mismo inicio, con segundos de diferencia.
     }
@@ -377,58 +390,98 @@ export class AuthService {
   }
 
   /**
-   * Busca en qué empresas está (fichas `tenants/{t}/members/{uid}`) y, si no está en ninguna,
-   * si tiene una invitación (`tenants/{t}/invites/{email}`), que se consume al entrar.
-   * Con varias empresas entra en la última elegida en este navegador.
+   * Busca en qué empresas está (fichas `tenants/{t}/members/{uid}`) y consume las invitaciones
+   * (`tenants/{t}/invites/{email}`) de empresas donde aún no tiene ficha, aunque ya esté en otra.
+   * Con una sola empresa entra en ella; con varias, en la última elegida en este navegador o,
+   * si no hay ninguna, pide elegir (`choose`).
    */
   private async ensureMembership(user: User): Promise<void> {
     const email = (user.email ?? '').toLowerCase();
     const tenantOf = (ref: DocumentReference) => ref.parent.parent?.id ?? null;
     const mine = await getDocs(query(collectionGroup(this.db, 'members'), where('uid', '==', user.uid)));
     const known = mine.docs.map((d) => tenantOf(d.ref)).filter((t): t is string => !!t);
-    let options = mine.docs
+    const options = mine.docs
       .filter((d) => d.data()['active'] === true)
       .map((d) => tenantOf(d.ref))
       .filter((t): t is string => !!t);
 
-    if (!options.length) {
-      // Un fallo al leer no es "sin invitación": que lo reintente checkMembership.
-      const invites = await getDocs(query(collectionGroup(this.db, 'invites'), where('email', '==', email)));
+    // Sin ninguna empresa, un fallo al leer no es "sin invitación": que lo reintente checkMembership.
+    // Con alguna ya, una invitación que no se pudo consumir espera a la próxima entrada.
+    const invites = await getDocs(query(collectionGroup(this.db, 'invites'), where('email', '==', email))).catch(
+      (err) => {
+        if (!options.length) throw err;
+        console.error(err);
+        return null;
+      },
+    );
+    for (const invite of invites?.docs ?? []) {
       // Una invitación de una empresa donde ya tiene ficha (sin acceso) no le devuelve el acceso.
-      const invite = invites.docs.find((d) => {
-        const t = tenantOf(d.ref);
-        return t && !known.includes(t);
-      });
-      if (!invite) {
-        if (this._user() === user) {
-          this._suspended.set(false);
-          this.setStatus('pending');
-        }
-        return;
+      const t = tenantOf(invite.ref);
+      if (!t || known.includes(t)) continue;
+      try {
+        await setDoc(doc(this.db, 'tenants', t, 'members', user.uid), {
+          uid: user.uid,
+          email: user.email ?? '',
+          displayName: user.displayName ?? email,
+          photoURL: user.photoURL ?? null,
+          role: invite.data()['role'] as MemberRole,
+          active: true,
+          createdAt: serverTimestamp(),
+        });
+      } catch (err) {
+        if (!options.length) throw err;
+        console.error(err);
+        continue;
       }
-      const t = tenantOf(invite.ref)!;
-      await setDoc(doc(this.db, 'tenants', t, 'members', user.uid), {
-        uid: user.uid,
-        email: user.email ?? '',
-        displayName: user.displayName ?? email,
-        photoURL: user.photoURL ?? null,
-        role: invite.data()['role'] as MemberRole,
-        active: true,
-        createdAt: serverTimestamp(),
-      });
       await deleteDoc(invite.ref).catch(() => undefined);
-      options = [t];
+      known.push(t);
+      options.push(t);
     }
 
+    // Nombre de cada empresa; las suspendidas no se ofrecen.
+    const found = await Promise.all(
+      options.map(async (id) => {
+        const snap = await getDoc(doc(this.db, 'tenants', id)).catch(() => null);
+        const data = snap?.data();
+        return data?.['active'] === true ? { id, name: String(data['name'] ?? '') } : null;
+      }),
+    );
     // Si entretanto cerró sesión o entró otra cuenta, esta comprobación ya no vale.
     if (this._user() !== user) return;
+    const list = found
+      .filter((t): t is MyTenant => !!t)
+      .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+    this._tenants.set(list);
+    if (!list.length) {
+      this._suspended.set(options.length > 0);
+      this.setStatus('pending');
+      return;
+    }
     let saved: string | null = null;
     try {
       saved = localStorage.getItem(TENANT_KEY);
     } catch {
-      // Sin localStorage: la primera empresa.
+      // Sin localStorage: con varias empresas, se elige al entrar.
     }
-    this.watchMember(options.includes(saved ?? '') ? saved! : options[0], user.uid);
+    const pick = list.length === 1 ? list[0].id : list.find((t) => t.id === saved)?.id;
+    if (pick) this.watchMember(pick, user.uid);
+    else this.setStatus('choose');
+  }
+
+  /**
+   * Entra en otra de sus empresas (selector del menú o pantalla de elegir). Los servicios
+   * rehacen sus consultas solos: pasan por `loading` y leen las rutas de la empresa nueva.
+   */
+  enterTenant(tenantId: string): void {
+    const uid = this.uid();
+    if (!uid || !this._tenants().some((t) => t.id === tenantId)) return;
+    if (this._status() === 'member' && this.tenant.id() === tenantId) return;
+    this.stopMember?.();
+    this.stopMember = null;
+    this._member.set(null);
+    this.tenant.set(null);
+    this.setStatus('loading');
+    this.watchMember(tenantId, uid);
   }
 
   /** Escucha la ficha de miembro y la empresa: perder el acceso o suspenderla saca al usuario. */
@@ -446,6 +499,9 @@ export class AuthService {
       }
       this._suspended.set(false);
       this.tenant.set(tenantId, tenant.name);
+      this._tenants.update((all) =>
+        all.map((t) => (t.id === tenantId && t.name !== tenant!.name ? { ...t, name: tenant!.name } : t)),
+      );
       try {
         localStorage.setItem(TENANT_KEY, tenantId);
       } catch {

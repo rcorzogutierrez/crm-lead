@@ -1,5 +1,5 @@
 import { Routes } from '@angular/router';
-import { adminGuard, guestGuard, memberGuard, platformGuard } from './core/auth.guards';
+import { adminGuard, chooseGuard, guestGuard, memberGuard, platformGuard } from './core/auth.guards';
 import { LEGACY_ROUTES, legacyParamsGuard } from './core/legacy-urls';
 
 /** `title` es una clave de traducción; `I18nTitleStrategy` la traduce y añade el nombre de la app. */
@@ -26,6 +26,13 @@ export const routes: Routes = [
     path: 'pending',
     title: 'pending.tab',
     loadComponent: () => import('./features/auth/pending').then((m) => m.Pending),
+  },
+  {
+    // Elegir empresa: quien está en varias, al entrar por primera vez en este navegador o para cambiar.
+    path: 'select-company',
+    canActivate: [chooseGuard],
+    title: 'choose.tab',
+    loadComponent: () => import('./features/auth/select-company').then((m) => m.SelectCompany),
   },
   {
     // Super-admin: empresas de la plataforma (fuera del riel: no es de ninguna empresa).

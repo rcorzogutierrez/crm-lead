@@ -1,6 +1,7 @@
 import { Component, DestroyRef, effect, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { LucideMail } from '@lucide/angular';
+import { statusHome } from '../../core/auth.guards';
 import { AuthService } from '../../core/auth.service';
 import { I18nKey, t } from '../../core/i18n/i18n';
 import { AuthBoard } from './auth-board';
@@ -95,10 +96,8 @@ export class Verify {
 
   constructor() {
     effect(() => {
-      const s = this.auth.status();
-      if (s === 'member') void this.router.navigateByUrl('/today');
-      if (s === 'pending') void this.router.navigateByUrl('/pending');
-      if (s === 'signedOut') void this.router.navigateByUrl('/login');
+      const home = statusHome(this.auth.status());
+      if (home && home !== '/verify') void this.router.navigateByUrl(home);
     });
 
     const tick = setInterval(() => this.wait.update((w) => Math.max(0, w - 1)), 1000);
