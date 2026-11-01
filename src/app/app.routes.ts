@@ -1,5 +1,5 @@
 import { Routes } from '@angular/router';
-import { adminGuard, guestGuard, memberGuard } from './core/auth.guards';
+import { adminGuard, guestGuard, memberGuard, platformGuard } from './core/auth.guards';
 import { LEGACY_ROUTES, legacyParamsGuard } from './core/legacy-urls';
 
 /** `title` es una clave de traducción; `I18nTitleStrategy` la traduce y añade el nombre de la app. */
@@ -26,6 +26,13 @@ export const routes: Routes = [
     path: 'pending',
     title: 'pending.tab',
     loadComponent: () => import('./features/auth/pending').then((m) => m.Pending),
+  },
+  {
+    // Super-admin: empresas de la plataforma (fuera del riel: no es de ninguna empresa).
+    path: 'platform',
+    canActivate: [platformGuard],
+    title: 'platform.title',
+    loadComponent: () => import('./features/platform/platform-page').then((m) => m.PlatformPage),
   },
   {
     path: '',

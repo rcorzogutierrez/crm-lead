@@ -1,7 +1,7 @@
 import { Service, inject } from '@angular/core';
-import { DocumentData, WriteBatch, collection, doc, limit, orderBy, query, serverTimestamp } from 'firebase/firestore';
+import { DocumentData, WriteBatch, doc, limit, orderBy, query, serverTimestamp } from 'firebase/firestore';
 import { AuthService } from './auth.service';
-import { FIRESTORE } from './firebase';
+import { TenantService } from './tenant.service';
 import { toDate } from './firestore-utils';
 import { I18nKey, intlLocale, t } from './i18n/i18n';
 import { teamQuery } from './team-query';
@@ -91,11 +91,11 @@ function mapDeletion(id: string, d: DocumentData): Deletion {
  */
 @Service()
 export class DeletionsService {
-  private readonly db = inject(FIRESTORE);
+  private readonly tenant = inject(TenantService);
   private readonly auth = inject(AuthService);
 
   private readonly live = teamQuery(
-    () => query(collection(this.db, 'deletions'), orderBy('at', 'desc'), limit(300)),
+    () => query(this.tenant.col('deletions'), orderBy('at', 'desc'), limit(300)),
     mapDeletion,
     () => this.auth.isAdmin(),
   );
@@ -107,7 +107,7 @@ export class DeletionsService {
   /** Añade la entrada al lote que borra. */
   record(batch: WriteBatch, input: DeletionInput): void {
     const user = this.auth.user();
-    batch.set(doc(collection(this.db, 'deletions')), {
+    batch.set(doc(this.tenant.col('deletions')), {
       kind: input.kind,
       refId: input.refId,
       label: input.label.slice(0, 300),

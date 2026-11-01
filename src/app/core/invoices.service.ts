@@ -3,7 +3,6 @@ import {
   DocumentData,
   Timestamp,
   WriteBatch,
-  collection,
   doc,
   getDoc,
   getDocs,
@@ -21,6 +20,7 @@ import { CatalogService } from './catalog.service';
 import { Company, CompanyService, companyAddress } from './company.service';
 import { DeletionsService } from './deletions.service';
 import { FIRESTORE } from './firebase';
+import { TenantService } from './tenant.service';
 import { toDate } from './firestore-utils';
 import { t } from './i18n/i18n';
 import { InvoiceLine, InvoiceTotals, PaymentMethod, invoiceBalance, invoiceLabel, invoiceLines, invoiceTotals, round2 } from './invoice-math';
@@ -192,6 +192,7 @@ function issuerOf(c: Company): InvoiceIssuer {
 @Service()
 export class InvoicesService {
   private readonly db = inject(FIRESTORE);
+  private readonly tenant = inject(TenantService);
   private readonly auth = inject(AuthService);
   private readonly catalog = inject(CatalogService);
   private readonly companies = inject(CompanyService);
@@ -205,7 +206,7 @@ export class InvoicesService {
     effect((onCleanup) => {
       if (this.auth.status() !== 'member') return;
       const stop = onSnapshot(
-        doc(this.db, 'meta', 'invoiceSeq'),
+        this.tenant.doc('meta', 'invoiceSeq'),
         (snap) => this._next.set(Number(snap.data()?.['next'] ?? 1)),
         (err) => console.error(err),
       );
@@ -220,9 +221,9 @@ export class InvoicesService {
   private readonly live = teamQuery(
     () =>
       this.auth.isAdmin()
-        ? query(collection(this.db, 'invoices'), where('status', '==', 'issued'))
+        ? query(this.tenant.col('invoices'), where('status', '==', 'issued'))
         : query(
-            collection(this.db, 'invoices'),
+            this.tenant.col('invoices'),
             where('assigneeId', '==', this.auth.uid()),
             where('status', '==', 'issued'),
           ),
@@ -235,7 +236,7 @@ export class InvoicesService {
   /** Escucha una factura; devuelve la función para dejar de escuchar. */
   watch(id: string, next: (inv: Invoice | null) => void, fail: (err: unknown) => void): () => void {
     return onSnapshot(
-      doc(this.db, 'invoices', id),
+      this.tenant.doc('invoices', id),
       (snap) => next(snap.exists() ? mapInvoice(snap.id, snap.data()) : null),
       fail,
     );
@@ -248,7 +249,7 @@ export class InvoicesService {
     fail: (err: unknown) => void,
   ): () => void {
     return onSnapshot(
-      query(collection(this.db, 'invoices', id, 'payments'), orderBy('paidAt', 'desc')),
+      query(this.tenant.col('invoices', id, 'payments'), orderBy('paidAt', 'desc')),
       (snap) => next(snap.docs.map((d) => mapPayment(d.id, d.data()))),
       fail,
     );
@@ -267,7 +268,7 @@ export class InvoicesService {
    */
   async issue(lead: Lead, input: IssueInput): Promise<string> {
     for (let attempt = 0; ; attempt++) {
-      const seq = await getDoc(doc(this.db, 'meta', 'invoiceSeq'));
+      const seq = await getDoc(this.tenant.doc('meta', 'invoiceSeq'));
       const number = seq.exists() ? Number(seq.data()['next']) : 1;
       try {
         await this.issueBatch(lead, input, number).commit();
@@ -284,7 +285,7 @@ export class InvoicesService {
     const user = this.auth.user();
     const id = String(number);
     const batch = writeBatch(this.db);
-    batch.set(doc(this.db, 'invoices', id), {
+    batch.set(this.tenant.doc('invoices', id), {
       number,
       prefix: company.invoicePrefix,
       leadId: lead.id,
@@ -302,9 +303,9 @@ export class InvoicesService {
       issuedBy: this.auth.uid(),
       issuedByName: user?.displayName ?? user?.email ?? '',
     });
-    batch.set(doc(this.db, 'meta', 'invoiceSeq'), { next: number + 1, updatedAt: serverTimestamp() });
-    batch.update(doc(this.db, 'leads', lead.id), { invoiceId: id, updatedAt: serverTimestamp() });
-    batch.set(doc(collection(this.db, 'leads', lead.id, 'activities')), {
+    batch.set(this.tenant.doc('meta', 'invoiceSeq'), { next: number + 1, updatedAt: serverTimestamp() });
+    batch.update(this.tenant.doc('leads', lead.id), { invoiceId: id, updatedAt: serverTimestamp() });
+    batch.set(doc(this.tenant.col('leads', lead.id, 'activities')), {
       type: 'invoice',
       body: t('invoice.activityIssued', { n: invoiceLabel({ prefix: company.invoicePrefix, number }) }),
       createdBy: this.auth.uid(),
@@ -322,7 +323,7 @@ export class InvoicesService {
     if (!(amount > 0) || amount > invoiceBalance(inv) + 0.005) throw new Error(t('pay.tooMuch'));
     const user = this.auth.user();
     const batch = writeBatch(this.db);
-    const ref = doc(collection(this.db, 'invoices', inv.id, 'payments'));
+    const ref = doc(this.tenant.col('invoices', inv.id, 'payments'));
     batch.set(ref, {
       amount,
       method: input.method,
@@ -332,12 +333,12 @@ export class InvoicesService {
       createdByName: user?.displayName ?? user?.email ?? '',
       createdAt: serverTimestamp(),
     });
-    batch.update(doc(this.db, 'invoices', inv.id), {
+    batch.update(this.tenant.doc('invoices', inv.id), {
       paid: round2(inv.paid + amount),
       lastPaymentId: ref.id,
     });
     const left = invoiceBalance({ total: inv.total, paid: inv.paid + amount });
-    batch.set(doc(collection(this.db, 'leads', inv.leadId, 'activities')), {
+    batch.set(doc(this.tenant.col('leads', inv.leadId, 'activities')), {
       type: 'payment',
       body: t(left < 0.005 ? 'pay.activityPaid' : 'pay.activity', {
         amount: centsLabel(amount),
@@ -353,17 +354,17 @@ export class InvoicesService {
   /** Solo admin: deshace un pago (queda en el historial, tachado) y el saldo vuelve a subir. */
   async undoPayment(inv: Invoice, p: Payment, reason: string): Promise<void> {
     const batch = writeBatch(this.db);
-    batch.update(doc(this.db, 'invoices', inv.id, 'payments', p.id), {
+    batch.update(this.tenant.doc('invoices', inv.id, 'payments', p.id), {
       undone: true,
       undoReason: reason.trim(),
       undoneAt: serverTimestamp(),
       undoneBy: this.auth.uid(),
     });
-    batch.update(doc(this.db, 'invoices', inv.id), {
+    batch.update(this.tenant.doc('invoices', inv.id), {
       paid: Math.max(0, round2(inv.paid - p.amount)),
       lastPaymentId: p.id,
     });
-    batch.set(doc(collection(this.db, 'leads', inv.leadId, 'activities')), {
+    batch.set(doc(this.tenant.col('leads', inv.leadId, 'activities')), {
       type: 'payment',
       body: t('pay.activityUndone', {
         amount: centsLabel(p.amount),
@@ -380,14 +381,14 @@ export class InvoicesService {
   async void(inv: Invoice, reason: string): Promise<void> {
     if (inv.paid > 0) throw new Error(t('pay.voidBlocked'));
     const batch = writeBatch(this.db);
-    batch.update(doc(this.db, 'invoices', inv.id), {
+    batch.update(this.tenant.doc('invoices', inv.id), {
       status: 'void',
       voidReason: reason.trim(),
       voidedAt: serverTimestamp(),
       voidedBy: this.auth.uid(),
     });
-    batch.update(doc(this.db, 'leads', inv.leadId), { invoiceId: null, updatedAt: serverTimestamp() });
-    batch.set(doc(collection(this.db, 'leads', inv.leadId, 'activities')), {
+    batch.update(this.tenant.doc('leads', inv.leadId), { invoiceId: null, updatedAt: serverTimestamp() });
+    batch.set(doc(this.tenant.col('leads', inv.leadId, 'activities')), {
       type: 'invoice',
       body: t('invoice.activityVoided', { n: invoiceLabel(inv), reason: reason.trim() }),
       createdBy: this.auth.uid(),
@@ -405,7 +406,7 @@ export class InvoicesService {
     const batch = writeBatch(this.db);
     // Los pagos (todos deshechos, si no la factura no estaría anulada) se van con ella.
     await this.deletePayments(batch, inv.id);
-    batch.delete(doc(this.db, 'invoices', inv.id));
+    batch.delete(this.tenant.doc('invoices', inv.id));
     this.deletions.record(batch, {
       kind: 'invoice',
       refId: inv.id,
@@ -418,14 +419,14 @@ export class InvoicesService {
 
   /** Añade al lote el borrado de los pagos de una factura (al borrarla, en cascada o no). */
   async deletePayments(batch: WriteBatch, invoiceId: string): Promise<number> {
-    const snap = await getDocs(collection(this.db, 'invoices', invoiceId, 'payments'));
+    const snap = await getDocs(this.tenant.col('invoices', invoiceId, 'payments'));
     snap.docs.forEach((d) => batch.delete(d.ref));
     return snap.size;
   }
 
   /** Solo admin: número de la última factura que existe (0 si no hay ninguna). */
   async highestNumber(): Promise<number> {
-    const snap = await getDocs(query(collection(this.db, 'invoices'), orderBy('number', 'desc'), limit(1)));
+    const snap = await getDocs(query(this.tenant.col('invoices'), orderBy('number', 'desc'), limit(1)));
     return snap.empty ? 0 : Number(snap.docs[0].data()['number'] ?? 0);
   }
 
@@ -434,6 +435,6 @@ export class InvoicesService {
    * número usado: la página no deja ir por debajo de la última factura que quede.
    */
   setNextNumber(next: number): Promise<void> {
-    return setDoc(doc(this.db, 'meta', 'invoiceSeq'), { next, updatedAt: serverTimestamp() });
+    return setDoc(this.tenant.doc('meta', 'invoiceSeq'), { next, updatedAt: serverTimestamp() });
   }
 }

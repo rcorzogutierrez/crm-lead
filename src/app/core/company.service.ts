@@ -1,7 +1,7 @@
 import { Service, effect, inject, signal } from '@angular/core';
-import { doc, onSnapshot, serverTimestamp, setDoc } from 'firebase/firestore';
+import { onSnapshot, serverTimestamp, setDoc } from 'firebase/firestore';
 import { AuthService } from './auth.service';
-import { FIRESTORE } from './firebase';
+import { TenantService } from './tenant.service';
 
 /**
  * Datos de la empresa que emite las facturas (doc `meta/company`). Todo el equipo los lee
@@ -89,7 +89,7 @@ export function companyAddress(c: Pick<Company, 'address1' | 'address2' | 'city'
 
 @Service()
 export class CompanyService {
-  private readonly db = inject(FIRESTORE);
+  private readonly tenant = inject(TenantService);
   private readonly auth = inject(AuthService);
 
   private readonly _company = signal<Company>(EMPTY_COMPANY);
@@ -103,7 +103,7 @@ export class CompanyService {
     effect((onCleanup) => {
       if (this.auth.status() !== 'member') return;
       const stop = onSnapshot(
-        doc(this.db, 'meta', 'company'),
+        this.tenant.doc('meta', 'company'),
         (snap) => {
           this._company.set(mapCompany(snap.data() ?? {}));
           this._loaded.set(true);
@@ -117,7 +117,7 @@ export class CompanyService {
   save(draft: CompanyDraft): Promise<void> {
     const out: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(draft)) out[k] = typeof v === 'string' && k !== 'logo' ? v.trim() : v;
-    return setDoc(doc(this.db, 'meta', 'company'), { ...out, updatedAt: serverTimestamp(), updatedBy: this.auth.uid() });
+    return setDoc(this.tenant.doc('meta', 'company'), { ...out, updatedAt: serverTimestamp(), updatedBy: this.auth.uid() });
   }
 }
 

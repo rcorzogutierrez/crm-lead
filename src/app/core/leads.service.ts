@@ -16,6 +16,7 @@ import {
 import { AuthService } from './auth.service';
 import { DealState, initialStats, statsPatch } from './contact-stats';
 import { FIRESTORE } from './firebase';
+import { TenantService } from './tenant.service';
 import { toDate } from './firestore-utils';
 import { t } from './i18n/i18n';
 import { FollowUpsService } from './followups.service';
@@ -94,14 +95,15 @@ export type PricingPatch = LeadPricing & { priceAck: number | null; note: string
 @Service()
 export class LeadsService {
   private readonly db = inject(FIRESTORE);
+  private readonly tenant = inject(TenantService);
   private readonly auth = inject(AuthService);
   private readonly followUps = inject(FollowUpsService);
   private readonly deletions = inject(DeletionsService);
   private readonly live = teamQuery(
     () =>
       this.auth.isAdmin()
-        ? query(collection(this.db, 'leads'), orderBy('createdAt', 'desc'))
-        : query(collection(this.db, 'leads'), where('assigneeId', '==', this.auth.uid()), orderBy('createdAt', 'desc')),
+        ? query(this.tenant.col('leads'), orderBy('createdAt', 'desc'))
+        : query(this.tenant.col('leads'), where('assigneeId', '==', this.auth.uid()), orderBy('createdAt', 'desc')),
     mapLead,
   );
 
@@ -145,9 +147,9 @@ export class LeadsService {
     if (contactId) {
       // Un negocio nuevo reactiva al contacto si estaba archivado.
       const patch = statsPatch(null, deal, await this.firstWonMissing(contactId, deal));
-      batch.update(doc(this.db, 'contacts', contactId), { ...patch, archived: false, archivedAt: null });
+      batch.update(this.tenant.doc('contacts', contactId), { ...patch, archived: false, archivedAt: null });
     } else {
-      const ref = doc(collection(this.db, 'contacts'));
+      const ref = doc(this.tenant.col('contacts'));
       contactId = ref.id;
       batch.set(ref, {
         ...initialStats(deal),
@@ -163,7 +165,7 @@ export class LeadsService {
       });
     }
 
-    const leadRef = doc(collection(this.db, 'leads'));
+    const leadRef = doc(this.tenant.col('leads'));
     batch.set(leadRef, {
       name: c.name,
       company: c.company,
@@ -193,14 +195,14 @@ export class LeadsService {
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     });
-    batch.set(doc(collection(this.db, 'leads', leadRef.id, 'activities')), {
+    batch.set(doc(this.tenant.col('leads', leadRef.id, 'activities')), {
       type: 'created',
       body: p ? dealServices(p) : '',
       createdBy: uid,
       createdAt: serverTimestamp(),
     });
     if (next) {
-      batch.set(doc(collection(this.db, 'followups')), {
+      batch.set(doc(this.tenant.col('followups')), {
         leadId: leadRef.id,
         leadName: c.name,
         company: c.company,
@@ -224,8 +226,8 @@ export class LeadsService {
   async updatePricing(lead: Lead, patch: PricingPatch): Promise<void> {
     const { note, ...pricing } = patch;
     const batch = writeBatch(this.db);
-    batch.update(doc(this.db, 'leads', lead.id), { ...pricing, updatedAt: serverTimestamp() });
-    batch.set(doc(collection(this.db, 'leads', lead.id, 'activities')), {
+    batch.update(this.tenant.doc('leads', lead.id), { ...pricing, updatedAt: serverTimestamp() });
+    batch.set(doc(this.tenant.col('leads', lead.id, 'activities')), {
       type: 'pricing',
       body: note,
       createdBy: this.auth.uid(),
@@ -236,7 +238,7 @@ export class LeadsService {
 
   /** Datos del lead que no cambian de responsable (para eso, `reassign`). */
   update(id: string, patch: Partial<Omit<LeadDraft, 'assigneeId'>> & { lostReason?: string }): Promise<void> {
-    return updateDoc(doc(this.db, 'leads', id), { ...clean(patch), updatedAt: serverTimestamp() });
+    return updateDoc(this.tenant.doc('leads', id), { ...clean(patch), updatedAt: serverTimestamp() });
   }
 
   /**
@@ -246,10 +248,10 @@ export class LeadsService {
   async reassign(lead: Lead, assigneeId: string, pendingFollowUpIds: string[]): Promise<void> {
     if (!assigneeId || lead.assigneeId === assigneeId) return;
     const batch = writeBatch(this.db);
-    batch.update(doc(this.db, 'leads', lead.id), { assigneeId, updatedAt: serverTimestamp() });
+    batch.update(this.tenant.doc('leads', lead.id), { assigneeId, updatedAt: serverTimestamp() });
     // La factura vigente pasa con la venta, para que el nuevo responsable la vea.
-    if (lead.invoiceId) batch.update(doc(this.db, 'invoices', lead.invoiceId), { assigneeId });
-    for (const id of pendingFollowUpIds) batch.update(doc(this.db, 'followups', id), { assigneeId });
+    if (lead.invoiceId) batch.update(this.tenant.doc('invoices', lead.invoiceId), { assigneeId });
+    for (const id of pendingFollowUpIds) batch.update(this.tenant.doc('followups', id), { assigneeId });
     this.patchContact(batch, lead, { ...lead, assigneeId }, false);
     await batch.commit();
   }
@@ -268,7 +270,7 @@ export class LeadsService {
     const isLost = to === 'lost';
     const detail = isLost ? (lost?.detail.trim() ?? '') : '';
     const code = isLost ? (lost?.code ?? null) : null;
-    batch.update(doc(this.db, 'leads', lead.id), {
+    batch.update(this.tenant.doc('leads', lead.id), {
       stage: to,
       lostReason: detail,
       lostCode: code,
@@ -278,10 +280,10 @@ export class LeadsService {
       updatedAt: serverTimestamp(),
     });
     if (closing) {
-      for (const fu of this.followUps.forLead(lead.id)) batch.update(doc(this.db, 'followups', fu.id), { status: 'cancelled' });
+      for (const fu of this.followUps.forLead(lead.id)) batch.update(this.tenant.doc('followups', fu.id), { status: 'cancelled' });
     }
     const reason = isLost ? lostReasonLabel({ lostCode: code, lostReason: detail }) : '';
-    batch.set(doc(collection(this.db, 'leads', lead.id, 'activities')), {
+    batch.set(doc(this.tenant.col('leads', lead.id, 'activities')), {
       type: 'stage',
       from: lead.stage,
       to,
@@ -304,13 +306,13 @@ export class LeadsService {
     const admin = this.auth.isAdmin();
     // Un vendedor solo puede consultar sus follow-ups: la consulta debe decirlo.
     const fuQuery = admin
-      ? query(collection(this.db, 'followups'), where('leadId', '==', id))
-      : query(collection(this.db, 'followups'), where('leadId', '==', id), where('assigneeId', '==', this.auth.uid()));
+      ? query(this.tenant.col('followups'), where('leadId', '==', id))
+      : query(this.tenant.col('followups'), where('leadId', '==', id), where('assigneeId', '==', this.auth.uid()));
     const [acts, fus, invs] = await Promise.all([
-      getDocs(collection(this.db, 'leads', id, 'activities')),
+      getDocs(this.tenant.col('leads', id, 'activities')),
       getDocs(fuQuery),
       // Las facturas solo las borra un admin, y solo anuladas (sin factura vigente, lo están todas).
-      admin ? getDocs(query(collection(this.db, 'invoices'), where('leadId', '==', id))).then((s) => s.docs) : Promise.resolve([]),
+      admin ? getDocs(query(this.tenant.col('invoices'), where('leadId', '==', id))).then((s) => s.docs) : Promise.resolve([]),
     ]);
     const voided = invs.filter((d) => d.data()['status'] === 'void');
     const batch = writeBatch(this.db);
@@ -328,7 +330,7 @@ export class LeadsService {
       invoices: voided.length,
     };
     const last = writeBatch(this.db);
-    last.delete(doc(this.db, 'leads', id));
+    last.delete(this.tenant.doc('leads', id));
     if (!fromContact) {
       this.patchContact(last, lead, null, false);
       this.deletions.record(last, {
@@ -347,13 +349,13 @@ export class LeadsService {
   private patchContact(batch: ReturnType<typeof writeBatch>, before: Lead, after: DealState | null, firstWon: boolean): void {
     if (!before.contactId) return;
     const patch = statsPatch(before, after, firstWon);
-    if (Object.keys(patch).length) batch.update(doc(this.db, 'contacts', before.contactId), patch);
+    if (Object.keys(patch).length) batch.update(this.tenant.doc('contacts', before.contactId), patch);
   }
 
   /** ¿Hay que fijar `firstWonAt`? Solo al ganar y si el contacto aún no la tiene. */
   private async firstWonMissing(contactId: string | null, after: DealState): Promise<boolean> {
     if (!contactId || after.stage !== 'won') return false;
-    const snap = await getDoc(doc(this.db, 'contacts', contactId));
+    const snap = await getDoc(this.tenant.doc('contacts', contactId));
     return !snap.data()?.['firstWonAt'];
   }
 }

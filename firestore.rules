@@ -1,667 +1,700 @@
 rules_version = '2';
 
-// Reglas del CRM para un equipo pequeño compartido.
-// - Solo miembros activos (members/{uid}.active == true) leen y escriben datos.
-// - Contactos y catálogo: visibles para todo el equipo. Solo un admin archiva o borra contactos.
+// Reglas del CRM, multiempresa. Cada empresa (tenant) guarda todo en tenants/{t}/…; nada cruza
+// de una empresa a otra porque cada regla mira la ficha del miembro dentro de esa empresa.
+// - La plataforma: el super-admin (platformAdmins/{uid}, creado a mano en la consola) crea,
+//   renombra, suspende y reactiva empresas e invita a su primer admin. No lee sus datos.
+// - Dentro de una empresa, solo miembros activos (members/{uid}.active == true) de una empresa
+//   activa (tenants/{t}.active == true) leen y escriben.
+// - Contactos y catálogo: visibles para toda la empresa. Solo un admin archiva o borra contactos.
 // - Borrar datos es cosa del admin: contactos (aunque tengan ventas), servicios, miembros sin
 //   acceso y facturas ya anuladas. Una factura vigente se anula antes de borrarse.
 // - Leads, su historial y sus follow-ups: un vendedor solo ve y toca los suyos (assigneeId);
 //   un admin ve todo y es el único que reasigna.
-// - El primer usuario crea meta/team y queda como admin.
-// - Los demás entran si un admin creó invites/{email}.
+// - Se entra en una empresa si un admin (o el super-admin) creó tenants/{t}/invites/{email}.
 service cloud.firestore {
   match /databases/{database}/documents {
 
     function signedIn() {
       return request.auth != null && request.auth.token.email_verified == true;
     }
-    function memberPath(uid) {
-      return /databases/$(database)/documents/members/$(uid);
-    }
-    function isMember() {
-      return signedIn()
-        && exists(memberPath(request.auth.uid))
-        && get(memberPath(request.auth.uid)).data.active == true;
-    }
-    function isAdmin() {
-      return isMember() && adminRole();
-    }
-    // Rol de admin sin volver a comprobar que es miembro (usar después de isMember()):
-    // ahorra cálculo en las reglas de leads, que van justas de tope.
-    function adminRole() {
-      return get(memberPath(request.auth.uid)).data.role == 'admin';
-    }
     function myEmail() {
       return request.auth.token.email.lower();
     }
-    function invitePath() {
-      return /databases/$(database)/documents/invites/$(myEmail());
-    }
-    function teamPath() {
-      return /databases/$(database)/documents/meta/team;
-    }
-    function isString(v, max) {
-      return v is string && v.size() <= max;
-    }
-    function changedOnly(keys) {
-      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(keys);
-    }
-    function isMine(d) {
-      return d.assigneeId == request.auth.uid;
-    }
-    function leadPath(leadId) {
-      return /databases/$(database)/documents/leads/$(leadId);
-    }
-    // El lead es visible para quien pide: admin o su responsable.
-    function canSeeLead(leadId) {
-      return isAdmin() || get(leadPath(leadId)).data.assigneeId == request.auth.uid;
-    }
-    // Igual, pero mirando el estado tras el batch (lead creado o reasignado en el mismo lote).
-    function canSeeLeadAfter(leadId) {
-      return isAdmin() || getAfter(leadPath(leadId)).data.assigneeId == request.auth.uid;
+    function isPlatformAdmin() {
+      return signedIn() && exists(/databases/$(database)/documents/platformAdmins/$(request.auth.uid));
     }
 
-    // ---- Equipo ----
-    match /meta/team {
-      allow read: if signedIn();
-      // Solo el primero: crea el equipo junto con su ficha de admin (en el mismo batch).
-      allow create: if signedIn()
-        && request.resource.data.ownerUid == request.auth.uid
-        && request.resource.data.keys().hasOnly(['ownerUid', 'name', 'createdAt'])
-        && getAfter(memberPath(request.auth.uid)).data.role == 'admin';
-      allow update: if isAdmin() && changedOnly(['name']);
-      allow delete: if false;
+    // ---- Plataforma ----
+    // La marca de super-admin se crea a mano en la consola; la app solo la lee (la propia).
+    match /platformAdmins/{uid} {
+      allow read: if signedIn() && request.auth.uid == uid;
+      allow write: if false;
     }
 
-    match /members/{uid} {
-      allow read: if isMember() || (signedIn() && request.auth.uid == uid);
-
-      allow create: if signedIn()
-        && request.auth.uid == uid
-        && request.resource.data.uid == uid
-        && request.resource.data.email == request.auth.token.email
-        && request.resource.data.active == true
-        && request.resource.data.keys().hasOnly(['uid', 'email', 'displayName', 'photoURL', 'role', 'active', 'createdAt'])
-        && (
-          // Fundador: no existe equipo y lo crea en el mismo batch.
-          (request.resource.data.role == 'admin'
-            && !exists(teamPath())
-            && getAfter(teamPath()).data.ownerUid == uid)
-          ||
-          // Invitado: el rol debe coincidir con la invitación.
-          (exists(invitePath())
-            && request.resource.data.role == get(invitePath()).data.role)
-        );
-
-      // Admins cambian rol/acceso de otros; cada uno puede actualizar su nombre y foto.
-      // Nadie cambia su propio rol ni acceso: quien quita un admin sigue siéndolo,
-      // así el equipo nunca se queda sin un admin activo.
-      allow update: if (isAdmin() && uid != request.auth.uid && changedOnly(['role', 'active'])
-                        && request.resource.data.role in ['admin', 'member']
-                        && request.resource.data.active is bool)
-                    || (isMember() && uid == request.auth.uid && changedOnly(['displayName', 'photoURL'])
-                        && isString(request.resource.data.displayName, 200)
-                        && (request.resource.data.photoURL == null || isString(request.resource.data.photoURL, 2000)));
-      // Un admin borra a otro miembro al que ya quitó el acceso (antes pasa sus datos a otro).
-      allow delete: if isAdmin() && uid != request.auth.uid && resource.data.active == false;
+    // Al entrar, cada uno busca sus fichas e invitaciones en todas las empresas (consultas de
+    // grupo de colecciones). Solo devuelven lo propio.
+    match /{path=**}/members/{uid} {
+      allow read: if signedIn() && resource.data.uid == request.auth.uid;
+    }
+    match /{path=**}/invites/{email} {
+      allow read: if signedIn() && resource.data.email == myEmail();
     }
 
-    // Última entrada y salida de cada miembro (lo ve el admin en Equipo).
-    // Cada uno anota solo lo suyo y con la hora del servidor: nadie puede escribir la de
-    // otro ni inventar una fecha. Leerlo es cosa del admin.
-    function sessionKeys() {
-      return ['signInAt', 'signOutAt', 'signOutReason'];
-    }
-    function sessionOk(keys) {
-      let d = request.resource.data;
-      return d.keys().hasOnly(sessionKeys())
-        && keys.hasOnly(sessionKeys())
-        && (!keys.hasAny(['signInAt']) || d.signInAt == request.time)
-        && (!keys.hasAny(['signOutAt', 'signOutReason'])
-            || (d.signOutAt == request.time && d.signOutReason in ['manual', 'idle']));
-    }
-
-    match /sessions/{uid} {
-      allow read: if isAdmin();
-      allow create: if isMember() && uid == request.auth.uid
-        && sessionOk(request.resource.data.keys());
-      allow update: if isMember() && uid == request.auth.uid
-        && sessionOk(request.resource.data.diff(resource.data).affectedKeys());
-      // Se va con el miembro borrado (solo de alguien sin acceso).
-      allow delete: if isAdmin() && uid != request.auth.uid
-        && (!exists(memberPath(uid)) || get(memberPath(uid)).data.active == false);
-    }
-
-    match /invites/{email} {
-      allow read: if isAdmin() || (signedIn() && myEmail() == email);
-      allow create: if isAdmin()
-        && email == email.lower()
-        && request.resource.data.email == email
-        && request.resource.data.role in ['admin', 'member']
-        && request.resource.data.invitedBy == request.auth.uid;
-      // El invitado la consume al entrar; un admin la puede retirar.
-      allow delete: if isAdmin() || (signedIn() && myEmail() == email);
-      // Un admin puede cambiar el rol de una invitación aún no usada.
-      allow update: if isAdmin()
-        && changedOnly(['role'])
-        && request.resource.data.role in ['admin', 'member'];
-    }
-
-    // ---- Catálogo de servicios y categorías de venta (solo admin escribe) ----
-    function pricingPath() {
-      return /databases/$(database)/documents/meta/pricing;
-    }
-    function servicePath(id) {
-      return /databases/$(database)/documents/services/$(id);
-    }
-    function validRate(v) {
-      return v is number && v >= 0 && v <= 100;
-    }
-    // Porcentaje vigente de una categoría (valores por defecto si aún no hay meta/pricing).
-    function tierRate(tier) {
-      return exists(pricingPath())
-        ? get(pricingPath()).data.get(tier, tier == 'bronze' ? 3 : tier == 'silver' ? 5 : 7)
-        : (tier == 'bronze' ? 3 : tier == 'silver' ? 5 : 7);
-    }
-
-    match /meta/pricing {
-      allow read: if isMember();
-      allow write: if isAdmin()
-        && request.resource.data.keys().hasOnly(['bronze', 'silver', 'gold', 'updatedAt'])
-        && validRate(request.resource.data.bronze)
-        && validRate(request.resource.data.silver)
-        && validRate(request.resource.data.gold);
-    }
-
-    // ---- Empresa y facturación ----
-    function companyPath() {
-      return /databases/$(database)/documents/meta/company;
-    }
-    function seqPath() {
-      return /databases/$(database)/documents/meta/invoiceSeq;
-    }
-    function invoicePath(id) {
-      return /databases/$(database)/documents/invoices/$(id);
-    }
-    function companyText(d) {
-      return isString(d.legalName, 200) && isString(d.tradeName, 200) && isString(d.taxId, 50)
-        && isString(d.address1, 200) && isString(d.address2, 200) && isString(d.city, 100)
-        && isString(d.state, 50) && isString(d.zip, 20) && isString(d.phone, 50)
-        && isString(d.email, 200) && isString(d.website, 200) && isString(d.invoicePrefix, 12);
-    }
-    // Todo el equipo la lee (el vendedor también factura); solo un admin la cambia.
-    match /meta/company {
-      allow read: if isMember();
-      allow write: if isAdmin()
-        && request.resource.data.keys().hasOnly(['legalName', 'tradeName', 'taxId', 'address1', 'address2',
-             'city', 'state', 'zip', 'phone', 'email', 'website', 'logo', 'fiscalYearStart', 'taxRate',
-             'invoicePrefix', 'updatedAt', 'updatedBy'])
-        && companyText(request.resource.data)
-        && isString(request.resource.data.logo, 200000)
-        && request.resource.data.fiscalYearStart is int
-        && request.resource.data.fiscalYearStart >= 1 && request.resource.data.fiscalYearStart <= 12
-        && request.resource.data.taxRate is number
-        && request.resource.data.taxRate >= 0 && request.resource.data.taxRate <= 30;
-    }
-    // Próximo número de factura. Al emitir sube de uno en uno junto con la factura (mismo lote);
-    // un admin puede fijar el número de arranque, y bajarlo solo a un número que no esté usado
-    // (tras borrar facturas anuladas; la app no deja bajarlo de la última que quede).
-    match /meta/invoiceSeq {
-      allow read: if isMember();
-      allow create, update: if isMember()
-        && request.resource.data.keys().hasOnly(['next', 'updatedAt'])
-        && request.resource.data.next is int
-        && (
-          (isAdmin() && request.resource.data.next >= 1
-            && (request.resource.data.next >= (resource == null ? 1 : resource.data.next)
-                || !exists(invoicePath(string(request.resource.data.next)))))
-          || (request.resource.data.next == (resource == null ? 1 : resource.data.next) + 1
-              && !exists(invoicePath(string(request.resource.data.next - 1)))
-              && existsAfter(invoicePath(string(request.resource.data.next - 1))))
-        );
-      allow delete: if false;
-    }
-
-    function validService(d) {
-      return isString(d.name, 200) && d.name.size() > 0
-        && isString(d.description, 1000)
-        && d.price is number && d.price >= 0
-        && isString(d.unit, 50)
-        && d.active is bool
-        && d.get('taxable', true) is bool
-        // Servicio, producto o material; los anteriores a este campo son servicios.
-        && d.get('kind', 'service') in ['service', 'product', 'material'];
-    }
-
-    match /services/{serviceId} {
-      allow read: if isMember();
-      allow create: if isAdmin() && validService(request.resource.data);
-      allow update: if isAdmin() && validService(request.resource.data);
-      // Se suelen archivar; borrar es del admin. Los negocios guardan nombre y precio del
-      // servicio, así que lo vendido no se pierde.
-      allow delete: if isAdmin();
-    }
-
-    // ---- Contactos (prospectos y clientes) ----
-    function validContact(d) {
-      return isString(d.name, 200) && d.name.size() > 0
-        && isString(d.company, 200)
-        && isString(d.email, 200)
-        && isString(d.phone, 50)
-        && isString(d.notes, 5000)
-        && d.assigneeId is string
-        && d.get('archived', false) is bool;
-    }
-    // Archivar es cosa del admin. Cualquiera puede reactivar (abrir un negocio nuevo
-    // con un contacto archivado lo reactiva en el mismo batch).
-    function archiveOk() {
-      return isAdmin()
-        || !request.resource.data.diff(resource.data).affectedKeys().hasAny(['archived', 'archivedAt'])
-        || (request.resource.data.get('archived', false) == false
-            && request.resource.data.get('archivedAt', null) == null);
-    }
-
-    // Resumen de compras (statsV, wonCount, wonTotal, firstWonAt, openBy): lo escribe la app
-    // en el mismo batch que el lead. Un vendedor solo puede moverlo lo que mueve un lead suyo:
-    // una venta más o menos y su propio contador de negocios abiertos. La versión (statsV),
-    // que dice si el resumen es fiable, solo la pone un admin o un contacto nuevo.
-    function validStats(d) {
-      return d.get('wonCount', 0) is number
-        && d.get('wonTotal', 0) is number
-        && d.get('openBy', {}) is map
-        && (d.get('firstWonAt', null) == null || d.firstWonAt is timestamp);
-    }
-    function statsOnCreate(d) {
-      return isAdmin() || (
-        d.get('statsV', 1) == 1
-        && d.get('wonCount', 0) in [0, 1]
-        && (d.get('wonCount', 0) == 1 || d.get('wonTotal', 0) == 0)
-        && d.get('openBy', {}).keys().hasOnly([request.auth.uid])
-        && d.get('openBy', {}).get(request.auth.uid, 0) in [0, 1]
-        && (d.get('firstWonAt', null) == null || d.firstWonAt == request.time));
-    }
-    function statsOnUpdate(d, old) {
-      return isAdmin() || (
-        d.get('statsV', null) == old.get('statsV', null)
-        && math.abs(d.get('wonCount', 0) - old.get('wonCount', 0)) <= 1
-        && (d.get('wonTotal', 0) == old.get('wonTotal', 0) || d.get('wonCount', 0) != old.get('wonCount', 0))
-        && d.get('openBy', {}).diff(old.get('openBy', {})).affectedKeys().hasOnly([request.auth.uid])
-        && math.abs(d.get('openBy', {}).get(request.auth.uid, 0) - old.get('openBy', {}).get(request.auth.uid, 0)) <= 1
-        && (d.get('firstWonAt', null) == old.get('firstWonAt', null)
-            || (old.get('firstWonAt', null) == null && d.firstWonAt == request.time)));
-    }
-
-    match /contacts/{contactId} {
-      allow read: if isMember();
-      allow create: if isMember()
-        && validContact(request.resource.data)
-        && validStats(request.resource.data)
-        && statsOnCreate(request.resource.data)
-        && request.resource.data.createdBy == request.auth.uid;
-      // El resumen de compras (wonCount, wonTotal, firstWonAt, openBy) lo mantiene la app
-      // en el mismo batch que el lead. El responsable del contacto solo lo cambia un admin.
-      allow update: if isMember()
-        && validContact(request.resource.data)
-        && request.resource.data.createdBy == resource.data.createdBy
-        && (isAdmin() || request.resource.data.assigneeId == resource.data.assigneeId)
-        && validStats(request.resource.data)
-        && statsOnUpdate(request.resource.data, resource.data)
-        && archiveOk();
-      // Solo un admin borra, también a un cliente con ventas (la app borra antes sus negocios).
-      allow delete: if isAdmin();
-    }
-
-    // ---- Leads (oportunidades) ----
-    function validLead(d) {
-      return isString(d.name, 200) && d.name.size() > 0
-        && isString(d.company, 200)
-        && isString(d.email, 200)
-        && isString(d.phone, 50)
-        && isString(d.notes, 5000)
-        && isString(d.get('detail', ''), 1000)
-        && isString(d.get('lostReason', ''), 5000)
-        && (d.get('lostCode', null) == null
-            || d.lostCode in ['price', 'competitor', 'noResponse', 'timing', 'notFit', 'other'])
-        && d.stage in ['new', 'contacted', 'qualified', 'proposal', 'negotiation', 'won', 'lost']
-        && d.source in ['web', 'whatsapp', 'phone', 'referral', 'social', 'event', 'email', 'other']
-        && d.value is number && d.value >= 0
-        && validExtras(d)
-        && d.assigneeId is string
-        && (d.get('contactId', null) == null
-            || existsAfter(/databases/$(database)/documents/contacts/$(d.contactId)));
-    }
-
-    // Lead con servicio: el valor sale del precio oficial × cantidad + % de la categoría.
-    // Una compra puede llevar más servicios en `extras` (hasta 3, con la misma categoría):
-    // el valor es la suma de todas las líneas, cada una a su precio oficial.
-    function hasService(d) {
-      return d.get('serviceId', null) != null;
-    }
-    function extrasOf(d) {
-      return d.get('extras', []);
-    }
-    // Las comparaciones fallan (y deniegan) si cantidad o precio no son números; el servicio
-    // se comprueba contra el catálogo. Se valida lo justo: las reglas tienen un tope de cálculo.
-    function lineShape(x) {
-      return x.keys().hasOnly(['serviceId', 'serviceName', 'quantity', 'unitPrice', 'ack'])
-        && x.serviceName is string && x.serviceName.size() <= 200
-        && x.quantity > 0 && x.unitPrice >= 0
-        && (x.get('ack', null) == null || x.ack is number);
-    }
-    function extraShape(ex, i) {
-      return ex.size() <= i || lineShape(ex[i]);
-    }
-    function validExtras(d) {
-      let ex = extrasOf(d);
-      return ex is list && ex.size() <= 3
-        && (hasService(d) || ex.size() == 0)
-        && extraShape(ex, 0) && extraShape(ex, 1) && extraShape(ex, 2);
-    }
-    function lineValue(x, pct) {
-      return float(x.unitPrice) * float(x.quantity) * (100.0 + float(pct)) / 100.0;
-    }
-    function extraValue(ex, i, pct) {
-      return ex.size() > i ? lineValue(ex[i], pct) : 0.0;
-    }
-    function priceMath(d) {
-      let ex = extrasOf(d);
-      let pct = d.tierPct;
-      return d.quantity is number && d.quantity > 0
-        && d.unitPrice is number && d.unitPrice >= 0
-        && d.tier in ['bronze', 'silver', 'gold']
-        && pct is number
-        && math.abs(d.value - lineValue(d, pct) - extraValue(ex, 0, pct) - extraValue(ex, 1, pct)
-            - extraValue(ex, 2, pct)) < 0.05;
-    }
-    // Precio oficial vigente de un servicio que sigue en el catálogo.
-    function officialNow(serviceId, price) {
-      let svc = get(servicePath(serviceId)).data;
-      return svc.price == price && svc.active == true;
-    }
-    function extraOfficial(ex, i) {
-      return ex.size() <= i || officialNow(ex[i].serviceId, ex[i].unitPrice);
-    }
-    // Al editar, cada servicio extra conserva su precio pactado si sigue en la misma posición;
-    // si no, va al precio oficial vigente.
-    function extraOnUpdate(ex, oldEx, i) {
-      return ex.size() <= i
-        || (oldEx.size() > i && oldEx[i].serviceId == ex[i].serviceId && oldEx[i].unitPrice == ex[i].unitPrice)
-        || officialNow(ex[i].serviceId, ex[i].unitPrice);
-    }
-    function extrasOnUpdate(d, old) {
-      let ex = extrasOf(d);
-      let oldEx = extrasOf(old);
-      return ex == oldEx
-        || (extraOnUpdate(ex, oldEx, 0) && extraOnUpdate(ex, oldEx, 1) && extraOnUpdate(ex, oldEx, 2));
-    }
-    // Al crear: precio y porcentaje deben ser los vigentes.
-    function pricingOnCreate(d) {
-      return !hasService(d)
-        ? d.value == 0
-        : priceMath(d)
-          && officialNow(d.serviceId, d.unitPrice)
-          && d.tierPct == tierRate(d.tier)
-          && extraOfficial(extrasOf(d), 0) && extraOfficial(extrasOf(d), 1) && extraOfficial(extrasOf(d), 2);
-    }
-    function pricingKeys() {
-      return ['serviceId', 'serviceName', 'quantity', 'unitPrice', 'extras', 'tier', 'tierPct', 'value'];
-    }
-    // Al editar: un lead ganado no cambia de precio; uno abierto solo puede tomar el precio
-    // oficial vigente (o conservar el pactado) y el porcentaje vigente (o conservar el suyo).
-    // Sin servicio, el valor no se toca a mano: hay que elegir un servicio del catálogo.
-    function pricingOnUpdate(d, old) {
-      return !d.diff(old).affectedKeys().hasAny(pricingKeys())
-        || (old.stage != 'won'
-            && (!hasService(d)
-                ? !hasService(old) && d.value == old.value
-                : priceMath(d)
-                  && (d.unitPrice == old.get('unitPrice', -1) && d.serviceId == old.get('serviceId', null)
-                      || get(servicePath(d.serviceId)).data.price == d.unitPrice
-                         // Cambiar a otro servicio: solo a uno que siga en el catálogo.
-                         && (d.serviceId == old.get('serviceId', null)
-                             || get(servicePath(d.serviceId)).data.active == true))
-                  && extrasOnUpdate(d, old)
-                  && (d.tierPct == old.get('tierPct', -1) && d.tier == old.get('tier', null)
-                      || d.tierPct == tierRate(d.tier))));
-    }
-
-    // La venta guarda su factura vigente: se pone al emitirla (mismo lote) y solo se quita al
-    // anularla (admin). Mientras tenga factura sigue ganada y no se borra.
-    function invoiceOnUpdate(d, old, leadId) {
-      let inv = d.get('invoiceId', null);
-      let oldInv = old.get('invoiceId', null);
-      return inv == oldInv
-        ? (oldInv == null || d.stage == 'won')
-        : (oldInv == null
-            ? getAfter(invoicePath(inv)).data.leadId == leadId
-            : inv == null && isAdmin() && getAfter(invoicePath(oldInv)).data.status == 'void');
-    }
-
-    match /leads/{leadId} {
-      // Las consultas de un vendedor deben filtrar por assigneeId == su uid.
-      allow read: if isAdmin() || (isMember() && isMine(resource.data));
-      // Un vendedor solo crea leads a su nombre.
-      allow create: if isMember()
-        && (adminRole() || isMine(request.resource.data))
-        && validLead(request.resource.data)
-        && pricingOnCreate(request.resource.data)
-        // Una venta lleva al menos un servicio del catálogo.
-        && (request.resource.data.stage != 'won' || hasService(request.resource.data))
-        && request.resource.data.get('invoiceId', null) == null
-        && request.resource.data.createdBy == request.auth.uid;
-      // Solo un admin cambia el responsable (reasignar) o el contacto del lead,
-      // y solo un admin reabre una venta ganada.
-      allow update: if isMember()
-        && (adminRole() || (isMine(resource.data) && isMine(request.resource.data)
-            && request.resource.data.get('contactId', null) == resource.data.get('contactId', null)
-            && (resource.data.stage != 'won' || request.resource.data.stage == 'won')))
-        && validLead(request.resource.data)
-        && pricingOnUpdate(request.resource.data, resource.data)
-        && invoiceOnUpdate(request.resource.data, resource.data, leadId)
-        && (request.resource.data.stage != 'won' || resource.data.stage == 'won' || hasService(request.resource.data))
-        && request.resource.data.createdBy == resource.data.createdBy;
-      // Una venta ganada solo la borra un admin, y nunca con factura vigente (se anula antes).
-      allow delete: if resource.data.get('invoiceId', null) == null && (isAdmin()
-        || (isMember() && isMine(resource.data) && resource.data.createdBy == request.auth.uid
-            && resource.data.stage != 'won'));
-
-      match /activities/{activityId} {
-        // Si el lead aún no existe en el servidor (la app ya lo muestra mientras se guarda),
-        // no hay nada que proteger: la consulta devuelve vacío en vez de fallar.
-        allow read: if isMember() && (!exists(leadPath(leadId)) || canSeeLead(leadId));
-        allow create: if isMember()
-          && canSeeLeadAfter(leadId)
-          && request.resource.data.createdBy == request.auth.uid
-          && request.resource.data.type in activityTypes()
-          && isString(request.resource.data.body, 5000);
-        allow update: if isMember() && canSeeLead(leadId)
-          && resource.data.createdBy == request.auth.uid
-          && request.resource.data.createdBy == resource.data.createdBy
-          && request.resource.data.type in activityTypes()
-          && isString(request.resource.data.body, 5000);
-        // Borrado: el autor, o quien borra el lead completo (admin o creador del lead).
-        allow delete: if isMember() && canSeeLead(leadId) && (
-          resource.data.createdBy == request.auth.uid
-          || isAdmin()
-          || get(leadPath(leadId)).data.createdBy == request.auth.uid
-        );
+    // ---- Empresa (tenant) ----
+    match /tenants/{t} {
+      function tenantKeys() {
+        return ['name', 'active', 'createdAt', 'createdBy', 'updatedAt'];
       }
-    }
-
-    function activityTypes() {
-      return ['call', 'whatsapp', 'email', 'meeting', 'note', 'stage', 'created', 'followup', 'pricing', 'invoice', 'payment'];
-    }
-    function followUpChannels() {
-      return ['call', 'whatsapp', 'email', 'meeting', 'task'];
-    }
-
-    match /followups/{followUpId} {
-      // Las consultas de un vendedor deben filtrar por assigneeId == su uid.
-      allow read: if isAdmin() || (isMember() && isMine(resource.data));
-      // El follow-up es del responsable del lead.
-      allow create: if isMember()
-        && canSeeLeadAfter(request.resource.data.leadId)
-        && request.resource.data.assigneeId == getAfter(leadPath(request.resource.data.leadId)).data.assigneeId
+      // Sus miembros (aunque esté suspendida, para saber por qué no entran), el invitado
+      // (ve el nombre) y el super-admin (lista de empresas).
+      allow read: if isPlatformAdmin()
+        || (signedIn() && exists(/databases/$(database)/documents/tenants/$(t)/members/$(request.auth.uid)))
+        || (signedIn() && exists(/databases/$(database)/documents/tenants/$(t)/invites/$(myEmail())));
+      allow create: if isPlatformAdmin()
+        && request.resource.data.keys().hasOnly(tenantKeys())
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 200
+        && request.resource.data.active == true
         && request.resource.data.createdBy == request.auth.uid
-        && request.resource.data.status == 'pending'
-        && request.resource.data.dueAt is timestamp
-        && request.resource.data.channel in followUpChannels()
-        && isString(request.resource.data.note, 1000);
-      // Al editar se revisa lo mismo que al crear (fecha, canal, tamaños).
-      allow update: if isMember()
-        && (adminRole() || (isMine(resource.data) && isMine(request.resource.data)))
-        && request.resource.data.status in ['pending', 'done', 'cancelled']
-        && request.resource.data.dueAt is timestamp
-        && request.resource.data.channel in followUpChannels()
-        && isString(request.resource.data.note, 1000)
-        && isString(request.resource.data.get('outcome', ''), 5000)
-        && request.resource.data.leadId == resource.data.leadId
-        && request.resource.data.createdBy == resource.data.createdBy;
-      allow delete: if isAdmin() || (isMember() && isMine(resource.data));
-    }
+        && request.resource.data.createdAt == request.time;
+      // El super-admin la renombra, suspende o reactiva. Una empresa no se borra desde la app.
+      allow update: if isPlatformAdmin()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'active', 'updatedAt'])
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 200
+        && request.resource.data.active is bool;
+      allow delete: if false;
 
-    // ---- Facturas ----
-    // Se emiten desde una venta ganada (vendedor responsable o admin), con número correlativo
-    // y el impuesto aparte. No se editan: un admin las anula, y solo una anulada se puede borrar.
-    function invoiceTotals(d) {
-      return d.subtotal is number && d.taxable is number && d.tax is number && d.total is number
-        && d.taxable >= 0 && d.taxable <= d.subtotal + 0.005
-        && math.abs(d.tax - d.taxable * float(d.taxRate) / 100.0) < 0.01
-        && math.abs(d.total - d.subtotal - d.tax) < 0.01;
-    }
-    function invoiceParty(m, keys) {
-      return m is map && m.keys().hasOnly(keys);
-    }
-    function invoiceNumberOk(d, id) {
-      let seq = get(seqPath());
-      return d.number is int && id == string(d.number)
-        && d.number == (exists(seqPath()) ? seq.data.next : 1)
-        && getAfter(seqPath()).data.next == d.number + 1;
-    }
-    match /invoices/{invoiceId} {
-      // Las consultas de un vendedor deben filtrar por assigneeId == su uid.
-      allow read: if isAdmin() || (isMember() && isMine(resource.data));
-      allow create: if isMember()
-        && request.resource.data.keys().hasOnly(['number', 'prefix', 'leadId', 'contactId', 'assigneeId',
-             'billTo', 'issuer', 'lines', 'subtotal', 'taxable', 'taxRate', 'tax', 'total', 'currency',
-             'notes', 'dueAt', 'status', 'issuedAt', 'issuedBy', 'issuedByName'])
-        && invoiceNumberOk(request.resource.data, invoiceId)
-        && isString(request.resource.data.prefix, 12)
-        && request.resource.data.status == 'issued'
-        && request.resource.data.issuedBy == request.auth.uid
-        && request.resource.data.issuedAt == request.time
-        && isString(request.resource.data.issuedByName, 200)
-        && request.resource.data.currency == 'USD'
-        && isString(request.resource.data.notes, 2000)
-        && (request.resource.data.dueAt == null || request.resource.data.dueAt is timestamp)
-        && invoiceParty(request.resource.data.billTo, ['name', 'company', 'email', 'phone', 'address'])
-        && invoiceParty(request.resource.data.issuer, ['legalName', 'tradeName', 'taxId', 'address',
-             'phone', 'email', 'website'])
-        && request.resource.data.lines is list
-        && request.resource.data.lines.size() >= 1 && request.resource.data.lines.size() <= 4
-        && request.resource.data.taxRate == get(companyPath()).data.taxRate
-        && invoiceTotals(request.resource.data)
-        && invoiceLeadOk(request.resource.data, invoiceId);
-      // Solo un admin anula (con motivo, y sin pagos vigentes) o la pasa al nuevo responsable
-      // de la venta. Lo pagado lo mueve un pago en el mismo lote (ver payments).
-      allow update: if (isMember() && (isMine(resource.data) || adminRole())
-          && changedOnly(['paid', 'lastPaymentId'])
-          && resource.data.status == 'issued'
-          && request.resource.data.paid is number
-          && request.resource.data.paid >= 0
-          && request.resource.data.paid <= resource.data.total + 0.005
-          && paymentMoved(invoiceId, request.resource.data.lastPaymentId))
-        || isAdmin() && (
-        (changedOnly(['status', 'voidReason', 'voidedAt', 'voidedBy'])
-          && resource.data.status == 'issued'
-          && resource.data.get('paid', 0) < 0.005
-          && request.resource.data.status == 'void'
-          && request.resource.data.voidedBy == request.auth.uid
-          && request.resource.data.voidedAt == request.time
-          && isString(request.resource.data.voidReason, 500)
-          && request.resource.data.voidReason.size() > 0)
-        || changedOnly(['assigneeId']));
-      allow delete: if isAdmin() && resource.data.status == 'void';
-    }
+      function memberPath(uid) {
+        return /databases/$(database)/documents/tenants/$(t)/members/$(uid);
+      }
+      function tenantPath() {
+        return /databases/$(database)/documents/tenants/$(t);
+      }
+      function isMember() {
+        return signedIn()
+          && exists(memberPath(request.auth.uid))
+          && get(memberPath(request.auth.uid)).data.active == true
+          && get(tenantPath()).data.active == true;
+      }
+      function isAdmin() {
+        return isMember() && adminRole();
+      }
+      // Rol de admin sin volver a comprobar que es miembro (usar después de isMember()):
+      // ahorra cálculo en las reglas de leads, que van justas de tope.
+      function adminRole() {
+        return get(memberPath(request.auth.uid)).data.role == 'admin';
+      }
+      function invitePath() {
+        return /databases/$(database)/documents/tenants/$(t)/invites/$(myEmail());
+      }
+      function isString(v, max) {
+        return v is string && v.size() <= max;
+      }
+      function changedOnly(keys) {
+        return request.resource.data.diff(resource.data).affectedKeys().hasOnly(keys);
+      }
+      function isMine(d) {
+        return d.assigneeId == request.auth.uid;
+      }
+      function leadPath(leadId) {
+        return /databases/$(database)/documents/tenants/$(t)/leads/$(leadId);
+      }
+      // El lead es visible para quien pide: admin o su responsable.
+      function canSeeLead(leadId) {
+        return isAdmin() || get(leadPath(leadId)).data.assigneeId == request.auth.uid;
+      }
+      // Igual, pero mirando el estado tras el batch (lead creado o reasignado en el mismo lote).
+      function canSeeLeadAfter(leadId) {
+        return isAdmin() || getAfter(leadPath(leadId)).data.assigneeId == request.auth.uid;
+      }
 
-    // ---- Registro de borrados ----
-    // La app deja una entrada en el mismo lote que cada borrado: qué, quién, cuándo y una copia
-    // de los datos. Cualquiera anota los suyos; solo el admin lo lee y nadie lo edita ni lo borra.
-    match /deletions/{entryId} {
-      allow read: if isAdmin();
-      allow create: if isMember()
-        && request.resource.data.keys().hasOnly(['kind', 'refId', 'label', 'detail', 'snapshot', 'by', 'byName', 'at'])
-        && request.resource.data.kind in ['contact', 'lead', 'activity', 'service', 'member', 'invoice']
-        && isString(request.resource.data.refId, 200)
-        && isString(request.resource.data.label, 300)
-        && isString(request.resource.data.detail, 1000)
-        && request.resource.data.snapshot is map
-        && request.resource.data.by == request.auth.uid
-        && isString(request.resource.data.byName, 200)
-        && request.resource.data.at == request.time;
-      allow update, delete: if false;
-    }
-    // ---- Pagos de una factura ----
-    // Abonos hasta completar el total. Registra el responsable de la factura o un admin; solo
-    // un admin deshace uno (queda tachado). Cada cambio mueve lo pagado de la factura en el
-    // mismo lote, y la factura exige que ese pago cambie con ella.
-    function paymentPath(invoiceId, paymentId) {
-      return /databases/$(database)/documents/invoices/$(invoiceId)/payments/$(paymentId);
-    }
-    // El pago se crea o se deshace en este mismo lote.
-    function paymentMoved(invoiceId, paymentId) {
-      let p = paymentPath(invoiceId, paymentId);
-      return paymentId is string && (
-        (!exists(p) && existsAfter(p))
-        || (exists(p) && get(p).data.get('undone', false) == false && getAfter(p).data.get('undone', false) == true));
-    }
-    function paymentMethods() {
-      return ['cash', 'card', 'transfer', 'zelle', 'check', 'other'];
-    }
-    match /invoices/{invoiceId}/payments/{paymentId} {
-      allow read: if isAdmin() || (isMember() && get(invoicePath(invoiceId)).data.assigneeId == request.auth.uid);
-      allow create: if isMember()
-        && request.resource.data.keys().hasOnly(['amount', 'method', 'paidAt', 'note', 'createdBy', 'createdByName', 'createdAt'])
-        && paymentCreateOk(get(invoicePath(invoiceId)).data, getAfter(invoicePath(invoiceId)).data, request.resource.data);
-      allow update: if isAdmin()
-        && changedOnly(['undone', 'undoReason', 'undoneAt', 'undoneBy'])
-        && resource.data.get('undone', false) == false
-        && request.resource.data.undone == true
-        && request.resource.data.undoneBy == request.auth.uid
-        && request.resource.data.undoneAt == request.time
-        && isString(request.resource.data.undoReason, 500)
-        && request.resource.data.undoReason.size() > 0
-        && math.abs(getAfter(invoicePath(invoiceId)).data.paid
-             - (get(invoicePath(invoiceId)).data.get('paid', 0) - resource.data.amount)) < 0.005;
-      // Se van con la factura anulada que borra el admin (una vigente no se borra).
-      allow delete: if isAdmin() && get(invoicePath(invoiceId)).data.status == 'void';
-    }
-    function paymentCreateOk(inv, after, d) {
-      return (adminRole() || inv.assigneeId == request.auth.uid)
-        && inv.status == 'issued'
-        && d.amount is number && d.amount > 0
-        && d.amount <= inv.total - inv.get('paid', 0) + 0.005
-        && math.abs(after.paid - (inv.get('paid', 0) + d.amount)) < 0.005
-        && d.method in paymentMethods()
-        && d.paidAt is timestamp && d.paidAt <= request.time + duration.value(2, 'd')
-        && isString(d.note, 500)
-        && d.createdBy == request.auth.uid
-        && isString(d.createdByName, 200)
-        && d.createdAt == request.time;
-    }
+      // ---- Equipo ----
+      match /members/{uid} {
+        allow read: if isMember() || (signedIn() && request.auth.uid == uid) || isPlatformAdmin();
 
-    // La venta es del que factura (o la factura un admin), está ganada, no tenía factura y queda
-    // apuntando a esta; el subtotal es su valor.
-    function invoiceLeadOk(d, id) {
-      let before = get(leadPath(d.leadId)).data;
-      let after = getAfter(leadPath(d.leadId)).data;
-      return (isAdmin() || before.assigneeId == request.auth.uid)
-        && before.stage == 'won'
-        && before.get('invoiceId', null) == null
-        && after.get('invoiceId', null) == id
-        && d.assigneeId == before.assigneeId
-        && d.contactId == before.get('contactId', null)
-        && math.abs(d.subtotal - before.value) < 0.005;
+        // Entra quien tiene invitación en esta empresa, con el rol de la invitación.
+        allow create: if signedIn()
+          && request.auth.uid == uid
+          && request.resource.data.uid == uid
+          && request.resource.data.email == request.auth.token.email
+          && request.resource.data.active == true
+          && request.resource.data.keys().hasOnly(['uid', 'email', 'displayName', 'photoURL', 'role', 'active', 'createdAt'])
+          && exists(invitePath())
+          && request.resource.data.role == get(invitePath()).data.role;
+
+        // Admins cambian rol/acceso de otros; cada uno puede actualizar su nombre y foto.
+        // Nadie cambia su propio rol ni acceso: quien quita un admin sigue siéndolo,
+        // así el equipo nunca se queda sin un admin activo.
+        allow update: if (isAdmin() && uid != request.auth.uid && changedOnly(['role', 'active'])
+                          && request.resource.data.role in ['admin', 'member']
+                          && request.resource.data.active is bool)
+                      || (isMember() && uid == request.auth.uid && changedOnly(['displayName', 'photoURL'])
+                          && isString(request.resource.data.displayName, 200)
+                          && (request.resource.data.photoURL == null || isString(request.resource.data.photoURL, 2000)));
+        // Un admin borra a otro miembro al que ya quitó el acceso (antes pasa sus datos a otro).
+        allow delete: if isAdmin() && uid != request.auth.uid && resource.data.active == false;
+      }
+
+      // Última entrada y salida de cada miembro (lo ve el admin en Equipo).
+      // Cada uno anota solo lo suyo y con la hora del servidor: nadie puede escribir la de
+      // otro ni inventar una fecha. Leerlo es cosa del admin.
+      function sessionKeys() {
+        return ['signInAt', 'signOutAt', 'signOutReason'];
+      }
+      function sessionOk(keys) {
+        let d = request.resource.data;
+        return d.keys().hasOnly(sessionKeys())
+          && keys.hasOnly(sessionKeys())
+          && (!keys.hasAny(['signInAt']) || d.signInAt == request.time)
+          && (!keys.hasAny(['signOutAt', 'signOutReason'])
+              || (d.signOutAt == request.time && d.signOutReason in ['manual', 'idle']));
+      }
+
+      match /sessions/{uid} {
+        allow read: if isAdmin();
+        allow create: if isMember() && uid == request.auth.uid
+          && sessionOk(request.resource.data.keys());
+        allow update: if isMember() && uid == request.auth.uid
+          && sessionOk(request.resource.data.diff(resource.data).affectedKeys());
+        // Se va con el miembro borrado (solo de alguien sin acceso).
+        allow delete: if isAdmin() && uid != request.auth.uid
+          && (!exists(memberPath(uid)) || get(memberPath(uid)).data.active == false);
+      }
+
+      // El super-admin invita al primer admin de una empresa nueva (y ve sus invitaciones).
+      match /invites/{email} {
+        allow read: if isAdmin() || (signedIn() && myEmail() == email) || isPlatformAdmin();
+        allow create: if (isAdmin() || isPlatformAdmin())
+          && email == email.lower()
+          && request.resource.data.email == email
+          && request.resource.data.role in ['admin', 'member']
+          && request.resource.data.invitedBy == request.auth.uid;
+        // El invitado la consume al entrar; un admin la puede retirar.
+        allow delete: if isAdmin() || (signedIn() && myEmail() == email) || isPlatformAdmin();
+        // Un admin puede cambiar el rol de una invitación aún no usada.
+        allow update: if isAdmin()
+          && changedOnly(['role'])
+          && request.resource.data.role in ['admin', 'member'];
+      }
+
+      // ---- Catálogo de servicios y categorías de venta (solo admin escribe) ----
+      function pricingPath() {
+        return /databases/$(database)/documents/tenants/$(t)/meta/pricing;
+      }
+      function servicePath(id) {
+        return /databases/$(database)/documents/tenants/$(t)/services/$(id);
+      }
+      function validRate(v) {
+        return v is number && v >= 0 && v <= 100;
+      }
+      // Porcentaje vigente de una categoría (valores por defecto si aún no hay meta/pricing).
+      function tierRate(tier) {
+        return exists(pricingPath())
+          ? get(pricingPath()).data.get(tier, tier == 'bronze' ? 3 : tier == 'silver' ? 5 : 7)
+          : (tier == 'bronze' ? 3 : tier == 'silver' ? 5 : 7);
+      }
+
+      match /meta/pricing {
+        allow read: if isMember();
+        allow write: if isAdmin()
+          && request.resource.data.keys().hasOnly(['bronze', 'silver', 'gold', 'updatedAt'])
+          && validRate(request.resource.data.bronze)
+          && validRate(request.resource.data.silver)
+          && validRate(request.resource.data.gold);
+      }
+
+      // ---- Empresa y facturación ----
+      function companyPath() {
+        return /databases/$(database)/documents/tenants/$(t)/meta/company;
+      }
+      function seqPath() {
+        return /databases/$(database)/documents/tenants/$(t)/meta/invoiceSeq;
+      }
+      function invoicePath(id) {
+        return /databases/$(database)/documents/tenants/$(t)/invoices/$(id);
+      }
+      function companyText(d) {
+        return isString(d.legalName, 200) && isString(d.tradeName, 200) && isString(d.taxId, 50)
+          && isString(d.address1, 200) && isString(d.address2, 200) && isString(d.city, 100)
+          && isString(d.state, 50) && isString(d.zip, 20) && isString(d.phone, 50)
+          && isString(d.email, 200) && isString(d.website, 200) && isString(d.invoicePrefix, 12);
+      }
+      // Todo el equipo la lee (el vendedor también factura); solo un admin la cambia.
+      match /meta/company {
+        allow read: if isMember();
+        allow write: if isAdmin()
+          && request.resource.data.keys().hasOnly(['legalName', 'tradeName', 'taxId', 'address1', 'address2',
+               'city', 'state', 'zip', 'phone', 'email', 'website', 'logo', 'fiscalYearStart', 'taxRate',
+               'invoicePrefix', 'updatedAt', 'updatedBy'])
+          && companyText(request.resource.data)
+          && isString(request.resource.data.logo, 200000)
+          && request.resource.data.fiscalYearStart is int
+          && request.resource.data.fiscalYearStart >= 1 && request.resource.data.fiscalYearStart <= 12
+          && request.resource.data.taxRate is number
+          && request.resource.data.taxRate >= 0 && request.resource.data.taxRate <= 30;
+      }
+      // Próximo número de factura. Al emitir sube de uno en uno junto con la factura (mismo lote);
+      // un admin puede fijar el número de arranque, y bajarlo solo a un número que no esté usado
+      // (tras borrar facturas anuladas; la app no deja bajarlo de la última que quede).
+      match /meta/invoiceSeq {
+        allow read: if isMember();
+        allow create, update: if isMember()
+          && request.resource.data.keys().hasOnly(['next', 'updatedAt'])
+          && request.resource.data.next is int
+          && (
+            (isAdmin() && request.resource.data.next >= 1
+              && (request.resource.data.next >= (resource == null ? 1 : resource.data.next)
+                  || !exists(invoicePath(string(request.resource.data.next)))))
+            || (request.resource.data.next == (resource == null ? 1 : resource.data.next) + 1
+                && !exists(invoicePath(string(request.resource.data.next - 1)))
+                && existsAfter(invoicePath(string(request.resource.data.next - 1))))
+          );
+        allow delete: if false;
+      }
+
+      function validService(d) {
+        return isString(d.name, 200) && d.name.size() > 0
+          && isString(d.description, 1000)
+          && d.price is number && d.price >= 0
+          && isString(d.unit, 50)
+          && d.active is bool
+          && d.get('taxable', true) is bool
+          // Servicio, producto o material; los anteriores a este campo son servicios.
+          && d.get('kind', 'service') in ['service', 'product', 'material'];
+      }
+
+      match /services/{serviceId} {
+        allow read: if isMember();
+        allow create: if isAdmin() && validService(request.resource.data);
+        allow update: if isAdmin() && validService(request.resource.data);
+        // Se suelen archivar; borrar es del admin. Los negocios guardan nombre y precio del
+        // servicio, así que lo vendido no se pierde.
+        allow delete: if isAdmin();
+      }
+
+      // ---- Contactos (prospectos y clientes) ----
+      function validContact(d) {
+        return isString(d.name, 200) && d.name.size() > 0
+          && isString(d.company, 200)
+          && isString(d.email, 200)
+          && isString(d.phone, 50)
+          && isString(d.notes, 5000)
+          && d.assigneeId is string
+          && d.get('archived', false) is bool;
+      }
+      // Archivar es cosa del admin. Cualquiera puede reactivar (abrir un negocio nuevo
+      // con un contacto archivado lo reactiva en el mismo batch).
+      function archiveOk() {
+        return isAdmin()
+          || !request.resource.data.diff(resource.data).affectedKeys().hasAny(['archived', 'archivedAt'])
+          || (request.resource.data.get('archived', false) == false
+              && request.resource.data.get('archivedAt', null) == null);
+      }
+
+      // Resumen de compras (statsV, wonCount, wonTotal, firstWonAt, openBy): lo escribe la app
+      // en el mismo batch que el lead. Un vendedor solo puede moverlo lo que mueve un lead suyo:
+      // una venta más o menos y su propio contador de negocios abiertos. La versión (statsV),
+      // que dice si el resumen es fiable, solo la pone un admin o un contacto nuevo.
+      function validStats(d) {
+        return d.get('wonCount', 0) is number
+          && d.get('wonTotal', 0) is number
+          && d.get('openBy', {}) is map
+          && (d.get('firstWonAt', null) == null || d.firstWonAt is timestamp);
+      }
+      function statsOnCreate(d) {
+        return isAdmin() || (
+          d.get('statsV', 1) == 1
+          && d.get('wonCount', 0) in [0, 1]
+          && (d.get('wonCount', 0) == 1 || d.get('wonTotal', 0) == 0)
+          && d.get('openBy', {}).keys().hasOnly([request.auth.uid])
+          && d.get('openBy', {}).get(request.auth.uid, 0) in [0, 1]
+          && (d.get('firstWonAt', null) == null || d.firstWonAt == request.time));
+      }
+      function statsOnUpdate(d, old) {
+        return isAdmin() || (
+          d.get('statsV', null) == old.get('statsV', null)
+          && math.abs(d.get('wonCount', 0) - old.get('wonCount', 0)) <= 1
+          && (d.get('wonTotal', 0) == old.get('wonTotal', 0) || d.get('wonCount', 0) != old.get('wonCount', 0))
+          && d.get('openBy', {}).diff(old.get('openBy', {})).affectedKeys().hasOnly([request.auth.uid])
+          && math.abs(d.get('openBy', {}).get(request.auth.uid, 0) - old.get('openBy', {}).get(request.auth.uid, 0)) <= 1
+          && (d.get('firstWonAt', null) == old.get('firstWonAt', null)
+              || (old.get('firstWonAt', null) == null && d.firstWonAt == request.time)));
+      }
+
+      match /contacts/{contactId} {
+        allow read: if isMember();
+        allow create: if isMember()
+          && validContact(request.resource.data)
+          && validStats(request.resource.data)
+          && statsOnCreate(request.resource.data)
+          && request.resource.data.createdBy == request.auth.uid;
+        // El resumen de compras (wonCount, wonTotal, firstWonAt, openBy) lo mantiene la app
+        // en el mismo batch que el lead. El responsable del contacto solo lo cambia un admin.
+        allow update: if isMember()
+          && validContact(request.resource.data)
+          && request.resource.data.createdBy == resource.data.createdBy
+          && (isAdmin() || request.resource.data.assigneeId == resource.data.assigneeId)
+          && validStats(request.resource.data)
+          && statsOnUpdate(request.resource.data, resource.data)
+          && archiveOk();
+        // Solo un admin borra, también a un cliente con ventas (la app borra antes sus negocios).
+        allow delete: if isAdmin();
+      }
+
+      // ---- Leads (oportunidades) ----
+      function validLead(d) {
+        return isString(d.name, 200) && d.name.size() > 0
+          && isString(d.company, 200)
+          && isString(d.email, 200)
+          && isString(d.phone, 50)
+          && isString(d.notes, 5000)
+          && isString(d.get('detail', ''), 1000)
+          && isString(d.get('lostReason', ''), 5000)
+          && (d.get('lostCode', null) == null
+              || d.lostCode in ['price', 'competitor', 'noResponse', 'timing', 'notFit', 'other'])
+          && d.stage in ['new', 'contacted', 'qualified', 'proposal', 'negotiation', 'won', 'lost']
+          && d.source in ['web', 'whatsapp', 'phone', 'referral', 'social', 'event', 'email', 'other']
+          && d.value is number && d.value >= 0
+          && validExtras(d)
+          && d.assigneeId is string
+          && (d.get('contactId', null) == null
+              || existsAfter(/databases/$(database)/documents/tenants/$(t)/contacts/$(d.contactId)));
+      }
+
+      // Lead con servicio: el valor sale del precio oficial × cantidad + % de la categoría.
+      // Una compra puede llevar más servicios en `extras` (hasta 3, con la misma categoría):
+      // el valor es la suma de todas las líneas, cada una a su precio oficial.
+      function hasService(d) {
+        return d.get('serviceId', null) != null;
+      }
+      function extrasOf(d) {
+        return d.get('extras', []);
+      }
+      // Las comparaciones fallan (y deniegan) si cantidad o precio no son números; el servicio
+      // se comprueba contra el catálogo. Se valida lo justo: las reglas tienen un tope de cálculo.
+      function lineShape(x) {
+        return x.keys().hasOnly(['serviceId', 'serviceName', 'quantity', 'unitPrice', 'ack'])
+          && x.serviceName is string && x.serviceName.size() <= 200
+          && x.quantity > 0 && x.unitPrice >= 0
+          && (x.get('ack', null) == null || x.ack is number);
+      }
+      function extraShape(ex, i) {
+        return ex.size() <= i || lineShape(ex[i]);
+      }
+      function validExtras(d) {
+        let ex = extrasOf(d);
+        return ex is list && ex.size() <= 3
+          && (hasService(d) || ex.size() == 0)
+          && extraShape(ex, 0) && extraShape(ex, 1) && extraShape(ex, 2);
+      }
+      function lineValue(x, pct) {
+        return float(x.unitPrice) * float(x.quantity) * (100.0 + float(pct)) / 100.0;
+      }
+      function extraValue(ex, i, pct) {
+        return ex.size() > i ? lineValue(ex[i], pct) : 0.0;
+      }
+      function priceMath(d) {
+        let ex = extrasOf(d);
+        let pct = d.tierPct;
+        return d.quantity is number && d.quantity > 0
+          && d.unitPrice is number && d.unitPrice >= 0
+          && d.tier in ['bronze', 'silver', 'gold']
+          && pct is number
+          && math.abs(d.value - lineValue(d, pct) - extraValue(ex, 0, pct) - extraValue(ex, 1, pct)
+              - extraValue(ex, 2, pct)) < 0.05;
+      }
+      // Precio oficial vigente de un servicio que sigue en el catálogo.
+      function officialNow(serviceId, price) {
+        let svc = get(servicePath(serviceId)).data;
+        return svc.price == price && svc.active == true;
+      }
+      function extraOfficial(ex, i) {
+        return ex.size() <= i || officialNow(ex[i].serviceId, ex[i].unitPrice);
+      }
+      // Al editar, cada servicio extra conserva su precio pactado si sigue en la misma posición;
+      // si no, va al precio oficial vigente.
+      function extraOnUpdate(ex, oldEx, i) {
+        return ex.size() <= i
+          || (oldEx.size() > i && oldEx[i].serviceId == ex[i].serviceId && oldEx[i].unitPrice == ex[i].unitPrice)
+          || officialNow(ex[i].serviceId, ex[i].unitPrice);
+      }
+      function extrasOnUpdate(d, old) {
+        let ex = extrasOf(d);
+        let oldEx = extrasOf(old);
+        return ex == oldEx
+          || (extraOnUpdate(ex, oldEx, 0) && extraOnUpdate(ex, oldEx, 1) && extraOnUpdate(ex, oldEx, 2));
+      }
+      // Al crear: precio y porcentaje deben ser los vigentes.
+      function pricingOnCreate(d) {
+        return !hasService(d)
+          ? d.value == 0
+          : priceMath(d)
+            && officialNow(d.serviceId, d.unitPrice)
+            && d.tierPct == tierRate(d.tier)
+            && extraOfficial(extrasOf(d), 0) && extraOfficial(extrasOf(d), 1) && extraOfficial(extrasOf(d), 2);
+      }
+      function pricingKeys() {
+        return ['serviceId', 'serviceName', 'quantity', 'unitPrice', 'extras', 'tier', 'tierPct', 'value'];
+      }
+      // Al editar: un lead ganado no cambia de precio; uno abierto solo puede tomar el precio
+      // oficial vigente (o conservar el pactado) y el porcentaje vigente (o conservar el suyo).
+      // Sin servicio, el valor no se toca a mano: hay que elegir un servicio del catálogo.
+      function pricingOnUpdate(d, old) {
+        return !d.diff(old).affectedKeys().hasAny(pricingKeys())
+          || (old.stage != 'won'
+              && (!hasService(d)
+                  ? !hasService(old) && d.value == old.value
+                  : priceMath(d)
+                    && (d.unitPrice == old.get('unitPrice', -1) && d.serviceId == old.get('serviceId', null)
+                        || get(servicePath(d.serviceId)).data.price == d.unitPrice
+                           // Cambiar a otro servicio: solo a uno que siga en el catálogo.
+                           && (d.serviceId == old.get('serviceId', null)
+                               || get(servicePath(d.serviceId)).data.active == true))
+                    && extrasOnUpdate(d, old)
+                    && (d.tierPct == old.get('tierPct', -1) && d.tier == old.get('tier', null)
+                        || d.tierPct == tierRate(d.tier))));
+      }
+
+      // La venta guarda su factura vigente: se pone al emitirla (mismo lote) y solo se quita al
+      // anularla (admin). Mientras tenga factura sigue ganada y no se borra.
+      function invoiceOnUpdate(d, old, leadId) {
+        let inv = d.get('invoiceId', null);
+        let oldInv = old.get('invoiceId', null);
+        return inv == oldInv
+          ? (oldInv == null || d.stage == 'won')
+          : (oldInv == null
+              ? getAfter(invoicePath(inv)).data.leadId == leadId
+              : inv == null && isAdmin() && getAfter(invoicePath(oldInv)).data.status == 'void');
+      }
+
+      match /leads/{leadId} {
+        // Las consultas de un vendedor deben filtrar por assigneeId == su uid.
+        allow read: if isAdmin() || (isMember() && isMine(resource.data));
+        // Un vendedor solo crea leads a su nombre.
+        allow create: if isMember()
+          && (adminRole() || isMine(request.resource.data))
+          && validLead(request.resource.data)
+          && pricingOnCreate(request.resource.data)
+          // Una venta lleva al menos un servicio del catálogo.
+          && (request.resource.data.stage != 'won' || hasService(request.resource.data))
+          && request.resource.data.get('invoiceId', null) == null
+          && request.resource.data.createdBy == request.auth.uid;
+        // Solo un admin cambia el responsable (reasignar) o el contacto del lead,
+        // y solo un admin reabre una venta ganada.
+        allow update: if isMember()
+          && (adminRole() || (isMine(resource.data) && isMine(request.resource.data)
+              && request.resource.data.get('contactId', null) == resource.data.get('contactId', null)
+              && (resource.data.stage != 'won' || request.resource.data.stage == 'won')))
+          && validLead(request.resource.data)
+          && pricingOnUpdate(request.resource.data, resource.data)
+          && invoiceOnUpdate(request.resource.data, resource.data, leadId)
+          && (request.resource.data.stage != 'won' || resource.data.stage == 'won' || hasService(request.resource.data))
+          && request.resource.data.createdBy == resource.data.createdBy;
+        // Una venta ganada solo la borra un admin, y nunca con factura vigente (se anula antes).
+        allow delete: if resource.data.get('invoiceId', null) == null && (isAdmin()
+          || (isMember() && isMine(resource.data) && resource.data.createdBy == request.auth.uid
+              && resource.data.stage != 'won'));
+
+        match /activities/{activityId} {
+          // Si el lead aún no existe en el servidor (la app ya lo muestra mientras se guarda),
+          // no hay nada que proteger: la consulta devuelve vacío en vez de fallar.
+          allow read: if isMember() && (!exists(leadPath(leadId)) || canSeeLead(leadId));
+          allow create: if isMember()
+            && canSeeLeadAfter(leadId)
+            && request.resource.data.createdBy == request.auth.uid
+            && request.resource.data.type in activityTypes()
+            && isString(request.resource.data.body, 5000);
+          allow update: if isMember() && canSeeLead(leadId)
+            && resource.data.createdBy == request.auth.uid
+            && request.resource.data.createdBy == resource.data.createdBy
+            && request.resource.data.type in activityTypes()
+            && isString(request.resource.data.body, 5000);
+          // Borrado: el autor, o quien borra el lead completo (admin o creador del lead).
+          allow delete: if isMember() && canSeeLead(leadId) && (
+            resource.data.createdBy == request.auth.uid
+            || isAdmin()
+            || get(leadPath(leadId)).data.createdBy == request.auth.uid
+          );
+        }
+      }
+
+      function activityTypes() {
+        return ['call', 'whatsapp', 'email', 'meeting', 'note', 'stage', 'created', 'followup', 'pricing', 'invoice', 'payment'];
+      }
+      function followUpChannels() {
+        return ['call', 'whatsapp', 'email', 'meeting', 'task'];
+      }
+
+      match /followups/{followUpId} {
+        // Las consultas de un vendedor deben filtrar por assigneeId == su uid.
+        allow read: if isAdmin() || (isMember() && isMine(resource.data));
+        // El follow-up es del responsable del lead.
+        allow create: if isMember()
+          && canSeeLeadAfter(request.resource.data.leadId)
+          && request.resource.data.assigneeId == getAfter(leadPath(request.resource.data.leadId)).data.assigneeId
+          && request.resource.data.createdBy == request.auth.uid
+          && request.resource.data.status == 'pending'
+          && request.resource.data.dueAt is timestamp
+          && request.resource.data.channel in followUpChannels()
+          && isString(request.resource.data.note, 1000);
+        // Al editar se revisa lo mismo que al crear (fecha, canal, tamaños).
+        allow update: if isMember()
+          && (adminRole() || (isMine(resource.data) && isMine(request.resource.data)))
+          && request.resource.data.status in ['pending', 'done', 'cancelled']
+          && request.resource.data.dueAt is timestamp
+          && request.resource.data.channel in followUpChannels()
+          && isString(request.resource.data.note, 1000)
+          && isString(request.resource.data.get('outcome', ''), 5000)
+          && request.resource.data.leadId == resource.data.leadId
+          && request.resource.data.createdBy == resource.data.createdBy;
+        allow delete: if isAdmin() || (isMember() && isMine(resource.data));
+      }
+
+      // ---- Facturas ----
+      // Se emiten desde una venta ganada (vendedor responsable o admin), con número correlativo
+      // y el impuesto aparte. No se editan: un admin las anula, y solo una anulada se puede borrar.
+      function invoiceTotals(d) {
+        return d.subtotal is number && d.taxable is number && d.tax is number && d.total is number
+          && d.taxable >= 0 && d.taxable <= d.subtotal + 0.005
+          && math.abs(d.tax - d.taxable * float(d.taxRate) / 100.0) < 0.01
+          && math.abs(d.total - d.subtotal - d.tax) < 0.01;
+      }
+      function invoiceParty(m, keys) {
+        return m is map && m.keys().hasOnly(keys);
+      }
+      function invoiceNumberOk(d, id) {
+        let seq = get(seqPath());
+        return d.number is int && id == string(d.number)
+          && d.number == (exists(seqPath()) ? seq.data.next : 1)
+          && getAfter(seqPath()).data.next == d.number + 1;
+      }
+      match /invoices/{invoiceId} {
+        // Las consultas de un vendedor deben filtrar por assigneeId == su uid.
+        allow read: if isAdmin() || (isMember() && isMine(resource.data));
+        allow create: if isMember()
+          && request.resource.data.keys().hasOnly(['number', 'prefix', 'leadId', 'contactId', 'assigneeId',
+               'billTo', 'issuer', 'lines', 'subtotal', 'taxable', 'taxRate', 'tax', 'total', 'currency',
+               'notes', 'dueAt', 'status', 'issuedAt', 'issuedBy', 'issuedByName'])
+          && invoiceNumberOk(request.resource.data, invoiceId)
+          && isString(request.resource.data.prefix, 12)
+          && request.resource.data.status == 'issued'
+          && request.resource.data.issuedBy == request.auth.uid
+          && request.resource.data.issuedAt == request.time
+          && isString(request.resource.data.issuedByName, 200)
+          && request.resource.data.currency == 'USD'
+          && isString(request.resource.data.notes, 2000)
+          && (request.resource.data.dueAt == null || request.resource.data.dueAt is timestamp)
+          && invoiceParty(request.resource.data.billTo, ['name', 'company', 'email', 'phone', 'address'])
+          && invoiceParty(request.resource.data.issuer, ['legalName', 'tradeName', 'taxId', 'address',
+               'phone', 'email', 'website'])
+          && request.resource.data.lines is list
+          && request.resource.data.lines.size() >= 1 && request.resource.data.lines.size() <= 4
+          && request.resource.data.taxRate == get(companyPath()).data.taxRate
+          && invoiceTotals(request.resource.data)
+          && invoiceLeadOk(request.resource.data, invoiceId);
+        // Solo un admin anula (con motivo, y sin pagos vigentes) o la pasa al nuevo responsable
+        // de la venta. Lo pagado lo mueve un pago en el mismo lote (ver payments).
+        allow update: if (isMember() && (isMine(resource.data) || adminRole())
+            && changedOnly(['paid', 'lastPaymentId'])
+            && resource.data.status == 'issued'
+            && request.resource.data.paid is number
+            && request.resource.data.paid >= 0
+            && request.resource.data.paid <= resource.data.total + 0.005
+            && paymentMoved(invoiceId, request.resource.data.lastPaymentId))
+          || isAdmin() && (
+          (changedOnly(['status', 'voidReason', 'voidedAt', 'voidedBy'])
+            && resource.data.status == 'issued'
+            && resource.data.get('paid', 0) < 0.005
+            && request.resource.data.status == 'void'
+            && request.resource.data.voidedBy == request.auth.uid
+            && request.resource.data.voidedAt == request.time
+            && isString(request.resource.data.voidReason, 500)
+            && request.resource.data.voidReason.size() > 0)
+          || changedOnly(['assigneeId']));
+        allow delete: if isAdmin() && resource.data.status == 'void';
+      }
+
+      // ---- Registro de borrados ----
+      // La app deja una entrada en el mismo lote que cada borrado: qué, quién, cuándo y una copia
+      // de los datos. Cualquiera anota los suyos; solo el admin lo lee y nadie lo edita ni lo borra.
+      match /deletions/{entryId} {
+        allow read: if isAdmin();
+        allow create: if isMember()
+          && request.resource.data.keys().hasOnly(['kind', 'refId', 'label', 'detail', 'snapshot', 'by', 'byName', 'at'])
+          && request.resource.data.kind in ['contact', 'lead', 'activity', 'service', 'member', 'invoice']
+          && isString(request.resource.data.refId, 200)
+          && isString(request.resource.data.label, 300)
+          && isString(request.resource.data.detail, 1000)
+          && request.resource.data.snapshot is map
+          && request.resource.data.by == request.auth.uid
+          && isString(request.resource.data.byName, 200)
+          && request.resource.data.at == request.time;
+        allow update, delete: if false;
+      }
+      // ---- Pagos de una factura ----
+      // Abonos hasta completar el total. Registra el responsable de la factura o un admin; solo
+      // un admin deshace uno (queda tachado). Cada cambio mueve lo pagado de la factura en el
+      // mismo lote, y la factura exige que ese pago cambie con ella.
+      function paymentPath(invoiceId, paymentId) {
+        return /databases/$(database)/documents/tenants/$(t)/invoices/$(invoiceId)/payments/$(paymentId);
+      }
+      // El pago se crea o se deshace en este mismo lote.
+      function paymentMoved(invoiceId, paymentId) {
+        let p = paymentPath(invoiceId, paymentId);
+        return paymentId is string && (
+          (!exists(p) && existsAfter(p))
+          || (exists(p) && get(p).data.get('undone', false) == false && getAfter(p).data.get('undone', false) == true));
+      }
+      function paymentMethods() {
+        return ['cash', 'card', 'transfer', 'zelle', 'check', 'other'];
+      }
+      match /invoices/{invoiceId}/payments/{paymentId} {
+        allow read: if isAdmin() || (isMember() && get(invoicePath(invoiceId)).data.assigneeId == request.auth.uid);
+        allow create: if isMember()
+          && request.resource.data.keys().hasOnly(['amount', 'method', 'paidAt', 'note', 'createdBy', 'createdByName', 'createdAt'])
+          && paymentCreateOk(get(invoicePath(invoiceId)).data, getAfter(invoicePath(invoiceId)).data, request.resource.data);
+        allow update: if isAdmin()
+          && changedOnly(['undone', 'undoReason', 'undoneAt', 'undoneBy'])
+          && resource.data.get('undone', false) == false
+          && request.resource.data.undone == true
+          && request.resource.data.undoneBy == request.auth.uid
+          && request.resource.data.undoneAt == request.time
+          && isString(request.resource.data.undoReason, 500)
+          && request.resource.data.undoReason.size() > 0
+          && math.abs(getAfter(invoicePath(invoiceId)).data.paid
+               - (get(invoicePath(invoiceId)).data.get('paid', 0) - resource.data.amount)) < 0.005;
+        // Se van con la factura anulada que borra el admin (una vigente no se borra).
+        allow delete: if isAdmin() && get(invoicePath(invoiceId)).data.status == 'void';
+      }
+      function paymentCreateOk(inv, after, d) {
+        return (adminRole() || inv.assigneeId == request.auth.uid)
+          && inv.status == 'issued'
+          && d.amount is number && d.amount > 0
+          && d.amount <= inv.total - inv.get('paid', 0) + 0.005
+          && math.abs(after.paid - (inv.get('paid', 0) + d.amount)) < 0.005
+          && d.method in paymentMethods()
+          && d.paidAt is timestamp && d.paidAt <= request.time + duration.value(2, 'd')
+          && isString(d.note, 500)
+          && d.createdBy == request.auth.uid
+          && isString(d.createdByName, 200)
+          && d.createdAt == request.time;
+      }
+
+      // La venta es del que factura (o la factura un admin), está ganada, no tenía factura y queda
+      // apuntando a esta; el subtotal es su valor.
+      function invoiceLeadOk(d, id) {
+        let before = get(leadPath(d.leadId)).data;
+        let after = getAfter(leadPath(d.leadId)).data;
+        return (isAdmin() || before.assigneeId == request.auth.uid)
+          && before.stage == 'won'
+          && before.get('invoiceId', null) == null
+          && after.get('invoiceId', null) == id
+          && d.assigneeId == before.assigneeId
+          && d.contactId == before.get('contactId', null)
+          && math.abs(d.subtotal - before.value) < 0.005;
+      }
     }
   }
 }

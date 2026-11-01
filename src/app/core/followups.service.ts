@@ -2,7 +2,6 @@ import { Service, computed, inject } from '@angular/core';
 import {
   DocumentData,
   Timestamp,
-  collection,
   doc,
   getDocs,
   orderBy,
@@ -16,6 +15,7 @@ import { Clock } from './clock.service';
 import { addDays, dayDiff } from './dates';
 import { t } from './i18n/i18n';
 import { FIRESTORE } from './firebase';
+import { TenantService } from './tenant.service';
 import { toDate } from './firestore-utils';
 import { ActivityType, ContactChannel, FollowUp, Lead } from './models';
 import { teamQuery } from './team-query';
@@ -56,14 +56,15 @@ function activityTypeFor(channel: ContactChannel): ActivityType {
 @Service()
 export class FollowUpsService {
   private readonly db = inject(FIRESTORE);
+  private readonly tenant = inject(TenantService);
   private readonly auth = inject(AuthService);
   private readonly clock = inject(Clock);
   private readonly live = teamQuery(
     () =>
       this.auth.isAdmin()
-        ? query(collection(this.db, 'followups'), where('status', '==', 'pending'), orderBy('dueAt', 'asc'))
+        ? query(this.tenant.col('followups'), where('status', '==', 'pending'), orderBy('dueAt', 'asc'))
         : query(
-            collection(this.db, 'followups'),
+            this.tenant.col('followups'),
             where('assigneeId', '==', this.auth.uid()),
             where('status', '==', 'pending'),
             orderBy('dueAt', 'asc'),
@@ -86,7 +87,7 @@ export class FollowUpsService {
   async doneBetween(assigneeId: string, start: Date, end: Date): Promise<FollowUp[]> {
     const snap = await getDocs(
       query(
-        collection(this.db, 'followups'),
+        this.tenant.col('followups'),
         where('assigneeId', '==', assigneeId),
         where('status', '==', 'done'),
         where('dueAt', '>=', Timestamp.fromDate(start)),
@@ -111,7 +112,7 @@ export class FollowUpsService {
           where('dueAt', '<', Timestamp.fromDate(r.end)),
           orderBy('dueAt', 'asc'),
         ] as const;
-        const col = collection(this.db, 'followups');
+        const col = this.tenant.col('followups');
         return this.auth.isAdmin() ? query(col, ...filters) : query(col, where('assigneeId', '==', this.auth.uid()), ...filters);
       },
       mapFollowUp,
@@ -128,7 +129,7 @@ export class FollowUpsService {
     lead: Pick<Lead, 'id' | 'name' | 'company' | 'assigneeId'>,
     dueAt: Date, channel: ContactChannel, note: string): Promise<void> {
     const batch = writeBatch(this.db);
-    batch.set(doc(collection(this.db, 'followups')), {
+    batch.set(doc(this.tenant.col('followups')), {
       leadId: lead.id,
       leadName: lead.name,
       company: lead.company,
@@ -140,7 +141,7 @@ export class FollowUpsService {
       createdBy: this.auth.uid(),
       createdAt: serverTimestamp(),
     });
-    batch.update(doc(this.db, 'leads', lead.id), {
+    batch.update(this.tenant.doc('leads', lead.id), {
       nextFollowUpAt: Timestamp.fromDate(this.nextDate(lead.id, dueAt)),
       updatedAt: serverTimestamp(),
     });
@@ -163,13 +164,13 @@ export class FollowUpsService {
   async complete(fu: FollowUp, input: CompleteInput): Promise<void> {
     const uid = this.auth.uid();
     const batch = writeBatch(this.db);
-    batch.update(doc(this.db, 'followups', fu.id), {
+    batch.update(this.tenant.doc('followups', fu.id), {
       status: 'done',
       outcome: input.outcome.trim(),
       completedAt: serverTimestamp(),
       completedBy: uid,
     });
-    batch.set(doc(collection(this.db, 'leads', fu.leadId, 'activities')), {
+    batch.set(doc(this.tenant.col('leads', fu.leadId, 'activities')), {
       type: activityTypeFor(input.channel ?? fu.channel),
       body: input.outcome.trim() || fu.note,
       createdBy: uid,
@@ -178,7 +179,7 @@ export class FollowUpsService {
 
     let next = this.nextDate(fu.leadId, null, fu.id);
     if (input.next) {
-      batch.set(doc(collection(this.db, 'followups')), {
+      batch.set(doc(this.tenant.col('followups')), {
         leadId: fu.leadId,
         leadName: fu.leadName,
         company: fu.company,
@@ -192,7 +193,7 @@ export class FollowUpsService {
       });
       next = this.nextDate(fu.leadId, input.next.dueAt, fu.id);
     }
-    batch.update(doc(this.db, 'leads', fu.leadId), {
+    batch.update(this.tenant.doc('leads', fu.leadId), {
       lastContactAt: serverTimestamp(),
       nextFollowUpAt: next ? Timestamp.fromDate(next) : null,
       updatedAt: serverTimestamp(),
@@ -203,9 +204,9 @@ export class FollowUpsService {
   /** Mueve la fecha de un follow-up. */
   async reschedule(fu: FollowUp, dueAt: Date): Promise<void> {
     const batch = writeBatch(this.db);
-    batch.update(doc(this.db, 'followups', fu.id), { dueAt: Timestamp.fromDate(dueAt) });
+    batch.update(this.tenant.doc('followups', fu.id), { dueAt: Timestamp.fromDate(dueAt) });
     const next = this.nextDate(fu.leadId, dueAt, fu.id);
-    batch.update(doc(this.db, 'leads', fu.leadId), {
+    batch.update(this.tenant.doc('leads', fu.leadId), {
       nextFollowUpAt: next ? Timestamp.fromDate(next) : null,
       updatedAt: serverTimestamp(),
     });
@@ -214,9 +215,9 @@ export class FollowUpsService {
 
   async cancel(fu: FollowUp): Promise<void> {
     const batch = writeBatch(this.db);
-    batch.update(doc(this.db, 'followups', fu.id), { status: 'cancelled' });
+    batch.update(this.tenant.doc('followups', fu.id), { status: 'cancelled' });
     const next = this.nextDate(fu.leadId, null, fu.id);
-    batch.update(doc(this.db, 'leads', fu.leadId), {
+    batch.update(this.tenant.doc('leads', fu.leadId), {
       nextFollowUpAt: next ? Timestamp.fromDate(next) : null,
       updatedAt: serverTimestamp(),
     });

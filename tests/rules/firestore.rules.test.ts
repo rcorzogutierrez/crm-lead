@@ -5,11 +5,14 @@ import {
   initializeTestEnvironment,
 } from '@firebase/rules-unit-testing';
 import {
+  CollectionReference,
+  DocumentReference,
   Firestore,
   Timestamp,
-  collection,
+  collection as rawCollection,
+  collectionGroup,
   deleteDoc,
-  doc,
+  doc as rawDoc,
   getDoc,
   getDocs,
   query,
@@ -22,9 +25,25 @@ import {
 import { readFileSync } from 'node:fs';
 import { afterAll, beforeAll, beforeEach, describe, it } from 'vitest';
 
-// Pruebas de firestore.rules. Equipo de ejemplo:
-// - ana: admin · luis y pedro: vendedores · inés: vendedora desactivada · extraño: sin equipo.
+// Pruebas de firestore.rules. Empresa de ejemplo (tenants/acme):
+// - ana: admin · luis y pedro: vendedores · inés: vendedora desactivada · extraño: sin empresa.
 // Catálogo: "web" a 1000 por unidad, categorías por defecto (3 / 5 / 7 %).
+// Otra empresa (tenants/beta) con su admin, berta, para probar el aislamiento.
+// rafa es el super-admin de la plataforma (platformAdmins/rafa).
+
+const TENANT = 'tenants/acme';
+const OTHER = 'tenants/beta';
+
+// Las rutas de las pruebas son relativas a la empresa de ejemplo; `rawDoc` / `rawCollection`
+// usan rutas absolutas.
+function doc(ref: CollectionReference): DocumentReference;
+function doc(fs: Firestore, path: string, ...segments: string[]): DocumentReference;
+function doc(a: Firestore | CollectionReference, path?: string, ...segments: string[]): DocumentReference {
+  return a.type === 'collection' ? rawDoc(a) : rawDoc(a, `${TENANT}/${path}`, ...segments);
+}
+function collection(fs: Firestore, path: string, ...segments: string[]): CollectionReference {
+  return rawCollection(fs, `${TENANT}/${path}`, ...segments);
+}
 
 let env: RulesTestEnvironment;
 
@@ -33,6 +52,8 @@ const LUIS = 'luis';
 const PEDRO = 'pedro';
 const INES = 'ines';
 const STRANGER = 'extrano';
+const BERTA = 'berta';
+const RAFA = 'rafa';
 
 const emailOf = (uid: string) => `${uid}@ejemplo.com`;
 
@@ -96,12 +117,17 @@ const followUp = (leadId: string, assigneeId: string, createdBy = assigneeId) =>
   status: 'pending',
 });
 
-/** Carga datos saltándose las reglas. */
+/** Carga datos saltándose las reglas (rutas dentro de la empresa de ejemplo). */
 async function seed(data: Record<string, Record<string, unknown>>): Promise<void> {
+  await seedRaw(Object.fromEntries(Object.entries(data).map(([path, value]) => [`${TENANT}/${path}`, value])));
+}
+
+/** Igual, con rutas absolutas. */
+async function seedRaw(data: Record<string, Record<string, unknown>>): Promise<void> {
   await env.withSecurityRulesDisabled(async (ctx) => {
     const fs = ctx.firestore() as unknown as Firestore;
     for (const [path, value] of Object.entries(data)) {
-      await setDoc(doc(fs, path), value);
+      await setDoc(rawDoc(fs, path), value);
     }
   });
 }
@@ -119,8 +145,14 @@ afterAll(async () => {
 
 beforeEach(async () => {
   await env.clearFirestore();
+  await seedRaw({
+    [TENANT]: { name: 'Acme', active: true },
+    [OTHER]: { name: 'Beta', active: true },
+    [`${OTHER}/members/${BERTA}`]: member(BERTA, 'admin'),
+    [`${OTHER}/contacts/b1`]: contact(BERTA),
+    [`platformAdmins/${RAFA}`]: { email: emailOf(RAFA) },
+  });
   await seed({
-    'meta/team': { ownerUid: ANA, name: 'Equipo' },
     [`members/${ANA}`]: member(ANA, 'admin'),
     [`members/${LUIS}`]: member(LUIS, 'member'),
     [`members/${PEDRO}`]: member(PEDRO, 'member'),
@@ -144,18 +176,16 @@ beforeEach(async () => {
 });
 
 describe('Alta en el equipo', () => {
-  it('el primer usuario crea el equipo y queda como admin', async () => {
-    await env.clearFirestore();
-    const fs = db(ANA);
-    const batch = writeBatch(fs);
-    batch.set(doc(fs, 'meta/team'), { ownerUid: ANA, name: 'Mi equipo' });
-    batch.set(doc(fs, `members/${ANA}`), member(ANA, 'admin'));
-    await assertSucceeds(batch.commit());
-  });
-
-  it('si ya hay equipo, nadie entra como admin sin invitación', async () => {
+  it('nadie se da de alta en una empresa sin invitación, ni como admin', async () => {
     await assertFails(setDoc(doc(db(STRANGER), `members/${STRANGER}`), member(STRANGER, 'admin')));
     await assertFails(setDoc(doc(db(STRANGER), `members/${STRANGER}`), member(STRANGER, 'member')));
+  });
+
+  it('nadie crea una empresa salvo el super-admin', async () => {
+    const tenant = { name: 'Nueva', active: true, createdBy: STRANGER, createdAt: serverTimestamp() };
+    await assertFails(setDoc(rawDoc(db(STRANGER), 'tenants/nueva'), tenant));
+    await assertFails(setDoc(rawDoc(db(ANA), 'tenants/nueva'), { ...tenant, createdBy: ANA }));
+    await assertSucceeds(setDoc(rawDoc(db(RAFA), 'tenants/nueva'), { ...tenant, createdBy: RAFA }));
   });
 
   it('un invitado entra con el rol de su invitación, no con otro', async () => {
@@ -1030,5 +1060,92 @@ describe('Registro de borrados', () => {
     await assertFails(setDoc(doc(db(ANA), 'deletions/y'), entry(LUIS)));
     await assertFails(setDoc(doc(db(ANA), 'deletions/y'), entry(ANA, { at: Timestamp.now() })));
     await assertFails(setDoc(doc(db(ANA), 'deletions/y'), entry(ANA, { kind: 'otro' })));
+  });
+});
+
+describe('Aislamiento entre empresas', () => {
+  it('un miembro de una empresa no lee ni escribe en otra', async () => {
+    await assertFails(getDoc(rawDoc(db(ANA), `${OTHER}/contacts/b1`)));
+    await assertFails(getDocs(rawCollection(db(ANA), `${OTHER}/contacts`)));
+    await assertFails(setDoc(rawDoc(db(ANA), `${OTHER}/contacts/x`), contact(ANA)));
+    await assertFails(getDoc(doc(db(BERTA), 'contacts/c1')));
+    await assertSucceeds(getDoc(rawDoc(db(BERTA), `${OTHER}/contacts/b1`)));
+  });
+
+  it('un admin de una empresa no invita ni cambia roles en otra', async () => {
+    const invite = { email: 'nuevo@ejemplo.com', role: 'admin', invitedBy: ANA };
+    await assertFails(setDoc(rawDoc(db(ANA), `${OTHER}/invites/nuevo@ejemplo.com`), invite));
+    await assertFails(updateDoc(rawDoc(db(ANA), `${OTHER}/members/${BERTA}`), { active: false }));
+    await assertFails(setDoc(rawDoc(db(ANA), `${OTHER}/members/${ANA}`), member(ANA, 'admin')));
+  });
+
+  it('una invitación de una empresa no da de alta en otra', async () => {
+    await seedRaw({ [`${OTHER}/invites/${emailOf(STRANGER)}`]: { email: emailOf(STRANGER), role: 'member', invitedBy: BERTA } });
+    await assertFails(setDoc(doc(db(STRANGER), `members/${STRANGER}`), member(STRANGER, 'member')));
+    await assertSucceeds(setDoc(rawDoc(db(STRANGER), `${OTHER}/members/${STRANGER}`), member(STRANGER, 'member')));
+  });
+
+  it('las búsquedas en todas las empresas solo devuelven lo propio', async () => {
+    await seedRaw({ [`${OTHER}/members/${LUIS}`]: member(LUIS, 'admin') });
+    await assertSucceeds(getDocs(query(collectionGroup(db(LUIS), 'members'), where('uid', '==', LUIS))));
+    await assertFails(getDocs(query(collectionGroup(db(LUIS), 'members'), where('uid', '==', ANA))));
+    await assertFails(getDocs(collectionGroup(db(LUIS), 'members')));
+    await seedRaw({ [`${OTHER}/invites/${emailOf(STRANGER)}`]: { email: emailOf(STRANGER), role: 'member', invitedBy: BERTA } });
+    await assertSucceeds(
+      getDocs(query(collectionGroup(db(STRANGER), 'invites'), where('email', '==', emailOf(STRANGER)))),
+    );
+    await assertFails(getDocs(query(collectionGroup(db(STRANGER), 'invites'), where('email', '==', emailOf(LUIS)))));
+  });
+
+  it('la misma persona tiene un rol distinto en cada empresa', async () => {
+    await seedRaw({ [`${OTHER}/members/${LUIS}`]: member(LUIS, 'admin') });
+    await assertSucceeds(updateDoc(rawDoc(db(LUIS), `${OTHER}/members/${BERTA}`), { role: 'member' }));
+    await assertFails(updateDoc(doc(db(LUIS), `members/${PEDRO}`), { role: 'admin' }));
+  });
+
+  it('los datos fuera de una empresa (raíz antigua) no se leen ni se escriben', async () => {
+    await assertFails(getDoc(rawDoc(db(ANA), 'contacts/c1')));
+    await assertFails(setDoc(rawDoc(db(ANA), 'contacts/x'), contact(ANA)));
+    await assertFails(setDoc(rawDoc(db(ANA), `members/${ANA}`), member(ANA, 'admin')));
+  });
+});
+
+describe('Empresa suspendida', () => {
+  it('nadie de la empresa lee ni escribe, pero ve su empresa y su ficha', async () => {
+    await seedRaw({ [TENANT]: { name: 'Acme', active: false } });
+    await assertFails(getDoc(doc(db(ANA), 'contacts/c1')));
+    await assertFails(setDoc(doc(db(LUIS), 'contacts/x'), contact(LUIS)));
+    await assertFails(updateDoc(doc(db(ANA), `members/${LUIS}`), { role: 'admin' }));
+    await assertSucceeds(getDoc(rawDoc(db(LUIS), TENANT)));
+    await assertSucceeds(getDoc(doc(db(LUIS), `members/${LUIS}`)));
+    // La otra empresa sigue como siempre.
+    await assertSucceeds(getDoc(rawDoc(db(BERTA), `${OTHER}/contacts/b1`)));
+  });
+});
+
+describe('Super-admin de la plataforma', () => {
+  it('ve las empresas y sus miembros, pero no sus datos', async () => {
+    await assertSucceeds(getDoc(rawDoc(db(RAFA), TENANT)));
+    await assertSucceeds(getDocs(collection(db(RAFA), 'members')));
+    await assertFails(getDoc(doc(db(RAFA), 'contacts/c1')));
+    await assertFails(getDocs(collection(db(RAFA), 'leads')));
+    await assertFails(getDoc(doc(db(RAFA), 'meta/company')));
+    await assertFails(getDoc(rawDoc(db(ANA), OTHER)));
+  });
+
+  it('invita al primer admin y suspende o reactiva la empresa', async () => {
+    const invite = { email: 'jefa@ejemplo.com', role: 'admin', invitedBy: RAFA };
+    await assertSucceeds(setDoc(doc(db(RAFA), 'invites/jefa@ejemplo.com'), invite));
+    await assertSucceeds(updateDoc(rawDoc(db(RAFA), TENANT), { active: false, updatedAt: serverTimestamp() }));
+    await assertSucceeds(updateDoc(rawDoc(db(RAFA), TENANT), { active: true, name: 'Acme Inc.' }));
+    await assertFails(updateDoc(rawDoc(db(ANA), TENANT), { active: false }));
+    await assertFails(updateDoc(rawDoc(db(RAFA), TENANT), { createdBy: ANA }));
+    await assertFails(deleteDoc(rawDoc(db(RAFA), TENANT)));
+  });
+
+  it('nadie se pone la marca de super-admin desde la app', async () => {
+    await assertFails(setDoc(rawDoc(db(ANA), `platformAdmins/${ANA}`), { email: emailOf(ANA) }));
+    await assertSucceeds(getDoc(rawDoc(db(RAFA), `platformAdmins/${RAFA}`)));
+    await assertFails(getDoc(rawDoc(db(ANA), `platformAdmins/${RAFA}`)));
   });
 });

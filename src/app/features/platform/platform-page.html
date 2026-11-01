@@ -1,0 +1,142 @@
+<header class="rail-surface sticky top-0 z-30 flex h-14 items-center gap-2.5 pr-[max(1rem,env(safe-area-inset-right))] pl-[max(1rem,env(safe-area-inset-left))] text-rail-ink">
+  <app-logo [size]="28" />
+  <span class="date-face text-base font-bold">CRM Lead</span>
+  <app-lang-switch tone="rail" class="ml-auto" />
+  @if (auth.status() === 'member') {
+    <a routerLink="/today" class="inline-flex h-9 min-w-9 items-center justify-center gap-1.5 rounded-lg px-2 text-sm font-semibold text-rail-ink hover:bg-rail-ink/10 sm:px-3" [attr.aria-label]="t('platform.backToApp')">
+      <svg lucideArrowLeft [size]="16" aria-hidden="true"></svg>
+      <span class="hidden sm:inline">{{ t('platform.backToApp') }}</span>
+    </a>
+  }
+  <button type="button" class="btn-icon size-9 text-rail-muted hover:bg-rail-ink/10 hover:text-rail-ink" (click)="signOut()" [attr.aria-label]="t('shell.signOut')" [title]="t('shell.signOut')">
+    <svg lucideLogOut [size]="16"></svg>
+  </button>
+</header>
+
+<main id="main" class="page page-narrow py-8" tabindex="-1">
+  <h1 class="page-title">{{ t('platform.title') }}</h1>
+  <p class="mt-1 text-ink-2" aria-live="polite">
+    @if (platform.loading()) {
+      {{ t('platform.intro') }}
+    } @else {
+      {{ t('platform.summary', { n: platform.tenants().length, active: activeCount() }) }}
+    }
+  </p>
+
+  <section class="mt-8" aria-labelledby="tenants-title">
+    <h2 id="tenants-title" class="section-title">{{ t('platform.companies') }}</h2>
+    <p class="mt-1 text-xs text-ink-3">{{ t('platform.privacy') }}</p>
+    @if (platform.error(); as err) {
+      <p class="alert-error mt-2" role="alert">{{ err }}</p>
+    } @else if (platform.loading()) {
+      <ul class="sheet mt-2 divide-y divide-rule" aria-hidden="true">
+        @for (i of [1, 2]; track i) {
+          <li class="px-4 py-3"><div class="h-11 animate-pulse rounded bg-sheet-2"></div></li>
+        }
+      </ul>
+    } @else if (!platform.tenants().length) {
+      <div class="sheet mt-2">
+        <app-empty-state [title]="t('platform.emptyTitle')">
+          {{ t('platform.emptyBody') }}
+        </app-empty-state>
+      </div>
+    } @else {
+      <ul class="sheet mt-2 divide-y divide-rule">
+        @for (c of platform.tenants(); track c.id) {
+          @let who = platform.admins()[c.id];
+          <li class="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3">
+            <div class="grid size-9 shrink-0 place-items-center rounded-lg bg-sheet-2 text-ink-2" aria-hidden="true">
+              <svg lucideBuilding2 [size]="18" [strokeWidth]="1.75"></svg>
+            </div>
+            <div class="min-w-0 flex-1">
+              <p class="flex flex-wrap items-center gap-x-1.5 font-semibold" [class.text-ink-2]="!c.active">
+                <span class="truncate">{{ c.name }}</span>
+                @if (!c.active) {
+                  <span class="inline-flex h-5 items-center rounded bg-ribbon-soft px-1.5 text-xs font-semibold text-ribbon">{{ t('platform.suspendedTag') }}</span>
+                }
+              </p>
+              <p class="text-xs text-ink-2">
+                @if (c.createdAt) {
+                  <span class="tabular">{{ t('platform.since', { date: dateLabel(c.createdAt) }) }}</span> ·
+                }
+                @if (!who) {
+                  <span class="text-ink-3">{{ t('common.loading') }}</span>
+                } @else {
+                  {{ t('platform.members', { n: who.members }) }}
+                }
+              </p>
+              @if (who) {
+                <p class="mt-0.5 text-xs text-ink-2">
+                  @for (a of who.admins; track a.email; let last = $last) {
+                    <span [class.line-through]="!a.active">{{ t('platform.adminIs', { name: a.name || a.email }) }}</span>@if (!last || who.invites.length) {<span aria-hidden="true"> · </span>}
+                  }
+                  @for (e of who.invites; track e; let last = $last) {
+                    <span>{{ t('platform.invitePending', { email: e }) }}</span>@if (!last) {<span aria-hidden="true"> · </span>}
+                  }
+                  @if (!who.admins.length && !who.invites.length) {
+                    <span class="font-semibold text-ribbon">{{ t('platform.noAdmin') }}</span>
+                  }
+                </p>
+              }
+            </div>
+            <!-- En móvil los botones bajan a su propio renglón para que el nombre se lea entero. -->
+            @if (confirmId() !== c.id && inviting()?.id !== c.id) {
+              <div class="flex w-full flex-wrap items-center gap-2 pl-12 sm:w-auto sm:pl-0">
+                <button type="button" class="btn-ghost btn-sm" [id]="'invite-' + c.id" (click)="askInvite(c)">{{ t('platform.inviteAdmin') }}</button>
+                @if (c.active) {
+                  <button type="button" class="btn-ghost btn-sm" [id]="'suspend-' + c.id" (click)="askSuspend(c)">{{ t('platform.suspend') }}</button>
+                } @else {
+                  <button type="button" class="btn-secondary btn-sm" [disabled]="busy()" (click)="setActive(c, true)">{{ t('platform.reactivate') }}</button>
+                }
+              </div>
+            }
+            @if (confirmId() === c.id) {
+              <div class="flex w-full flex-wrap items-center gap-2 rounded-md bg-sheet-2 px-3 py-2" role="group" [attr.aria-label]="t('platform.suspend')">
+                <p [id]="'suspend-q-' + c.id" tabindex="-1" class="min-w-0 basis-full text-sm sm:flex-1 sm:basis-0">{{ t('platform.suspendConfirm', { name: c.name }) }}</p>
+                <button type="button" class="btn-ghost btn-sm ms-auto sm:ms-0" (click)="cancelSuspend(c)">{{ t('common.cancel') }}</button>
+                <button type="button" class="btn-secondary btn-sm" [disabled]="busy()" (click)="setActive(c, false)">{{ t('platform.suspend') }}</button>
+              </div>
+            }
+            @if (inviting(); as inv) {
+              @if (inv.id === c.id) {
+                <form class="flex w-full flex-wrap items-end gap-2 rounded-md bg-sheet-2 px-3 py-2.5" novalidate (submit)="sendInvite($event, c)">
+                  <div class="min-w-56 flex-1">
+                    <label class="field-label" [for]="'invite-email-' + c.id">{{ t('platform.adminEmail') }}</label>
+                    <input [id]="'invite-email-' + c.id" type="email" class="input" autocomplete="off" [value]="inv.email" (input)="setInviteEmail($any($event.target).value)" />
+                  </div>
+                  <button type="button" class="btn-ghost btn-sm" (click)="cancelInvite(c)">{{ t('common.cancel') }}</button>
+                  <button type="submit" class="btn-primary btn-sm" [disabled]="busy()">{{ t('team.invite') }}</button>
+                  @if (inv.error) {
+                    <p class="w-full text-sm text-ribbon" role="alert">{{ t(inv.error) }}</p>
+                  }
+                </form>
+              }
+            }
+          </li>
+        }
+      </ul>
+    }
+  </section>
+
+  <section class="mt-8" aria-labelledby="create-title">
+    <h2 id="create-title" class="section-title">{{ t('platform.newCompany') }}</h2>
+    <form class="sheet mt-2 flex flex-wrap items-start gap-3 p-4" novalidate (submit)="create($event)">
+      <div class="min-w-56 flex-1">
+        <label class="field-label" for="company-name">{{ t('platform.companyName') }}</label>
+        <input id="company-name" type="text" class="input" autocomplete="organization" [placeholder]="t('platform.companyPlaceholder')" [formField]="createForm.name" />
+        @if (createForm.name().touched() && createForm.name().invalid()) {
+          <p class="field-error">{{ t($any(createForm.name().errors()[0].message)) }}</p>
+        }
+      </div>
+      <div class="min-w-56 flex-1">
+        <label class="field-label" for="company-admin">{{ t('platform.adminEmail') }}</label>
+        <input id="company-admin" type="email" class="input" autocomplete="off" [placeholder]="t('team.emailPlaceholder')" [formField]="createForm.email" />
+        @if (createForm.email().touched() && createForm.email().invalid()) {
+          <p class="field-error">{{ t($any(createForm.email().errors()[0].message)) }}</p>
+        }
+      </div>
+      <button type="submit" class="btn-primary mt-6.5" [disabled]="createForm().submitting()">{{ t('platform.create') }}</button>
+      <p class="w-full text-xs text-ink-3">{{ t('platform.createHint') }}</p>
+    </form>
+  </section>
+</main>

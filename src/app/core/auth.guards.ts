@@ -33,3 +33,21 @@ export const adminGuard: CanActivateFn = async () => {
   await auth.settled();
   return auth.isAdmin() ? true : router.parseUrl('/today');
 };
+
+/** Panel de la plataforma: solo el super-admin, sea o no miembro de alguna empresa. */
+export const platformGuard: CanActivateFn = async () => {
+  const auth = inject(AuthService);
+  const router = inject(Router);
+  await auth.settled();
+  if (auth.platformAdmin()) return true;
+  switch (auth.status()) {
+    case 'member':
+      return router.parseUrl('/today');
+    case 'pending':
+      return router.parseUrl('/pending');
+    case 'unverified':
+      return router.parseUrl('/verify');
+    default:
+      return router.parseUrl('/login');
+  }
+};

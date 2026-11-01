@@ -2,9 +2,7 @@ import { Service, computed, inject } from '@angular/core';
 import { t } from './i18n/i18n';
 import {
   DocumentData,
-  collection,
   deleteDoc,
-  doc,
   getDocs,
   orderBy,
   query,
@@ -18,6 +16,7 @@ import { AuthService } from './auth.service';
 import { ContactsService } from './contacts.service';
 import { DeletionsService } from './deletions.service';
 import { FIRESTORE } from './firebase';
+import { TenantService } from './tenant.service';
 import { FollowUpsService } from './followups.service';
 import { LeadsService } from './leads.service';
 import { toDate } from './firestore-utils';
@@ -28,6 +27,7 @@ import { teamQuery } from './team-query';
 @Service()
 export class MembersService {
   private readonly db = inject(FIRESTORE);
+  private readonly tenant = inject(TenantService);
   private readonly auth = inject(AuthService);
   private readonly leads = inject(LeadsService);
   private readonly contacts = inject(ContactsService);
@@ -35,7 +35,7 @@ export class MembersService {
   private readonly deletions = inject(DeletionsService);
 
   private readonly liveMembers = teamQuery(
-    () => query(collection(this.db, 'members'), orderBy('displayName')),
+    () => query(this.tenant.col('members'), orderBy('displayName')),
     (uid: string, d: DocumentData): Member => ({
       uid,
       email: d['email'] ?? '',
@@ -47,7 +47,7 @@ export class MembersService {
   );
 
   private readonly liveInvites = teamQuery(
-    () => query(collection(this.db, 'invites'), orderBy('createdAt', 'desc')),
+    () => query(this.tenant.col('invites'), orderBy('createdAt', 'desc')),
     (email: string, d: DocumentData): Invite => ({
       email,
       role: d['role'] ?? 'member',
@@ -59,7 +59,7 @@ export class MembersService {
 
   /** Última entrada y salida de cada uno: solo la lee un admin. */
   private readonly liveSessions = teamQuery(
-    () => query(collection(this.db, 'sessions')),
+    () => query(this.tenant.col('sessions')),
     (uid: string, d: DocumentData): SessionLog => ({
       uid,
       signInAt: toDate(d['signInAt']),
@@ -85,7 +85,7 @@ export class MembersService {
 
   invite(email: string, role: MemberRole): Promise<void> {
     const id = email.trim().toLowerCase();
-    return setDoc(doc(this.db, 'invites', id), {
+    return setDoc(this.tenant.doc('invites', id), {
       email: id,
       role,
       invitedBy: this.auth.uid(),
@@ -94,20 +94,20 @@ export class MembersService {
   }
 
   revokeInvite(email: string): Promise<void> {
-    return deleteDoc(doc(this.db, 'invites', email));
+    return deleteDoc(this.tenant.doc('invites', email));
   }
 
   setInviteRole(email: string, role: MemberRole): Promise<void> {
-    return updateDoc(doc(this.db, 'invites', email), { role });
+    return updateDoc(this.tenant.doc('invites', email), { role });
   }
 
   /** Solo para otros miembros: las reglas no dejan que un admin cambie su propio rol. */
   setRole(uid: string, role: MemberRole): Promise<void> {
-    return updateDoc(doc(this.db, 'members', uid), { role });
+    return updateDoc(this.tenant.doc('members', uid), { role });
   }
 
   setActive(uid: string, active: boolean): Promise<void> {
-    return updateDoc(doc(this.db, 'members', uid), { active });
+    return updateDoc(this.tenant.doc('members', uid), { active });
   }
 
   /** Lo que tiene a su nombre un miembro: negocios y contactos (lo ve entero un admin). */
@@ -132,15 +132,15 @@ export class MembersService {
       await this.leads.reassign(l, heirUid, this.followUps.forLead(l.id).map((f) => f.id));
     }
     // Contactos y facturas que quedan a su nombre (las anuladas no viajan con la venta).
-    const invoices = heirUid ? await getDocs(query(collection(this.db, 'invoices'), where('assigneeId', '==', uid))) : null;
+    const invoices = heirUid ? await getDocs(query(this.tenant.col('invoices'), where('assigneeId', '==', uid))) : null;
     const moves = writeBatch(this.db);
-    for (const c of owned) moves.update(doc(this.db, 'contacts', c.id), { assigneeId: heirUid, updatedAt: serverTimestamp() });
+    for (const c of owned) moves.update(this.tenant.doc('contacts', c.id), { assigneeId: heirUid, updatedAt: serverTimestamp() });
     invoices?.forEach((d) => moves.update(d.ref, { assigneeId: heirUid }));
     if (owned.length || !invoices?.empty) await moves.commit();
 
     const batch = writeBatch(this.db);
-    batch.delete(doc(this.db, 'members', uid));
-    batch.delete(doc(this.db, 'sessions', uid));
+    batch.delete(this.tenant.doc('members', uid));
+    batch.delete(this.tenant.doc('sessions', uid));
     this.deletions.record(batch, {
       kind: 'member',
       refId: uid,

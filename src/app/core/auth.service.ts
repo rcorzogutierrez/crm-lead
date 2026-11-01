@@ -16,17 +16,22 @@ import {
   verifyPasswordResetCode,
 } from 'firebase/auth';
 import {
+  DocumentReference,
+  collectionGroup,
   deleteDoc,
   doc,
   getDoc,
+  getDocs,
   onSnapshot,
+  query,
   serverTimestamp,
   setDoc,
-  writeBatch,
+  where,
 } from 'firebase/firestore';
 import { AUTH, FIRESTORE } from './firebase';
 import { I18nKey } from './i18n/i18n';
 import { Member, MemberRole, SignOutReason } from './models';
+import { TENANT_KEY, TenantService } from './tenant.service';
 
 export type AuthStatus = 'loading' | 'signedOut' | 'unverified' | 'pending' | 'member';
 
@@ -80,10 +85,10 @@ const MEMBERSHIP_RETRIES = [1_000, 2_500];
 /**
  * Sesión del usuario y su pertenencia al equipo.
  *
- * Alta en el equipo:
- * - El primer usuario que entra cuando no existe `meta/team` se convierte en admin (dueño).
- * - El resto entra si un admin creó `invites/{email}`; el rol viene de la invitación.
- * - Cualquier otro queda en estado `pending` hasta ser invitado.
+ * Alta en una empresa (tenant):
+ * - Las empresas las crea el super-admin de la plataforma, que invita a su primer admin.
+ * - Se entra si un admin de la empresa creó `tenants/{t}/invites/{email}`; el rol viene de la invitación.
+ * - Cualquier otro queda en estado `pending` hasta ser invitado (o si su empresa está suspendida).
  *
  * Se entra con Google o con email y contraseña; con el mismo email es la misma cuenta.
  * Una cuenta con contraseña queda en `unverified` hasta confirmar el email con el enlace
@@ -93,17 +98,24 @@ const MEMBERSHIP_RETRIES = [1_000, 2_500];
 export class AuthService {
   private readonly auth = inject(AUTH);
   private readonly db = inject(FIRESTORE);
+  private readonly tenant = inject(TenantService);
 
   private readonly _user = signal<User | null>(null);
   private readonly _member = signal<Member | null>(null);
   private readonly _status = signal<AuthStatus>('loading');
   private readonly _error = signal<I18nKey | null>(null);
+  private readonly _suspended = signal(false);
+  private readonly _platformAdmin = signal(false);
   private stopMember: (() => void) | null = null;
 
   readonly user = this._user.asReadonly();
   readonly member = this._member.asReadonly();
   readonly status = this._status.asReadonly();
   readonly error = this._error.asReadonly();
+  /** En `pending` porque su empresa está suspendida (no por falta de invitación). */
+  readonly suspended = this._suspended.asReadonly();
+  /** Super-admin de la plataforma (`platformAdmins/{uid}`, creado a mano en la consola). */
+  readonly platformAdmin = this._platformAdmin.asReadonly();
   readonly uid = computed(() => this._user()?.uid ?? '');
   readonly isAdmin = computed(() => this._member()?.role === 'admin');
   /** Si la cuenta tiene contraseña (además o en lugar de Google). */
@@ -119,6 +131,8 @@ export class AuthService {
       this.stopMember = null;
       this._user.set(user);
       this._member.set(null);
+      this.tenant.set(null);
+      this._platformAdmin.set(false);
       if (!user) {
         this.setStatus('signedOut');
         return;
@@ -275,7 +289,7 @@ export class AuthService {
     const uid = this.uid();
     if (reason && uid && this._status() === 'member') {
       const write = setDoc(
-        doc(this.db, 'sessions', uid),
+        this.tenant.doc('sessions', uid),
         { signOutAt: serverTimestamp(), signOutReason: reason },
         { merge: true },
       );
@@ -297,7 +311,7 @@ export class AuthService {
     } catch {
       // Sin localStorage: puede anotarse dos veces el mismo inicio, con segundos de diferencia.
     }
-    void setDoc(doc(this.db, 'sessions', user.uid), { signInAt: serverTimestamp() }, { merge: true }).catch(
+    void setDoc(this.tenant.doc('sessions', user.uid), { signInAt: serverTimestamp() }, { merge: true }).catch(
       (err) => console.error(err),
     );
   }
@@ -328,6 +342,7 @@ export class AuthService {
     for (let attempt = 0; ; attempt++) {
       try {
         await this.verifiedToken(user, attempt > 0);
+        await this.checkPlatformAdmin(user);
         await this.ensureMembership(user);
         return;
       } catch (err) {
@@ -346,6 +361,12 @@ export class AuthService {
     }
   }
 
+  /** Marca de super-admin; si no se puede leer, no lo es. */
+  private async checkPlatformAdmin(user: User): Promise<void> {
+    const snap = await getDoc(doc(this.db, 'platformAdmins', user.uid)).catch(() => null);
+    if (this._user() === user) this._platformAdmin.set(!!snap?.exists());
+  }
+
   /** Renueva el token si aún no dice que el email está confirmado (o si `force`). */
   private async verifiedToken(user: User, force: boolean): Promise<void> {
     if (!force) {
@@ -355,77 +376,125 @@ export class AuthService {
     await user.getIdToken(true);
   }
 
+  /**
+   * Busca en qué empresas está (fichas `tenants/{t}/members/{uid}`) y, si no está en ninguna,
+   * si tiene una invitación (`tenants/{t}/invites/{email}`), que se consume al entrar.
+   * Con varias empresas entra en la última elegida en este navegador.
+   */
   private async ensureMembership(user: User): Promise<void> {
-    const memberRef = doc(this.db, 'members', user.uid);
-    const snap = await getDoc(memberRef);
+    const email = (user.email ?? '').toLowerCase();
+    const tenantOf = (ref: DocumentReference) => ref.parent.parent?.id ?? null;
+    const mine = await getDocs(query(collectionGroup(this.db, 'members'), where('uid', '==', user.uid)));
+    const known = mine.docs.map((d) => tenantOf(d.ref)).filter((t): t is string => !!t);
+    let options = mine.docs
+      .filter((d) => d.data()['active'] === true)
+      .map((d) => tenantOf(d.ref))
+      .filter((t): t is string => !!t);
 
-    if (!snap.exists()) {
-      const email = (user.email ?? '').toLowerCase();
-      const base = {
+    if (!options.length) {
+      // Un fallo al leer no es "sin invitación": que lo reintente checkMembership.
+      const invites = await getDocs(query(collectionGroup(this.db, 'invites'), where('email', '==', email)));
+      // Una invitación de una empresa donde ya tiene ficha (sin acceso) no le devuelve el acceso.
+      const invite = invites.docs.find((d) => {
+        const t = tenantOf(d.ref);
+        return t && !known.includes(t);
+      });
+      if (!invite) {
+        if (this._user() === user) {
+          this._suspended.set(false);
+          this.setStatus('pending');
+        }
+        return;
+      }
+      const t = tenantOf(invite.ref)!;
+      await setDoc(doc(this.db, 'tenants', t, 'members', user.uid), {
         uid: user.uid,
         email: user.email ?? '',
         displayName: user.displayName ?? email,
         photoURL: user.photoURL ?? null,
+        role: invite.data()['role'] as MemberRole,
         active: true,
         createdAt: serverTimestamp(),
-      };
-      const teamRef = doc(this.db, 'meta', 'team');
-      const team = await getDoc(teamRef);
-
-      if (!team.exists()) {
-        // Primer usuario: crea el equipo y queda como admin.
-        const batch = writeBatch(this.db);
-        batch.set(teamRef, { ownerUid: user.uid, name: 'Mi equipo', createdAt: serverTimestamp() });
-        batch.set(memberRef, { ...base, role: 'admin' satisfies MemberRole });
-        await batch.commit();
-      } else {
-        const inviteRef = doc(this.db, 'invites', email);
-        // Un fallo al leer no es "sin invitación": que lo reintente checkMembership.
-        const invite = await getDoc(inviteRef);
-        if (!invite.exists()) {
-          // Puede que otra pestaña acabe de darle el alta (y gastar la invitación).
-          if (!(await getDoc(memberRef)).exists()) {
-            if (this._user() === user) this.setStatus('pending');
-            return;
-          }
-        } else {
-          const batch = writeBatch(this.db);
-          batch.set(memberRef, { ...base, role: invite.data()['role'] as MemberRole });
-          await batch.commit();
-          await deleteDoc(inviteRef).catch(() => undefined);
-        }
-      }
+      });
+      await deleteDoc(invite.ref).catch(() => undefined);
+      options = [t];
     }
 
     // Si entretanto cerró sesión o entró otra cuenta, esta comprobación ya no vale.
     if (this._user() !== user) return;
-    this.watchMember(user.uid);
+    let saved: string | null = null;
+    try {
+      saved = localStorage.getItem(TENANT_KEY);
+    } catch {
+      // Sin localStorage: la primera empresa.
+    }
+    this.watchMember(options.includes(saved ?? '') ? saved! : options[0], user.uid);
   }
 
-  private watchMember(uid: string): void {
-    this.stopMember = onSnapshot(
-      doc(this.db, 'members', uid),
+  /** Escucha la ficha de miembro y la empresa: perder el acceso o suspenderla saca al usuario. */
+  private watchMember(tenantId: string, uid: string): void {
+    let member: Member | null = null;
+    let tenant: { name: string; active: boolean } | null = null;
+    const apply = () => {
+      if (!member || !tenant) return;
+      if (!tenant.active) {
+        this._member.set(null);
+        this.tenant.set(null);
+        this._suspended.set(true);
+        this.setStatus('pending');
+        return;
+      }
+      this._suspended.set(false);
+      this.tenant.set(tenantId, tenant.name);
+      try {
+        localStorage.setItem(TENANT_KEY, tenantId);
+      } catch {
+        // Sin localStorage: se elige otra vez al entrar.
+      }
+      this._member.set(member);
+      const first = this._status() !== 'member';
+      this.setStatus('member');
+      const user = this._user();
+      if (first && user) this.recordSignIn(user);
+    };
+    const lost = () => {
+      this._member.set(null);
+      this.tenant.set(null);
+      this.setStatus('pending');
+    };
+    const stopMember = onSnapshot(
+      doc(this.db, 'tenants', tenantId, 'members', uid),
       (snap) => {
         const data = snap.data();
         if (!data || data['active'] !== true) {
-          this._member.set(null);
-          this.setStatus('pending');
+          member = null;
+          lost();
           return;
         }
-        this._member.set({
+        member = {
           uid,
           email: data['email'],
           displayName: data['displayName'],
           photoURL: data['photoURL'] ?? null,
           role: data['role'],
           active: true,
-        });
-        const first = this._status() !== 'member';
-        this.setStatus('member');
-        const user = this._user();
-        if (first && user) this.recordSignIn(user);
+        };
+        apply();
       },
-      () => this.setStatus('pending'),
+      () => lost(),
     );
+    const stopTenant = onSnapshot(
+      doc(this.db, 'tenants', tenantId),
+      (snap) => {
+        const data = snap.data();
+        tenant = { name: data?.['name'] ?? '', active: data?.['active'] === true };
+        apply();
+      },
+      () => lost(),
+    );
+    this.stopMember = () => {
+      stopMember();
+      stopTenant();
+    };
   }
 }

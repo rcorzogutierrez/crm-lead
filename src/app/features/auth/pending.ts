@@ -1,23 +1,33 @@
 import { Component, effect, inject, signal } from '@angular/core';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../core/auth.service';
 import { t } from '../../core/i18n/i18n';
 import { LangSwitch } from '../../shared/lang-switch';
 
 @Component({
   selector: 'app-pending',
-  imports: [LangSwitch],
+  imports: [LangSwitch, RouterLink],
   template: `
     <div class="relative flex min-h-dvh items-center justify-center px-6 py-16">
       <app-lang-switch class="absolute top-4 right-4" />
       <div class="w-full max-w-md">
-        <h1 class="date-face text-[2rem] font-bold">{{ t('pending.title') }}</h1>
-        <p class="mt-3 text-ink-2">
-          {{ t('pending.signedAs') }} <span class="font-semibold text-ink">{{ auth.user()?.email }}</span>{{ t('pending.notInTeam') }}
-          {{ t('pending.askAdmin') }} <span class="font-semibold text-ink">{{ t('nav.team') }}</span>.
-        </p>
-        <div class="mt-8 flex gap-2">
-          <button type="button" class="btn-primary" [disabled]="checking()" (click)="recheck()">{{ checking() ? t('pending.checking') : t('pending.recheck') }}</button>
+        @if (auth.suspended()) {
+          <h1 class="page-title">{{ t('pending.suspendedTitle') }}</h1>
+          <p class="mt-3 text-ink-2">{{ t('pending.suspendedBody') }}</p>
+        } @else {
+          <h1 class="page-title">{{ t('pending.title') }}</h1>
+          <p class="mt-3 text-ink-2">
+            {{ t('pending.signedAs') }} <span class="font-semibold text-ink">{{ auth.user()?.email }}</span>{{ t('pending.notInTeam') }}
+            {{ t('pending.askAdmin') }} <span class="font-semibold text-ink">{{ t('nav.team') }}</span>.
+          </p>
+        }
+        <div class="mt-8 flex flex-wrap gap-2">
+          @if (!auth.suspended()) {
+            <button type="button" class="btn-primary" [disabled]="checking()" (click)="recheck()">{{ checking() ? t('pending.checking') : t('pending.recheck') }}</button>
+          }
+          @if (auth.platformAdmin()) {
+            <a routerLink="/platform" class="btn-secondary">{{ t('pending.platform') }}</a>
+          }
           <button type="button" class="btn-ghost" (click)="signOut()">{{ t('pending.other') }}</button>
         </div>
       </div>

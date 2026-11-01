@@ -50,8 +50,13 @@
     }
   </nav>
 
-  <div class="px-4 pb-3">
+  <div class="flex items-center gap-2 px-4 pb-3">
     <app-lang-switch tone="rail" />
+    @if (auth.platformAdmin()) {
+      <a routerLink="/platform" class="btn-icon ml-auto size-8 text-rail-muted hover:bg-rail-ink/10 hover:text-rail-ink" [attr.aria-label]="t('shell.platform')" [title]="t('shell.platform')">
+        <svg lucideBuilding2 [size]="16"></svg>
+      </a>
+    }
   </div>
 
   @if (auth.member(); as me) {
@@ -101,6 +106,12 @@
             <svg lucideKeyRound [size]="18" [strokeWidth]="1.75"></svg>
             {{ t(pwLabel()) }}
           </button>
+          @if (auth.platformAdmin()) {
+            <a routerLink="/platform" class="flex h-11 w-full items-center gap-3 border-t border-rule px-4 text-sm font-semibold hover:bg-sheet-2" (click)="accountOpen.set(false)">
+              <svg lucideBuilding2 [size]="18" [strokeWidth]="1.75"></svg>
+              {{ t('shell.platform') }}
+            </a>
+          }
           <button type="button" class="flex h-11 w-full items-center gap-3 border-t border-rule px-4 text-sm font-semibold hover:bg-sheet-2" (click)="accountOpen.set(false); signOut()">
             <svg lucideLogOut [size]="18" [strokeWidth]="1.75"></svg>
             {{ t('shell.signOut') }}
