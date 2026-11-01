@@ -122,6 +122,12 @@ export class PlatformPage {
     const mail = inv.email.trim().toLowerCase();
     if (!mail) return this.inviting.set({ ...inv, error: 'team.emailRequired' });
     if (!EMAIL_RE.test(mail)) return this.inviting.set({ ...inv, error: 'form.emailInvalid' });
+    // Ya invitado o ya admin: las reglas no dejan rehacer una invitación, y no hace falta.
+    const who = this.platform.admins()[c.id];
+    if (who?.invites.includes(mail)) return this.inviting.set({ ...inv, error: 'platform.alreadyInvited' });
+    if (who?.admins.some((a) => a.email.toLowerCase() === mail)) {
+      return this.inviting.set({ ...inv, error: 'platform.alreadyAdmin' });
+    }
     this.busy.set(true);
     try {
       await this.platform.inviteAdmin(c.id, mail);

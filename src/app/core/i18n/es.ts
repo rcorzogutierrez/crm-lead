@@ -577,6 +577,8 @@ export const es = {
   'pipe.nextTitle': '¿Qué sigue con {name}?',
   'platform.adminEmail': 'Email de su admin',
   'platform.adminIs': 'Admin: {name}',
+  'platform.alreadyAdmin': 'Esa persona ya es admin de esta empresa.',
+  'platform.alreadyInvited': 'Ya tiene una invitación sin usar. Que entre con ese email y pulse "Ya me invitaron".',
   'platform.backToApp': 'Volver a la app',
   'platform.companies': 'Empresas',
   'platform.companyName': 'Nombre de la empresa',

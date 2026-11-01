@@ -579,6 +579,8 @@ export const en: Record<I18nKey, string> = {
   'pipe.nextTitle': 'What\'s next with {name}?',
   'platform.adminEmail': 'Admin\'s email',
   'platform.adminIs': 'Admin: {name}',
+  'platform.alreadyAdmin': 'That person is already an admin of this company.',
+  'platform.alreadyInvited': 'They already have an unused invitation. Ask them to sign in with that email and press "I\'ve been invited".',
   'platform.backToApp': 'Back to the app',
   'platform.companies': 'Companies',
   'platform.companyName': 'Company name',
