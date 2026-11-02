@@ -1,0 +1,154 @@
+<div class="page page-narrow">
+  <h1 class="page-title">{{ t('nav.settings') }}</h1>
+  <p class="mt-1 max-w-prose text-ink-2" aria-live="polite">{{ summary() }}</p>
+  <app-section-tabs class="mt-3 block" [tabs]="settingsTabs" label="settings.views" />
+
+  <section class="mt-8" aria-labelledby="sites-title">
+    <h2 id="sites-title" class="section-title">{{ t('sites.list') }}</h2>
+    <p class="mt-1 max-w-prose text-xs text-ink-3">{{ t('sites.how') }}</p>
+
+    @if (sites.error(); as err) {
+      <p class="alert-error mt-2" role="alert">{{ err }}</p>
+    } @else if (sites.loading()) {
+      <div class="sheet mt-2 space-y-2 p-4" aria-hidden="true">
+        @for (i of [1, 2]; track i) {
+          <div class="h-14 animate-pulse rounded bg-sheet-2"></div>
+        }
+      </div>
+    } @else if (!sites.sites().length) {
+      <app-empty-state class="sheet mt-2" [title]="t('sites.emptyTitle')">{{ t('sites.emptyBody') }}</app-empty-state>
+    } @else {
+      <ul class="sheet mt-2 divide-y divide-rule">
+        @for (s of sites.sites(); track s.id) {
+          <li class="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3">
+            <span class="grid size-8 shrink-0 place-items-center rounded-md bg-sheet-2 text-ink-2" aria-hidden="true">
+              <svg lucideGlobe [size]="16"></svg>
+            </span>
+            <div class="min-w-0 flex-1">
+              <p class="flex flex-wrap items-center gap-x-1.5 font-semibold" [class.text-ink-2]="!s.active">
+                <span class="truncate">{{ s.name }}</span>
+                @if (!s.active) {
+                  <span class="inline-flex h-5 items-center rounded border border-rule-strong px-1.5 text-xs font-semibold text-ink-2">{{ t('sites.offTag') }}</span>
+                }
+              </p>
+              <p class="truncate text-xs text-ink-2 tabular">
+                @if (s.domain) {
+                  {{ s.domain }} ·
+                }
+                @if (s.receivedCount) {
+                  {{ t(s.receivedCount === 1 ? 'sites.received1' : 'sites.receivedN', { n: s.receivedCount }) }} ·
+                  <time [attr.datetime]="s.lastReceivedAt?.toISOString()" [attr.title]="full(s.lastReceivedAt)">{{ t('sites.lastAt', { when: last(s) }) }}</time>
+                } @else {
+                  <span class="text-ink-3">{{ t('sites.nothingYet') }}</span>
+                }
+              </p>
+              @if (assigneeGone(s)) {
+                <p class="mt-0.5 text-xs font-medium text-ribbon">{{ t('sites.assigneeGone', { name: assigneeName(s) }) }}</p>
+              }
+            </div>
+            <!-- En móvil los controles bajan a su propio renglón para que el nombre se lea entero. -->
+            <div class="flex w-full flex-wrap items-center gap-2 pl-11 sm:w-auto sm:pl-0">
+              <label class="sr-only" [for]="'site-who-' + s.id">{{ t('sites.assigneeOf', { site: s.name }) }}</label>
+              <span class="text-xs text-ink-2" aria-hidden="true">{{ t('sites.goesTo') }}</span>
+              <select
+                [id]="'site-who-' + s.id"
+                class="input h-8 w-auto max-w-48 text-[0.8125rem]"
+                (change)="pickAssignee(s, $any($event.target).value)"
+              >
+                <!-- [selected] en cada opción: con [value] en el select, las opciones aún no existen al fijarlo. -->
+                <option value="" [selected]="!s.assigneeId">{{ t('sites.anyAdmin') }}</option>
+                @if (assigneeGone(s)) {
+                  <option [value]="s.assigneeId" disabled selected>{{ assigneeName(s) }}</option>
+                }
+                @for (m of members.active(); track m.uid) {
+                  <option [value]="m.uid" [selected]="m.uid === s.assigneeId">{{ m.displayName }}</option>
+                }
+              </select>
+              @if (confirmId() !== s.id) {
+                @if (s.active) {
+                  <button type="button" class="btn-ghost btn-sm" [id]="'site-off-' + s.id" (click)="askDisable(s)">{{ t('sites.disable') }}</button>
+                } @else {
+                  <button type="button" class="btn-secondary btn-sm" (click)="setActive(s, true)">{{ t('sites.enable') }}</button>
+                }
+              }
+            </div>
+            @if (confirmId() === s.id) {
+              <div class="flex w-full flex-wrap items-center gap-2 rounded-md bg-sheet-2 px-3 py-2" role="group" [attr.aria-label]="t('sites.disable')">
+                <p class="min-w-0 basis-full text-sm sm:flex-1 sm:basis-0">{{ t('sites.disableConfirm', { site: s.name }) }}</p>
+                <button type="button" class="btn-ghost btn-sm ms-auto sm:ms-0" (click)="cancelDisable(s)">{{ t('common.cancel') }}</button>
+                <button type="button" class="btn-secondary btn-sm" [id]="'site-off-ok-' + s.id" (click)="setActive(s, false)">{{ t('sites.disable') }}</button>
+              </div>
+            }
+          </li>
+        }
+      </ul>
+    }
+  </section>
+
+  <section class="mt-8" aria-labelledby="site-new-title">
+    <h2 id="site-new-title" class="section-title" tabindex="-1">{{ t('sites.new') }}</h2>
+    @if (revealed(); as r) {
+      <div class="sheet mt-2 p-4" role="group" [attr.aria-label]="t('sites.tokenFor', { site: r.site })">
+        <p class="flex items-center gap-2 font-semibold">
+          <svg lucideKeyRound [size]="16" class="shrink-0 text-pen" aria-hidden="true"></svg>
+          {{ t('sites.tokenFor', { site: r.site }) }}
+        </p>
+        <p class="mt-1 max-w-prose text-sm text-ink-2">{{ t('sites.tokenOnce') }}</p>
+        <div class="mt-3 flex flex-wrap items-center gap-2">
+          <label class="sr-only" for="site-token">{{ t('sites.tokenLabel') }}</label>
+          <input
+            id="site-token"
+            class="input min-w-0 flex-1 basis-64 font-mono text-[0.8125rem]"
+            readonly
+            [value]="r.token"
+            (focus)="$any($event.target).select()"
+          />
+          <button type="button" class="btn-primary" (click)="copy()">
+            <svg lucideCopy [size]="16" aria-hidden="true"></svg>
+            {{ t('sites.copy') }}
+          </button>
+        </div>
+        <dl class="mt-3 grid grid-cols-1 gap-x-4 gap-y-1 text-xs sm:grid-cols-[auto_minmax(0,1fr)]">
+          <dt class="font-semibold text-ink-2">{{ t('sites.envVar') }}</dt>
+          <dd class="font-mono break-all">CRM_INTAKE_TOKEN</dd>
+          <dt class="font-semibold text-ink-2">{{ t('sites.endpoint') }}</dt>
+          <dd class="font-mono break-all">POST {{ endpoint }}</dd>
+        </dl>
+        <p class="mt-2 text-xs text-ink-3">{{ t('sites.guide') }}</p>
+        <button type="button" class="btn-secondary btn-sm mt-3" (click)="done()">{{ t('sites.done') }}</button>
+      </div>
+    } @else {
+      <form class="sheet mt-2 grid grid-cols-1 gap-3 p-4 sm:grid-cols-2" novalidate (submit)="create($event)">
+        <div>
+          <label class="field-label" for="site-name">{{ t('sites.name') }}</label>
+          <input id="site-name" class="input" [placeholder]="t('sites.namePlaceholder')" [formField]="siteForm.name" />
+          @if (siteForm.name().touched() && siteForm.name().invalid()) {
+            <p class="field-error">{{ t($any(siteForm.name().errors()[0].message)) }}</p>
+          }
+        </div>
+        <div>
+          <label class="field-label" for="site-domain">{{ t('sites.domain') }}</label>
+          <input id="site-domain" class="input" inputmode="url" [placeholder]="t('sites.domainPlaceholder')" [formField]="siteForm.domain" />
+          @if (siteForm.domain().touched() && siteForm.domain().invalid()) {
+            <p class="field-error">{{ t($any(siteForm.domain().errors()[0].message)) }}</p>
+          }
+        </div>
+        <div>
+          <label class="field-label" for="site-who">{{ t('sites.goesToLabel') }}</label>
+          <select id="site-who" class="input" [formField]="siteForm.assigneeId">
+            <option value="">{{ t('sites.anyAdmin') }}</option>
+            @for (m of members.active(); track m.uid) {
+              <option [value]="m.uid">{{ m.displayName }}</option>
+            }
+          </select>
+        </div>
+        <div class="flex items-end">
+          <button type="submit" class="btn-primary" [disabled]="siteForm().submitting()">
+            {{ siteForm().submitting() ? t('sites.creating') : t('sites.create') }}
+          </button>
+        </div>
+        <p class="text-xs text-ink-3 sm:col-span-2">{{ t('sites.newHint') }}</p>
+      </form>
+    }
+  </section>
+</div>

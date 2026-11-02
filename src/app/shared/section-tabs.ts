@@ -10,23 +10,26 @@ export interface SectionTab {
   admin?: boolean;
 }
 
-/** Vistas de una misma sección del menú (Negocios: lista / tablero; Ajustes: servicios / equipo / empresa / registro). */
+/** Vistas de una misma sección del menú (Negocios: lista / tablero; Ajustes: servicios / equipo / empresa / sitios web / registro). */
 @Component({
   selector: 'app-section-tabs',
   imports: [RouterLink, RouterLinkActive],
   template: `
-    <nav class="segmented" [attr.aria-label]="t(label())">
-      @for (tab of visible(); track tab.path) {
-        <a
-          [routerLink]="tab.path"
-          routerLinkActive=""
-          #rla="routerLinkActive"
-          [attr.aria-current]="rla.isActive ? 'page' : null"
-          class="segment"
-          >{{ t(tab.label) }}</a
-        >
-      }
-    </nav>
+    <!-- En el móvil, si no caben (Ajustes tiene cinco), la fila se desliza como los filtros. -->
+    <div class="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+      <nav class="segmented" [attr.aria-label]="t(label())">
+        @for (tab of visible(); track tab.path) {
+          <a
+            [routerLink]="tab.path"
+            routerLinkActive=""
+            #rla="routerLinkActive"
+            [attr.aria-current]="rla.isActive ? 'page' : null"
+            class="segment"
+            >{{ t(tab.label) }}</a
+          >
+        }
+      </nav>
+    </div>
   `,
 })
 export class SectionTabs {
@@ -47,5 +50,6 @@ export const SETTINGS_TABS: readonly SectionTab[] = [
   { path: '/services', label: 'nav.services' },
   { path: '/team', label: 'nav.team' },
   { path: '/company', label: 'nav.company' },
+  { path: '/sites', label: 'nav.sites', admin: true },
   { path: '/deletions', label: 'nav.deletions', admin: true },
 ];

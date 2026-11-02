@@ -1,4 +1,4 @@
-# Compila, prueba y publica en Firebase (Hosting + reglas e índices de Firestore).
+# Compila, prueba y publica en Firebase (Hosting, reglas e índices de Firestore y Cloud Functions).
 # - push a main: lint + tests + pruebas de reglas + build, y luego deploy (como `npm run deploy`).
 #   Si el push solo toca documentación (paths-ignore), no corre: no hay nada nuevo que publicar.
 # - pull request: lo mismo sin deploy, para ver si el cambio rompe algo antes de fusionarlo.
@@ -52,7 +52,7 @@ jobs:
           path: dist/crm-lead/browser
           retention-days: 7
 
-  # firestore.rules contra el emulador de Firestore (necesita Java).
+  # firestore.rules y la función de entrada de leads contra el emulador de Firestore (necesita Java).
   rules:
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -63,6 +63,9 @@ jobs:
         with:
           node-version: 24
           cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            functions/package-lock.json
 
       - uses: actions/setup-java@v5
         with:
@@ -77,6 +80,11 @@ jobs:
 
       - run: npm ci
       - run: npm run test:rules
+
+      # Cloud Functions (functions/): compila y prueba la lógica y la transacción de /api/intake.
+      - run: npm ci --prefix functions
+      - run: npm --prefix functions run build
+      - run: npm --prefix functions run test:emulator
 
   deploy:
     needs: [build, rules]
@@ -98,6 +106,9 @@ jobs:
           name: dist
           path: dist/crm-lead/browser
 
+      # El predeploy de functions compila con tsc.
+      - run: npm ci --prefix functions
+
       - name: Credenciales de Firebase
         env:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
@@ -109,5 +120,7 @@ jobs:
           printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > "$RUNNER_TEMP/firebase-sa.json"
           echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/firebase-sa.json" >> "$GITHUB_ENV"
 
-      - name: Deploy (hosting + reglas + índices)
-        run: npx -y firebase-tools@latest deploy --only hosting,firestore --project crm-lead-follow-up --non-interactive
+      # --force deja puesta la limpieza automática de imágenes viejas de las funciones
+      # (si no, se acumulan y cobran céntimos de almacenamiento) y no pregunta nada.
+      - name: Deploy (hosting + reglas + índices + funciones)
+        run: npx -y firebase-tools@latest deploy --only hosting,firestore,functions --project crm-lead-follow-up --non-interactive --force
