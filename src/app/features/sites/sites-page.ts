@@ -1,4 +1,5 @@
 import { Component, Injector, afterNextRender, computed, inject, signal } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import { FormField, form, maxLength, required, submit } from '@angular/forms/signals';
 import { LucideCopy, LucideGlobe, LucideKeyRound } from '@lucide/angular';
 import { Clock } from '../../core/clock.service';
@@ -23,7 +24,7 @@ interface Revealed {
  */
 @Component({
   selector: 'app-sites-page',
-  imports: [FormField, EmptyState, SectionTabs, LucideCopy, LucideGlobe, LucideKeyRound],
+  imports: [RouterLink, FormField, EmptyState, SectionTabs, LucideCopy, LucideGlobe, LucideKeyRound],
   templateUrl: './sites-page.html',
 })
 export class SitesPage {

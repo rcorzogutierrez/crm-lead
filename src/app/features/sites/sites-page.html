@@ -5,7 +5,10 @@
 
   <section class="mt-8" aria-labelledby="sites-title">
     <h2 id="sites-title" class="section-title">{{ t('sites.list') }}</h2>
-    <p class="mt-1 max-w-prose text-xs text-ink-3">{{ t('sites.how') }}</p>
+    <p class="mt-1 max-w-prose text-xs text-ink-3">
+      {{ t('sites.how') }}
+      <a routerLink="/sites/guide" class="inline-block min-h-6 font-semibold text-pen hover:underline">{{ t('sites.guideLink') }}</a>
+    </p>
 
     @if (sites.error(); as err) {
       <p class="alert-error mt-2" role="alert">{{ err }}</p>
@@ -16,7 +19,10 @@
         }
       </div>
     } @else if (!sites.sites().length) {
-      <app-empty-state class="sheet mt-2" [title]="t('sites.emptyTitle')">{{ t('sites.emptyBody') }}</app-empty-state>
+      <app-empty-state class="sheet mt-2" [title]="t('sites.emptyTitle')">
+        {{ t('sites.emptyBody') }}
+        <div actions><a routerLink="/sites/guide" class="btn-secondary btn-sm">{{ t('sites.guideLink') }}</a></div>
+      </app-empty-state>
     } @else {
       <ul class="sheet mt-2 divide-y divide-rule">
         @for (s of sites.sites(); track s.id) {
@@ -114,7 +120,9 @@
           <dt class="font-semibold text-ink-2">{{ t('sites.endpoint') }}</dt>
           <dd class="font-mono break-all">POST {{ endpoint }}</dd>
         </dl>
-        <p class="mt-2 text-xs text-ink-3">{{ t('sites.guide') }}</p>
+        <p class="mt-2 text-sm">
+          <a routerLink="/sites/guide" class="inline-block min-h-6 font-semibold text-pen hover:underline">{{ t('sites.guideLink') }}</a>
+        </p>
         <button type="button" class="btn-secondary btn-sm mt-3" (click)="done()">{{ t('sites.done') }}</button>
       </div>
     } @else {
