@@ -106,6 +106,12 @@ export const routes: Routes = [
         loadComponent: () => import('./features/sites/sites-page').then((m) => m.SitesPage),
       },
       {
+        path: 'sites/guide',
+        title: 'sites.guideLink',
+        canActivate: [adminGuard],
+        loadComponent: () => import('./features/sites/sites-guide').then((m) => m.SitesGuide),
+      },
+      {
         path: 'deletions',
         title: 'nav.deletions',
         canActivate: [adminGuard],
